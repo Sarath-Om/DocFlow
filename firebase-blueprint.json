@@ -1,0 +1,114 @@
+{
+  "entities": {
+    "Folder": {
+      "title": "Folder",
+      "description": "Personalized folder organization for documents",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the folder"
+        },
+        "color": {
+          "type": "string",
+          "description": "Hex color code for the folder"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Icon identifier for the folder"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp; clients must submit FieldValue.serverTimestamp()"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp; clients must submit FieldValue.serverTimestamp()"
+        }
+      },
+      "required": ["userId", "name", "color", "icon", "createdAt", "updatedAt"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "User document (PDF, Word, or scanned document) with metadata and content",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user identifier"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the document"
+        },
+        "folderId": {
+          "type": "string",
+          "description": "Folder ID or 'root'"
+        },
+        "category": {
+          "type": "string",
+          "description": "Document categorization like Work, Personal, Invoices, Contracts, Receipts"
+        },
+        "fileType": {
+          "type": "string",
+          "description": "Document file format (pdf, docx, scanned)"
+        },
+        "fileName": {
+          "type": "string",
+          "description": "File name with extension"
+        },
+        "fileSize": {
+          "type": "integer",
+          "description": "Size in bytes"
+        },
+        "content": {
+          "type": "string",
+          "description": "Document text/extracted content or encrypted payload"
+        },
+        "isEncrypted": {
+          "type": "boolean",
+          "description": "Whether document content is encrypted"
+        },
+        "encryptionKeyHint": {
+          "type": "string",
+          "description": "Hint for decryption key if encrypted"
+        },
+        "isOfflineCached": {
+          "type": "boolean",
+          "description": "Whether document is flagged for offline access"
+        },
+        "pageCount": {
+          "type": "integer",
+          "description": "Number of pages in document"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp; clients must submit FieldValue.serverTimestamp()"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp; clients must submit FieldValue.serverTimestamp()"
+        }
+      },
+      "required": ["userId", "title", "folderId", "category", "fileType", "fileName", "fileSize", "content", "isEncrypted", "isOfflineCached", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/folders/{folderId}": {
+      "schema": { "$ref": "#/entities/Folder" },
+      "description": "Personalized folders owned by a specific user"
+    },
+    "/users/{userId}/documents/{documentId}": {
+      "schema": { "$ref": "#/entities/Document" },
+      "description": "Documents owned by a specific user with real-time sync across devices"
+    }
+  }
+}

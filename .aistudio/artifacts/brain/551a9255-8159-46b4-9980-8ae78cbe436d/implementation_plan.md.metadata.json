@@ -1,0 +1,6 @@
+{
+  "summary":  "Implementation plan for upgrading DocFlow with unified PDF, Word (.docx), Excel (.xlsx), and PowerPoint (.pptx) opening and structured block editing, plus bidirectional Pic-to-Doc and Doc-to-Pic conversion across all formats in the Apple Crystal Glass UI.",
+  "updatedAt":  "2026-10-21T18:46:27.116134475Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
