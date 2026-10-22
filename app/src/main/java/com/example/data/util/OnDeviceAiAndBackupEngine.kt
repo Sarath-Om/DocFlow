@@ -417,7 +417,7 @@ object OnDeviceAiAndBackupEngine {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val stored = prefs.getString(KEY_PIN_HASH, null) ?: return pin == "1234"
         return runCatching {
-            CryptoUtils.decrypt(stored, pin) == "DOCFLOW_SAFE_VERIFIED"
+            CryptoUtils.decrypt(stored, pin).getOrNull() == "DOCFLOW_SAFE_VERIFIED"
         }.getOrDefault(false)
     }
 
@@ -563,7 +563,7 @@ object OnDeviceAiAndBackupEngine {
         passphrase: String,
         targetUserId: String
     ): Result<Pair<List<CachedFolderEntity>, List<CachedDocumentEntity>>> = runCatching {
-        val decryptedJson = CryptoUtils.decrypt(encryptedContent.trim(), passphrase.ifBlank { "docflow-backup" })
+        val decryptedJson = CryptoUtils.decrypt(encryptedContent.trim(), passphrase.ifBlank { "docflow-backup" }).getOrThrow()
         val root = JSONObject(decryptedJson)
 
         val restoredFolders = mutableListOf<CachedFolderEntity>()

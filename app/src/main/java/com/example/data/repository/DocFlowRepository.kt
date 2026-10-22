@@ -30,11 +30,7 @@ class DocFlowRepository(
         get() = firestoreInstance ?: FirebaseFirestore.getInstance()
 
     constructor(context: Context) : this(
-        firestoreInstance = runCatching {
-            FirebaseFirestore.getInstance(
-                context.applicationContext.getString(R.string.firestore_database_id)
-            )
-        }.getOrNull(),
+        firestoreInstance = null,
         offlineLocalOnly = true
     )
 

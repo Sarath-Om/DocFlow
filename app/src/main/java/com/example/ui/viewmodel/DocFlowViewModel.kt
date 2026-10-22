@@ -652,6 +652,10 @@ class DocFlowViewModel(
         }
     }
 
+    fun setThemeMode(mode: ThemeMode) {
+        _themeMode.value = mode
+    }
+
     fun toggleTagFilter(tag: String) {
         val clean = tag.trim().lowercase()
         if (clean.isEmpty()) return
@@ -1593,7 +1597,7 @@ class DocFlowViewModel(
         viewModelScope.launch {
             val existing = privateSafeDocuments.value.find { it.id == docId } ?: return@launch
             val decryptedBody = if (existing.isEncrypted) {
-                runCatching { CryptoUtils.decrypt(existing.content, pinPassword.ifBlank { "1234" }) }
+                CryptoUtils.decrypt(existing.content, pinPassword.ifBlank { "1234" })
                     .getOrDefault(existing.content)
             } else {
                 existing.content
@@ -2687,7 +2691,7 @@ class DocFlowViewModel(
         context: Context,
         doc: DocEntity,
         comments: List<DocumentCommentEntity>,
-        annotations: List<PdfAnnotationYMapEntity>
+        annotations: List<PdfAnnotationYMapEntity> = emptyList()
     ) {
         viewModelScope.launch {
             val exportRes = PdfLibAnnotationEngine.exportAllNotesToPdf(

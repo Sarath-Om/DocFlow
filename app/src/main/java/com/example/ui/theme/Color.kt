@@ -29,6 +29,13 @@ val DocFlowOrangePpt = Color(0xFFEA580C)
 val DocFlowGrayTxt = Color(0xFF6B7280)
 val DocFlowPurpleOfd = Color(0xFF7C3AED)
 
+val BadgePdfRed = DocFlowRedPdf
+val BadgeDocBlue = DocFlowBlueWord
+val BadgeXlsGreen = DocFlowGreenExcel
+val BadgePptOrange = DocFlowOrangePpt
+val BadgeOfdPurple = DocFlowPurpleOfd
+val BadgeTxtSlate = DocFlowGrayTxt
+
 // Legacy compatibility aliases used by sub-components
 val DocBluePrimary = DocFlowAccentBlue
 val DocBlueSecondary = DocFlowTealTranslate
