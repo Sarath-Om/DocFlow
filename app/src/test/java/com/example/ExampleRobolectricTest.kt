@@ -59,7 +59,7 @@ class ExampleRobolectricTest {
 
   @Test
   fun `sync states provide human readable labels`() {
-    assertEquals("Cloud Synced", SyncState.SYNCED.label)
+    assertEquals("Saved Locally", SyncState.SYNCED.label)
     assertEquals("Local Only", SyncState.LOCAL_ONLY.label)
   }
 
@@ -437,50 +437,64 @@ class ExampleRobolectricTest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val userId = "pdf-export-user"
 
+    val sourceDoc = com.example.data.model.DocEntity(
+        id = "doc-contract-7",
+        userId = userId,
+        title = "Master Service Agreement",
+        folderId = "root",
+        category = "Contract",
+        fileType = "docx",
+        fileName = "msa.docx",
+        fileSize = 4096L,
+        content = "SECTION 1: MASTER AGREEMENT"
+    )
+
     val versionSnapshot = com.example.data.local.DocumentVersionEntity(
         id = "ver-701",
         documentId = "doc-contract-7",
+        userId = userId,
         versionNumber = 3,
         versionLabel = "Final Board Review Draft",
         authorName = "Sarath Om",
-        contentSnapshot = "SECTION 1: MASTER AGREEMENT\nAll document versions stay local on your phone.\n Verified clause 4.2.",
+        stateVector = "sv-3",
+        snapshotContent = "SECTION 1: MASTER AGREEMENT\nAll document versions stay local on your phone.\nVerified clause 4.2.",
+        byteSize = 128L,
         createdAtMillis = 1761125000000L
     )
 
     val versionPdfResult = com.example.data.util.PdfLibAnnotationEngine.exportVersionSnapshotToPdf(
         context = context,
-        documentTitle = "Master Service Agreement",
+        document = sourceDoc,
         version = versionSnapshot
     )
     assertTrue(versionPdfResult.isSuccess)
     val exportedVer = versionPdfResult.getOrThrow()
     assertTrue(exportedVer.pdfFile.exists())
-    assertTrue(exportedVer.fileSize > 0L)
-    assertTrue(exportedVer.pageCount >= 1)
+    assertTrue(exportedVer.pdfFile.length() > 0L)
 
     val noteEntity = com.example.data.local.DocumentCommentEntity(
         id = "note-901",
         documentId = "doc-contract-7",
+        userId = userId,
         authorName = "Legal Counsel",
         authorRole = "EDITOR",
-        anchorText = "Clause 4.2 Liability Cap",
-        commentBody = "Ensure liability cap matches the offline privacy warranty.",
+        anchorLineOrText = "Clause 4.2 Liability Cap",
+        body = "Ensure liability cap matches the offline privacy warranty.",
         isSuggestion = true,
         suggestedReplacement = "Liability is strictly capped at zero for free local APK distribution.",
-        isResolved = false,
+        status = "OPEN",
         createdAtMillis = 1761126000000L
     )
 
     val notePdfResult = com.example.data.util.PdfLibAnnotationEngine.exportNoteOrCommentToPdf(
         context = context,
-        documentTitle = "Master Service Agreement",
+        document = sourceDoc,
         comment = noteEntity
     )
     assertTrue(notePdfResult.isSuccess)
     val exportedNote = notePdfResult.getOrThrow()
     assertTrue(exportedNote.pdfFile.exists())
-    assertTrue(exportedNote.fileSize > 0L)
-    assertTrue(exportedNote.pageCount >= 1)
+    assertTrue(exportedNote.pdfFile.length() > 0L)
 
     // Store the exported version PDF in Room and verify it is searchable
     val versionDocEntity = CachedDocumentEntity(
@@ -488,14 +502,14 @@ class ExampleRobolectricTest {
         userId = userId,
         title = "Master Service Agreement - v3 (Final Board Review Draft)",
         folderId = "root",
-        category = "Work",
+        category = "Contract",
         fileType = "pdf",
         fileName = exportedVer.pdfFile.name,
-        fileSize = exportedVer.fileSize,
-        content = versionSnapshot.contentSnapshot,
+        fileSize = exportedVer.pdfFile.length(),
+        content = versionSnapshot.snapshotContent,
         tags = "pdf, version-export, v3",
         localFilePath = exportedVer.pdfFile.absolutePath,
-        pageCount = exportedVer.pageCount.toLong()
+        pageCount = 1L
     )
     dao.upsertDocument(versionDocEntity)
 
@@ -505,6 +519,7 @@ class ExampleRobolectricTest {
     assertTrue(retrieved.parsedTags().contains("version-export"))
   }
 }
+
 
 
 

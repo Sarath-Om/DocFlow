@@ -2,32 +2,41 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// DocFlow Flat Minimal Design System Palette
+// DocFlow Shared Design System Color Tokens (Flat, Minimal, Android-style — No Glassmorphism)
 val DocFlowAccentBlue = Color(0xFF1F6BFF)
-val DocFlowAccentBlueDark = Color(0xFF4785FF)
+val DocFlowAccentBlueDark = Color(0xFF1F6BFF)
 
 // Light Mode Tokens
 val DocFlowLightBackground = Color(0xFFF0F1F3)
 val DocFlowLightCard = Color(0xFFFFFFFF)
 val DocFlowLightTextPrimary = Color(0xFF111111)
 val DocFlowLightTextSecondary = Color(0xFF8A8D93)
-val DocFlowLightDivider = Color(0xFFE5E7EB)
+val DocFlowLightDivider = Color(0xFFE3E4E7)
 
 // Dark Mode Tokens
 val DocFlowDarkBackground = Color(0xFF0F1113)
 val DocFlowDarkCard = Color(0xFF1B1D20)
 val DocFlowDarkTextPrimary = Color(0xFFF2F3F5)
 val DocFlowDarkTextSecondary = Color(0xFF9A9DA3)
-val DocFlowDarkDivider = Color(0xFF2A2D32)
+val DocFlowDarkDivider = Color(0xFF2A2C30)
 
-// Icon Circle & File Format Accents
-val DocFlowRedPdf = Color(0xFFE53935)
-val DocFlowBlueWord = Color(0xFF1F6BFF)
-val DocFlowTealTranslate = Color(0xFF0D9488)
-val DocFlowGreenExcel = Color(0xFF16A34A)
-val DocFlowOrangePpt = Color(0xFFEA580C)
-val DocFlowGrayTxt = Color(0xFF6B7280)
+// Icon-Circle & File Format Accents
+val DocFlowRedPdf = Color(0xFFE5483F)       // Red #E5483F (PDF, convert)
+val DocFlowBlueIcon = Color(0xFF1F8BFF)     // Blue #1F8BFF (summary, safe, Bluetooth)
+val DocFlowBlueWord = Color(0xFF1F6BFF)     // Blue #1F6BFF (Word, primary)
+val DocFlowTealTranslate = Color(0xFF1FB8C9) // Teal #1FB8C9 (translate)
+val DocFlowGreenDownload = Color(0xFF25C25A) // Green #25C25A (downloads, WhatsApp)
+val DocFlowGreenExcel = Color(0xFF16A34A)   // Green-dark (Excel)
+val DocFlowOrangePpt = Color(0xFFEA580C)    // Orange (PPT)
+val DocFlowGrayTrash = Color(0xFF9A9DA3)    // Gray #9A9DA3 (trash, TXT)
+val DocFlowGrayTxt = Color(0xFF9A9DA3)
 val DocFlowPurpleOfd = Color(0xFF7C3AED)
+
+// Highlight & Search Match Tokens
+val DocFlowSearchMatchYellow = Color(0xFFFDE047)
+val DocFlowSearchCurrentOrange = Color(0xFFF97316)
+val DocFlowDangerRed = Color(0xFFE5483F)
+val DocFlowWarningAmber = Color(0xFFD97706)
 
 val BadgePdfRed = DocFlowRedPdf
 val BadgeDocBlue = DocFlowBlueWord
@@ -43,9 +52,9 @@ val DocEmeraldAccent = DocFlowGreenExcel
 
 val DocBlueDarkPrimary = DocFlowAccentBlueDark
 val DocBlueDarkPrimaryContainer = Color(0xFF17397A)
-val DocBlueDarkSecondary = Color(0xFF2DD4BF)
+val DocBlueDarkSecondary = DocFlowTealTranslate
 val DocBlueDarkSecondaryContainer = Color(0xFF115E59)
-val DocEmeraldDarkAccent = Color(0xFF4ADE80)
+val DocEmeraldDarkAccent = DocFlowGreenDownload
 val DocVioletDarkContainer = Color(0xFF5B21B6)
 
 val DarkBackground = DocFlowDarkBackground
@@ -54,15 +63,15 @@ val DarkSurfaceLowest = Color(0xFF0A0C0E)
 val DarkSurfaceLow = Color(0xFF15171A)
 val DarkSurfaceContainer = DocFlowDarkCard
 val DarkSurfaceHigh = Color(0xFF23262A)
-val DarkSurfaceVariant = Color(0xFF282B30)
+val DarkSurfaceVariant = Color(0xFF25282C)
 val DarkOnSurface = DocFlowDarkTextPrimary
 val DarkOnSurfaceVariant = DocFlowDarkTextSecondary
-val DarkOutline = Color(0xFF3E4249)
+val DarkOutline = DocFlowDarkDivider
 val DarkOutlineVariant = DocFlowDarkDivider
 
 val LightBackground = DocFlowLightBackground
 val LightSurface = DocFlowLightCard
-val LightSurfaceVariant = Color(0xFFE6E8EC)
+val LightSurfaceVariant = Color(0xFFE8EAEE)
 val LightOnSurface = DocFlowLightTextPrimary
 val LightOnSurfaceVariant = DocFlowLightTextSecondary
 
@@ -74,12 +83,12 @@ val CrystalEmerald = DocFlowGreenExcel
 val CrystalRose = DocFlowRedPdf
 
 val FolderColors = listOf(
-    "#1F6BFF", // DocFlow Blue
-    "#E53935", // PDF Red
-    "#0D9488", // Translate Teal
-    "#16A34A", // Green
-    "#EA580C", // Orange
-    "#7C3AED", // Purple
-    "#D97706", // Amber
-    "#6B7280"  // Slate Gray
+    "#1F6BFF", // Accent Blue
+    "#E5483F", // PDF Red
+    "#1FB8C9", // Translate Teal
+    "#25C25A", // Download Green
+    "#16A34A", // Excel Dark Green
+    "#EA580C", // PPT Orange
+    "#1F8BFF", // Summary/Safe Blue
+    "#9A9DA3"  // Neutral Gray
 )

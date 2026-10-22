@@ -662,6 +662,9 @@ private fun OfflineDocFlowWorkspace(
                 folders = folders,
                 initialFolderId = if (selectedFolderId == "all") "root" else selectedFolderId,
                 onBack = { currentScreen = AppScreen.MainTabs },
+                onCreateNewFolder = { folderName ->
+                    viewModel.createFolder(folderName, "#1F6BFF", "folder", "root")
+                },
                 onSaveScannedDocument = { title, folderId, category, fileType, fileName, content, isEncrypted, password, keyHint, isOfflineCached, pageCount, localPdfPath, generatedPdfUri, customTags ->
                     viewModel.createOrScanDocument(
                         title = title,
@@ -801,7 +804,7 @@ private fun OfflineDocFlowWorkspace(
                         viewModel.toggleDocumentBiometricLock(activeDoc)
                     },
                     onDelete = {
-                        viewModel.deleteDocument(activeDoc.id)
+                        viewModel.softDeleteDocument(activeDoc.id)
                         currentScreen = AppScreen.MainTabs
                     },
                     liveSyncStatus = liveSyncStatus,
@@ -887,6 +890,13 @@ private fun OfflineDocFlowWorkspace(
                     },
                     onSwitchCurrentUserRole = { role ->
                         viewModel.switchCurrentUserRole(role)
+                    },
+                    onMoveToPrivateSafe = { docId ->
+                        viewModel.moveToPrivateSafe(docId, "1234")
+                    },
+                    initialPageIndex = cachedEntity?.lastPageViewed ?: 0,
+                    onPageChanged = { pageIdx ->
+                        viewModel.updateDocumentLastPage(activeDoc.id, pageIdx)
                     }
                 )
             }

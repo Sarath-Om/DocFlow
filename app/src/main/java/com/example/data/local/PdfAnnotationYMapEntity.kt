@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
 enum class PdfMarkupTool(val label: String) {
     PEN("Draw"),
     HIGHLIGHT("Highlight"),
+    UNDERLINE("Underline"),
     TEXT_BOX("Text Box"),
     MARKER("Marker"),
     STICKY_NOTE("Sticky Note"),
@@ -47,6 +48,8 @@ data class PdfAnnotationYMapEntity(
     val updatedAtMillis: Long = System.currentTimeMillis(),
     val syncState: String = SyncState.PENDING_CREATE.name
 ) {
+    fun decodePoints(): List<Offset> = decodeNormalizedPoints()
+
     fun decodeNormalizedPoints(): List<Offset> {
         if (normalizedPointsEncoded.isBlank()) return emptyList()
         return normalizedPointsEncoded.split(";")
