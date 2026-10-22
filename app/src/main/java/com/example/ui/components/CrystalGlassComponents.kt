@@ -2,9 +2,11 @@ package com.example.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -360,6 +362,7 @@ fun CrystalGlassBackground(
  * `Modifier.appleCrystalGlassBlur`, transparent container colors, directional 1dp
  * specular rim border, and colored ambient glow.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CrystalGlassCard(
     modifier: Modifier = Modifier,
@@ -367,6 +370,7 @@ fun CrystalGlassCard(
     isDark: Boolean = true,
     tintColor: Color? = null,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
     val shape: Shape = RoundedCornerShape(cornerRadius)
@@ -381,10 +385,17 @@ fun CrystalGlassCard(
         end = Offset(520f, 520f)
     )
 
-    val clickMod = if (onClick != null) {
-        Modifier.clickable { onClick() }
-    } else {
-        Modifier
+    val clickMod = when {
+        onClick != null && onLongClick != null -> Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
+        onLongClick != null -> Modifier.combinedClickable(
+            onClick = {},
+            onLongClick = onLongClick
+        )
+        onClick != null -> Modifier.clickable { onClick() }
+        else -> Modifier
     }
 
     Card(

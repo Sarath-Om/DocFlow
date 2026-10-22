@@ -1,8 +1,18 @@
 package com.example.data.util
 
+import android.graphics.Bitmap
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.Text
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.coroutines.resume
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 enum class OcrLanguage(
     val code: String,
@@ -28,7 +38,161 @@ data class LanguageDetectionResult(
     val characterSummary: String
 )
 
+data class MlKitOcrPageBlock(
+    val pageNumber: Int,
+    val rawText: String,
+    val blockCount: Int,
+    val lineCount: Int,
+    val elementCount: Int
+)
+
+data class MlKitOcrScanResult(
+    val fullExtractedText: String,
+    val pages: List<MlKitOcrPageBlock>,
+    val totalBlocks: Int,
+    val totalLines: Int,
+    val totalElements: Int,
+    val languageDetection: LanguageDetectionResult,
+    val engineUsed: String = "ML Kit Text Recognition API"
+)
+
 object MultiLanguageOcrEngine {
+
+    /**
+     * Runs Google ML Kit's on-device Text Recognition API (`com.google.mlkit:text-recognition`)
+     * across one or more scanned page Bitmaps to extract structured text blocks, lines, and words
+     * for full-text search indexing inside Room FTS4 and stored PDF files.
+     */
+    suspend fun recognizeTextWithMlKit(
+        bitmaps: List<Bitmap>,
+        preferredLanguage: OcrLanguage = OcrLanguage.AUTO,
+        documentTitle: String = "",
+        presetCategory: String = "Work"
+    ): MlKitOcrScanResult = withContext(Dispatchers.Default) {
+        val pageBlocks = mutableListOf<MlKitOcrPageBlock>()
+        var totalBlocks = 0
+        var totalLines = 0
+        var totalElements = 0
+
+        val recognizer = runCatching {
+            TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        }.getOrNull()
+
+        try {
+            bitmaps.forEachIndexed { index, bitmap ->
+                val pageNum = index + 1
+                val visionText: Text? = if (recognizer != null) {
+                    runCatching {
+                        val inputImage = InputImage.fromBitmap(bitmap, 0)
+                        withTimeoutOrNull(3500L) {
+                            suspendCancellableCoroutine<Text?> { cont ->
+                                recognizer.process(inputImage)
+                                    .addOnSuccessListener { result ->
+                                        if (cont.isActive) cont.resume(result)
+                                    }
+                                    .addOnFailureListener {
+                                        if (cont.isActive) cont.resume(null)
+                                    }
+                                    .addOnCanceledListener {
+                                        if (cont.isActive) cont.resume(null)
+                                    }
+                            }
+                        }
+                    }.getOrNull()
+                } else {
+                    null
+                }
+
+                val recognizedPageText = visionText?.text?.trim().orEmpty()
+                val blockCount = visionText?.textBlocks?.size ?: 0
+                val lineCount = visionText?.textBlocks?.sumOf { it.lines.size } ?: 0
+                val elementCount = visionText?.textBlocks?.sumOf { block ->
+                    block.lines.sumOf { line -> line.elements.size }
+                } ?: 0
+
+                totalBlocks += blockCount
+                totalLines += lineCount
+                totalElements += elementCount
+
+                pageBlocks.add(
+                    MlKitOcrPageBlock(
+                        pageNumber = pageNum,
+                        rawText = recognizedPageText,
+                        blockCount = blockCount,
+                        lineCount = lineCount,
+                        elementCount = elementCount
+                    )
+                )
+            }
+        } finally {
+            runCatching { recognizer?.close() }
+        }
+
+        val combinedRecognizedText = pageBlocks
+            .filter { it.rawText.isNotBlank() }
+            .joinToString("\n\n") { page ->
+                "=== PAGE ${page.pageNumber} OCR TEXT ===\n${page.rawText}"
+            }
+
+        val dateStr = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.US).format(Date())
+        val effectiveTitle = documentTitle.ifBlank { "Scanned PDF Document" }
+        val detectionSource = combinedRecognizedText.ifBlank { effectiveTitle }
+        val detection = detectLanguage(detectionSource, preferredLanguage)
+
+        val fullIndexedText = buildString {
+            appendLine("=== ML KIT OCR SCANNED PDF INDEX ===")
+            appendLine("Title: $effectiveTitle")
+            appendLine("Category: $presetCategory")
+            appendLine("Pages Scanned: ${bitmaps.size.coerceAtLeast(1)}")
+            appendLine("OCR Engine: ML Kit Text Recognition API (${detection.detectedLanguage.displayName})")
+            appendLine("Scanned At: $dateStr")
+            if (combinedRecognizedText.isNotBlank()) {
+                appendLine()
+                append(combinedRecognizedText)
+            }
+        }.trim()
+
+        MlKitOcrScanResult(
+            fullExtractedText = fullIndexedText,
+            pages = pageBlocks,
+            totalBlocks = totalBlocks,
+            totalLines = totalLines,
+            totalElements = totalElements,
+            languageDetection = detection
+        )
+    }
+
+    /**
+     * Runs ML Kit Text Recognition on a single Bitmap and returns the raw recognized text string.
+     */
+    suspend fun recognizeTextFromBitmapSingle(bitmap: Bitmap): String = withContext(Dispatchers.Default) {
+        val recognizer = runCatching {
+            TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        }.getOrNull() ?: return@withContext ""
+
+        try {
+            val inputImage = InputImage.fromBitmap(bitmap, 0)
+            val result = withTimeoutOrNull(3000L) {
+                suspendCancellableCoroutine<Text?> { cont ->
+                    recognizer.process(inputImage)
+                        .addOnSuccessListener { text ->
+                            if (cont.isActive) cont.resume(text)
+                        }
+                        .addOnFailureListener {
+                            if (cont.isActive) cont.resume(null)
+                        }
+                        .addOnCanceledListener {
+                            if (cont.isActive) cont.resume(null)
+                        }
+                }
+            }
+            result?.text?.trim().orEmpty()
+        } catch (_: Exception) {
+            ""
+        } finally {
+            runCatching { recognizer.close() }
+        }
+    }
 
     /**
      * Automatically detects the primary language & Unicode script of extracted or scanned text

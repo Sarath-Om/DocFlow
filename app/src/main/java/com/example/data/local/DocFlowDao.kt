@@ -37,7 +37,7 @@ interface DocFlowDao {
     fun searchCachedDocumentsFts(userId: String, ftsQuery: String): Flow<List<CachedDocumentEntity>>
 
     /**
-     * Fallback/substring search on title, contentPreview, tags, category, or fileName.
+     * Fallback/substring search on title, full OCR content, contentPreview, tags, category, or fileName.
      */
     @Query(
         """
@@ -46,6 +46,7 @@ interface DocFlowDao {
           AND syncState != 'PENDING_DELETE'
           AND (
               title LIKE '%' || :rawQuery || '%'
+              OR (isEncrypted = 0 AND content LIKE '%' || :rawQuery || '%')
               OR contentPreview LIKE '%' || :rawQuery || '%'
               OR tags LIKE '%' || :rawQuery || '%'
               OR category LIKE '%' || :rawQuery || '%'
@@ -55,6 +56,26 @@ interface DocFlowDao {
         """
     )
     fun searchCachedDocumentsSubstring(userId: String, rawQuery: String): Flow<List<CachedDocumentEntity>>
+
+    /**
+     * Full-text search specifically across stored PDF and scanned PDF documents (including ML Kit OCR text).
+     */
+    @Query(
+        """
+        SELECT * FROM cached_documents
+        WHERE userId = :userId
+          AND syncState != 'PENDING_DELETE'
+          AND fileType IN ('pdf', 'scanned')
+          AND (
+              title LIKE '%' || :rawQuery || '%'
+              OR (isEncrypted = 0 AND content LIKE '%' || :rawQuery || '%')
+              OR contentPreview LIKE '%' || :rawQuery || '%'
+              OR tags LIKE '%' || :rawQuery || '%'
+          )
+        ORDER BY updatedAtMillis DESC
+        """
+    )
+    fun searchStoredPdfDocuments(userId: String, rawQuery: String): Flow<List<CachedDocumentEntity>>
 
     @Query("SELECT * FROM cached_documents WHERE userId = :userId AND id = :docId LIMIT 1")
     suspend fun getCachedDocumentById(userId: String, docId: String): CachedDocumentEntity?

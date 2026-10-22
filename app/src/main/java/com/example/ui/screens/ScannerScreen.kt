@@ -226,6 +226,9 @@ fun ScannerScreen(
     var encryptionPassword by remember { mutableStateOf("") }
     var encryptionHint by remember { mutableStateOf("") }
     var isOfflineCached by remember { mutableStateOf(true) }
+    var mlKitBlocksDetected by remember { mutableStateOf(0) }
+    var mlKitLinesDetected by remember { mutableStateOf(0) }
+    var mlKitElementsDetected by remember { mutableStateOf(0) }
 
     val detectedLanguageResult = remember(extractedText, selectedLanguage, docTitle) {
         MultiLanguageOcrEngine.detectLanguage(
@@ -280,6 +283,20 @@ fun ScannerScreen(
             }
             docTitle = effectiveTitle
 
+            // Run ML Kit Text Recognition API across all captured page bitmaps
+            val mlKitResult = MultiLanguageOcrEngine.recognizeTextWithMlKit(
+                bitmaps = capturedRawBitmaps.toList(),
+                preferredLanguage = selectedLanguage,
+                documentTitle = effectiveTitle,
+                presetCategory = selectedCategory
+            )
+            mlKitBlocksDetected = mlKitResult.totalBlocks
+            mlKitLinesDetected = mlKitResult.totalLines
+            mlKitElementsDetected = mlKitResult.totalElements
+            if (extractedText.isBlank() || extractedText.startsWith("=== ML KIT OCR")) {
+                extractedText = mlKitResult.fullExtractedText
+            }
+
             for (idx in 0 until totalPages) {
                 val rawBmp = capturedRawBitmaps[idx]
                 val baseSheet = ImageProcessingPdfPipeline.createHighResDocumentBitmap(
@@ -306,7 +323,8 @@ fun ScannerScreen(
             val pdfRes = ImageProcessingPdfPipeline.convertBitmapsToPdfFile(
                 context = context,
                 fileName = cleanName,
-                bitmaps = processedPageBitmaps.toList()
+                bitmaps = processedPageBitmaps.toList(),
+                ocrText = extractedText
             )
             if (pdfRes.isSuccess) {
                 val res = pdfRes.getOrThrow()
@@ -899,9 +917,11 @@ fun ScannerScreen(
                         }
                     }
 
-                    // Multi-Language OCR & Automatic Language Detection Banner
+                    // ML Kit Text Recognition API & Automatic Language Detection Banner
                     CrystalGlassCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("mlkit_ocr_status_card"),
                         cornerRadius = 16.dp,
                         tintColor = Color(0xFF059669)
                     ) {
@@ -910,24 +930,58 @@ fun ScannerScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = Color(0xFF059669),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = "OCR Language Detected: ${detectedLanguageResult.detectedLanguage.displayName} (${detectedLanguageResult.detectedLanguage.nativeLabel}) • ${detectedLanguageResult.confidencePercent}% Accuracy",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF059669)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color(0xFF059669),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "ML Kit Text Recognition API • ${detectedLanguageResult.detectedLanguage.displayName} (${detectedLanguageResult.confidencePercent}%)",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF059669)
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        scope.launch {
+                                            isProcessingPipeline = true
+                                            val sourceBitmaps = if (capturedRawBitmaps.isNotEmpty()) {
+                                                capturedRawBitmaps.toList()
+                                            } else {
+                                                processedPageBitmaps.toList()
+                                            }
+                                            val mlKitRes = MultiLanguageOcrEngine.recognizeTextWithMlKit(
+                                                bitmaps = sourceBitmaps,
+                                                preferredLanguage = selectedLanguage,
+                                                documentTitle = docTitle.ifBlank { selectedPreset.defaultTitle },
+                                                presetCategory = selectedCategory
+                                            )
+                                            mlKitBlocksDetected = mlKitRes.totalBlocks
+                                            mlKitLinesDetected = mlKitRes.totalLines
+                                            mlKitElementsDetected = mlKitRes.totalElements
+                                            extractedText = mlKitRes.fullExtractedText
+                                            isProcessingPipeline = false
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.testTag("run_mlkit_ocr_button")
+                                ) {
+                                    Text("Re-Run ML Kit OCR", style = MaterialTheme.typography.labelSmall)
+                                }
                             }
                             Text(
-                                text = "Script Family: ${detectedLanguageResult.scriptFamily} • ${detectedLanguageResult.characterSummary}",
+                                text = "ML Kit Blocks: $mlKitBlocksDetected • Lines: $mlKitLinesDetected • Words: $mlKitElementsDetected • Full-Text PDF Search Indexed (Room FTS4)",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1052,16 +1106,17 @@ fun ScannerScreen(
                         }
                     }
 
-                    // Extracted Multi-Language OCR & Structured Block Content
+                    // Extracted ML Kit OCR & Full-Text Searchable PDF Content
                     OutlinedTextField(
                         value = extractedText,
                         onValueChange = { extractedText = it },
                         label = {
-                            Text("Extracted Multi-Language OCR & Table Blocks (${detectedLanguageResult.detectedLanguage.displayName})")
+                            Text("ML Kit OCR Text (Indexed for Full-Text PDF Search in Room FTS4)")
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(175.dp),
+                            .height(175.dp)
+                            .testTag("scan_ocr_text_input"),
                         textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                         shape = RoundedCornerShape(14.dp)
                     )

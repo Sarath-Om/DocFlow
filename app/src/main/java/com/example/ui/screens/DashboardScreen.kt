@@ -206,6 +206,7 @@ fun DashboardScreen(
     var showAdvancedFilterPanel by remember { mutableStateOf(false) }
     var activeSegmentIndex by remember { mutableIntStateOf(0) }
     var docForAddingTag by remember { mutableStateOf<DocEntity?>(null) }
+    var docForQuickPreviewModal by remember { mutableStateOf<DocEntity?>(null) }
 
     val openDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -517,7 +518,7 @@ fun DashboardScreen(
                                         onValueChange = onSearchQueryChange,
                                         placeholder = {
                                             Text(
-                                                text = "Search documents, tags, or people",
+                                                text = "Search documents, PDF OCR text, or tags",
                                                 color = Color.White.copy(alpha = 0.42f),
                                                 style = MaterialTheme.typography.bodyMedium
                                             )
@@ -1440,6 +1441,21 @@ fun DashboardScreen(
                             val cachedEntity = cachedDocumentsMap[doc.id]
                             val syncStateName = cachedEntity?.syncState ?: SyncState.SYNCED.name
                             val tagsList = cachedEntity?.parsedTags() ?: emptyList()
+                            val ocrMatchSnippet = remember(searchQuery, cachedEntity, doc.content, doc.isEncrypted) {
+                                cachedEntity?.extractMatchingOcrSnippet(searchQuery)
+                                    ?: if (searchQuery.isNotBlank() && !doc.isEncrypted) {
+                                        doc.content.lineSequence()
+                                            .map { it.trim() }
+                                            .firstOrNull { line ->
+                                                line.isNotEmpty() &&
+                                                    !line.startsWith("===") &&
+                                                    line.contains(searchQuery.trim(), ignoreCase = true)
+                                            }
+                                            ?.take(140)
+                                    } else {
+                                        null
+                                    }
+                            }
 
                             DocumentItemCard(
                                 doc = doc,
@@ -1449,7 +1465,10 @@ fun DashboardScreen(
                                 tags = tagsList,
                                 selectedTagFilters = selectedTagFilters,
                                 hasLocalPdf = !cachedEntity?.localFilePath.isNullOrBlank(),
+                                ocrMatchSnippet = ocrMatchSnippet,
                                 onClick = { onOpenDocument(doc) },
+                                onLongClick = { docForQuickPreviewModal = doc },
+                                onQuickPreviewClick = { docForQuickPreviewModal = doc },
                                 onTagClick = { clickedTag -> onToggleTagFilter(clickedTag) },
                                 onAddTagClick = { docForAddingTag = doc },
                                 onToggleOffline = { onToggleDocumentOffline(doc) },
@@ -1643,6 +1662,34 @@ fun DashboardScreen(
         }
     }
 
+    docForQuickPreviewModal?.let { previewDoc ->
+        val cached = cachedDocumentsMap[previewDoc.id]
+        val folderName = folders.find { it.id == previewDoc.folderId }?.name ?: "Main Workspace"
+        DocumentQuickPreviewAndContextModal(
+            document = previewDoc,
+            cachedEntity = cached,
+            folderName = folderName,
+            isOfflineMode = isOfflineMode,
+            onDismiss = { docForQuickPreviewModal = null },
+            onOpenDocument = {
+                docForQuickPreviewModal = null
+                onOpenDocument(previewDoc)
+            },
+            onCategorizeAndTag = {
+                docForQuickPreviewModal = null
+                docForAddingTag = previewDoc
+            },
+            onToggleOffline = {
+                onToggleDocumentOffline(previewDoc)
+                docForQuickPreviewModal = null
+            },
+            onShareDocument = {
+                onShareDocument(previewDoc)
+                docForQuickPreviewModal = null
+            }
+        )
+    }
+
     docForAddingTag?.let { targetDoc ->
         val cached = cachedDocumentsMap[targetDoc.id]
         val activeCat = cached?.category ?: targetDoc.category
@@ -1831,12 +1878,16 @@ private fun DocumentItemCard(
     tags: List<String>,
     selectedTagFilters: Set<String>,
     hasLocalPdf: Boolean,
+    ocrMatchSnippet: String? = null,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+    onQuickPreviewClick: () -> Unit = {},
     onTagClick: (String) -> Unit,
     onAddTagClick: () -> Unit,
     onToggleOffline: () -> Unit,
     onShareClick: () -> Unit = {}
 ) {
+    var showContextDropdown by remember { mutableStateOf(false) }
     val isSigned = tags.any { it.equals("signed", true) || it.equals("completed", true) }
     val isUrgent = tags.any { it.equals("urgent", true) || it.equals("action-required", true) }
     val isLegal = doc.category.equals("Contracts", true) || doc.category.equals("Legal", true)
@@ -1865,250 +1916,628 @@ private fun DocumentItemCard(
         }
     }
 
-    CrystalGlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("document_card_${doc.id}"),
-        cornerRadius = 22.dp,
-        onClick = onClick
-    ) {
-        Column(
+    Box(modifier = Modifier.fillMaxWidth()) {
+        CrystalGlassCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .testTag("document_card_${doc.id}"),
+            cornerRadius = 22.dp,
+            onClick = onClick,
+            onLongClick = {
+                showContextDropdown = true
+                onLongClick()
+            }
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Crystal Glass Format Badge with Top Glowing Bar
-                Box(
-                    modifier = Modifier
-                        .width(44.dp)
-                        .height(52.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(badgeColor.copy(alpha = 0.15f))
-                        .border(1.dp, badgeColor.copy(alpha = 0.35f), RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Crystal Glass Format Badge with Top Glowing Bar
                     Box(
                         modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .height(3.dp)
-                            .background(badgeColor)
-                    )
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                            .width(44.dp)
+                            .height(52.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(badgeColor.copy(alpha = 0.15f))
+                            .border(1.dp, badgeColor.copy(alpha = 0.35f), RoundedCornerShape(14.dp)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = doc.fileType.uppercase().take(4),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = badgeColor,
-                            fontSize = 9.sp
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .background(badgeColor)
                         )
-                        Icon(
-                            imageVector = badgeIcon,
-                            contentDescription = doc.fileType,
-                            tint = badgeColor,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
-                // Document Title, Metadata & Status Pill
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = doc.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = formatStorageBytes(doc.fileSize.coerceAtLeast(1024L)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.60f)
-                        )
-                        Text("•", color = Color.White.copy(alpha = 0.45f))
-                        Text(
-                            text = formattedTime,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.60f)
-                        )
-                        Text("•", color = Color.White.copy(alpha = 0.45f))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.ChatBubbleOutline,
-                                contentDescription = null,
-                                tint = Color(0xFF00F4FE),
-                                modifier = Modifier.size(12.dp)
-                            )
                             Text(
-                                text = "${doc.pageCount}",
+                                text = doc.fileType.uppercase().take(4),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF00F4FE)
+                                fontWeight = FontWeight.ExtraBold,
+                                color = badgeColor,
+                                fontSize = 9.sp
+                            )
+                            Icon(
+                                imageVector = badgeIcon,
+                                contentDescription = doc.fileType,
+                                tint = badgeColor,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
 
-                    // Status Pill + Sync Indicator Row
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    // Document Title, Metadata & Status Pill
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Surface(
-                            color = badgeColor.copy(alpha = 0.15f),
-                            shape = CircleShape,
-                            modifier = Modifier.border(1.dp, badgeColor.copy(alpha = 0.30f), CircleShape)
+                        Text(
+                            text = doc.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
+                            Text(
+                                text = formatStorageBytes(doc.fileSize.coerceAtLeast(1024L)),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.60f)
+                            )
+                            Text("•", color = Color.White.copy(alpha = 0.45f))
+                            Text(
+                                text = formattedTime,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.60f)
+                            )
+                            Text("•", color = Color.White.copy(alpha = 0.45f))
                             Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
-                                if (isSigned) {
-                                    Icon(
-                                        imageVector = Icons.Default.CheckCircle,
-                                        contentDescription = null,
-                                        tint = badgeColor,
-                                        modifier = Modifier.size(11.dp)
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.Description,
+                                    contentDescription = null,
+                                    tint = Color(0xFF00F4FE),
+                                    modifier = Modifier.size(12.dp)
+                                )
                                 Text(
-                                    text = statusLabel,
+                                    text = "${doc.pageCount}p",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = badgeColor
+                                    color = Color(0xFF00F4FE)
                                 )
                             }
                         }
 
-                        SyncStatusVisualIndicator(
-                            syncStateName = syncStateName,
-                            isOfflineMode = isOfflineMode,
-                            isOfflineCached = doc.isOfflineCached
-                        )
-
-                        if (doc.isEncrypted || tags.any { it.equals("biometric-locked", true) }) {
+                        // Status Pill + Sync Indicator Row
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.horizontalScroll(rememberScrollState())
+                        ) {
                             Surface(
-                                color = Color(0xFFA178FF).copy(alpha = 0.16f),
-                                shape = CircleShape
+                                color = badgeColor.copy(alpha = 0.15f),
+                                shape = CircleShape,
+                                modifier = Modifier.border(1.dp, badgeColor.copy(alpha = 0.30f), CircleShape)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Fingerprint,
-                                        contentDescription = "Biometric Protected",
-                                        tint = Color(0xFFA178FF),
-                                        modifier = Modifier.size(11.dp)
-                                    )
+                                    if (isSigned) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = badgeColor,
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                    }
                                     Text(
-                                        text = "BIO • AES-256",
+                                        text = statusLabel,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = badgeColor
+                                    )
+                                }
+                            }
+
+                            SyncStatusVisualIndicator(
+                                syncStateName = syncStateName,
+                                isOfflineMode = isOfflineMode,
+                                isOfflineCached = doc.isOfflineCached
+                            )
+
+                            if (hasLocalPdf || doc.fileType.equals("pdf", true) || doc.fileType.equals("scanned", true)) {
+                                Surface(
+                                    color = Color(0xFF00F4FE).copy(alpha = 0.14f),
+                                    shape = CircleShape
+                                ) {
+                                    Text(
+                                        text = "ML Kit OCR",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFA178FF)
+                                        color = Color(0xFF00F4FE),
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                     )
+                                }
+                            }
+
+                            if (doc.isEncrypted || tags.any { it.equals("biometric-locked", true) }) {
+                                Surface(
+                                    color = Color(0xFFA178FF).copy(alpha = 0.16f),
+                                    shape = CircleShape
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Fingerprint,
+                                            contentDescription = "Biometric Protected",
+                                            tint = Color(0xFFA178FF),
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                        Text(
+                                            text = "BIO • AES-256",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFA178FF)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // Right Actions: Share + Offline Pin + More Options
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onShareClick,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .testTag("share_doc_${doc.id}")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share Document",
-                            tint = Color(0xFF00F4FE),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = onToggleOffline,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .testTag("toggle_offline_${doc.id}")
-                    ) {
-                        Icon(
-                            imageVector = if (doc.isOfflineCached) Icons.Default.OfflinePin else Icons.Default.CloudDone,
-                            contentDescription = "Toggle Offline",
-                            tint = if (doc.isOfflineCached) Color(0xFF00F4FE) else Color.White.copy(alpha = 0.45f),
-                            modifier = Modifier.size(19.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = onAddTagClick,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .testTag("add_tag_doc_${doc.id}")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreHoriz,
-                            contentDescription = "Document Options & Tags",
-                            tint = Color.White.copy(alpha = 0.50f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-
-            // Custom Tags Row
-            if (tags.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    tags.take(6).forEach { tag ->
-                        val isSelected = selectedTagFilters.any { it.equals(tag, ignoreCase = true) }
-                        Surface(
+                    // Right Actions: Quick Preview + Share + Offline Pin + More Options
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onQuickPreviewClick,
                             modifier = Modifier
-                                .clip(CircleShape)
-                                .clickable { onTagClick(tag) },
-                            color = if (isSelected) Color(0xFF3E90FF) else Color.White.copy(alpha = 0.06f),
-                            shape = CircleShape
+                                .size(34.dp)
+                                .testTag("quick_preview_btn_${doc.id}")
                         ) {
-                            Text(
-                                text = "#$tag",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isSelected) Color.White else Color(0xFF00F4FE),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Quick Preview Metadata",
+                                tint = Color(0xFF00F4FE),
+                                modifier = Modifier.size(17.dp)
                             )
+                        }
+                        IconButton(
+                            onClick = onShareClick,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .testTag("share_doc_${doc.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share Document",
+                                tint = Color(0xFF00F4FE),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = onToggleOffline,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .testTag("toggle_offline_${doc.id}")
+                        ) {
+                            Icon(
+                                imageVector = if (doc.isOfflineCached) Icons.Default.OfflinePin else Icons.Default.CloudDone,
+                                contentDescription = "Toggle Offline",
+                                tint = if (doc.isOfflineCached) Color(0xFF00F4FE) else Color.White.copy(alpha = 0.45f),
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = onAddTagClick,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .testTag("add_tag_doc_${doc.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreHoriz,
+                                contentDescription = "Document Options & Tags",
+                                tint = Color.White.copy(alpha = 0.50f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Full-Text OCR Search Match Snippet inside stored PDF / Document
+                if (!ocrMatchSnippet.isNullOrBlank()) {
+                    Surface(
+                        color = Color(0xFF00F4FE).copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color(0xFF00F4FE).copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                            .testTag("ocr_search_match_snippet_${doc.id}")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DocumentScanner,
+                                contentDescription = null,
+                                tint = Color(0xFF00F4FE),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "PDF OCR Match: \"$ocrMatchSnippet\"",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                // Custom Tags Row
+                if (tags.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        tags.take(6).forEach { tag ->
+                            val isSelected = selectedTagFilters.any { it.equals(tag, ignoreCase = true) }
+                            Surface(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .clickable { onTagClick(tag) },
+                                color = if (isSelected) Color(0xFF3E90FF) else Color.White.copy(alpha = 0.06f),
+                                shape = CircleShape
+                            ) {
+                                Text(
+                                    text = "#$tag",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) Color.White else Color(0xFF00F4FE),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+/**
+ * Apple Crystal Glass Long-Press Context Menu & Quick-Preview Modal displaying
+ * document metadata details (Page Count, File Size, Last Modified Date, Folder, Format,
+ * and ML Kit OCR text preview) alongside context menu actions.
+ */
+@Composable
+private fun DocumentQuickPreviewAndContextModal(
+    document: DocEntity,
+    cachedEntity: CachedDocumentEntity?,
+    folderName: String,
+    isOfflineMode: Boolean,
+    onDismiss: () -> Unit,
+    onOpenDocument: () -> Unit,
+    onCategorizeAndTag: () -> Unit,
+    onToggleOffline: () -> Unit,
+    onShareDocument: () -> Unit
+) {
+    val cyanGlow = Color(0xFF00F4FE)
+    val blueGlow = Color(0xFF3E90FF)
+    val emeraldGlow = Color(0xFF34D399)
+
+    val lastModifiedMillis = cachedEntity?.updatedAtMillis
+        ?: (document.updatedAt ?: document.createdAt)?.toDate()?.time
+        ?: System.currentTimeMillis()
+    val formattedLastModified = remember(lastModifiedMillis) {
+        SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.US).format(Date(lastModifiedMillis))
+    }
+    val formattedFileSize = remember(document.fileSize) {
+        formatStorageBytes(document.fileSize.coerceAtLeast(1024L))
+    }
+    val effectivePageCount = document.pageCount.coerceAtLeast(1L)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("quick_preview_modal"),
+        containerColor = Color(0xFF0D111F),
+        titleContentColor = Color.White,
+        textContentColor = Color.White,
+        title = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.testTag("doc_context_menu_header")
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DocumentScanner,
+                        contentDescription = null,
+                        tint = cyanGlow,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Quick Preview & Context Menu",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                }
+                Text(
+                    text = document.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cyanGlow,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Metadata Details Card (Page Count, Size, Last Modified Date)
+                CrystalGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("quick_preview_metadata_card"),
+                    cornerRadius = 18.dp,
+                    tintColor = cyanGlow
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "DOCUMENT METADATA DETAILS",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = cyanGlow
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("quick_preview_page_count"),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Page Count",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.70f)
+                            )
+                            Text(
+                                text = "$effectivePageCount Page${if (effectivePageCount == 1L) "" else "s"}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("quick_preview_file_size"),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "File Size",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.70f)
+                            )
+                            Text(
+                                text = formattedFileSize,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("quick_preview_last_modified"),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Last Modified",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.70f)
+                            )
+                            Text(
+                                text = formattedLastModified,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = emeraldGlow
+                            )
+                        }
+
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Format & Location",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.70f)
+                            )
+                            Text(
+                                text = "${document.fileType.uppercase()} • $folderName (${document.category})",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+
+                // Live Document & ML Kit OCR Content Preview Box
+                CrystalGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("quick_preview_content_box"),
+                    cornerRadius = 16.dp,
+                    tintColor = blueGlow
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (document.isEncrypted) {
+                                "AES-256 ENCRYPTED VAULT PREVIEW"
+                            } else {
+                                "QUICK CONTENT & ML KIT OCR PREVIEW"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = blueGlow
+                        )
+                        Text(
+                            text = if (document.isEncrypted) {
+                                "Protected with AES-256 + Biometric Authentication. Open document to unlock."
+                            } else {
+                                document.content.ifBlank {
+                                    cachedEntity?.contentPreview ?: "Document indexed in local Room storage."
+                                }.take(320)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.85f),
+                            maxLines = 6,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // Context Menu Action Buttons
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("doc_long_press_context_actions"),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onCategorizeAndTag,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("context_menu_edit_tags"),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, cyanGlow.copy(alpha = 0.4f))
+                    ) {
+                        Icon(Icons.Default.Tag, contentDescription = null, tint = cyanGlow, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Categorize & Edit Search Tags", color = Color.White)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onToggleOffline,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("context_menu_toggle_offline"),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                        ) {
+                            Icon(
+                                imageVector = if (document.isOfflineCached) Icons.Default.OfflinePin else Icons.Default.CloudDone,
+                                contentDescription = null,
+                                tint = cyanGlow,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (document.isOfflineCached) "Pinned" else "Pin Offline",
+                                color = Color.White,
+                                maxLines = 1
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = onShareDocument,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("context_menu_share_doc"),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = null,
+                                tint = cyanGlow,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Share", color = Color.White, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onOpenDocument,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = cyanGlow,
+                    contentColor = Color(0xFF040B16)
+                ),
+                modifier = Modifier.testTag("context_menu_open_doc")
+            ) {
+                Text("Open Document", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("context_menu_close_preview")
+            ) {
+                Text("Close", color = Color.White.copy(alpha = 0.75f))
+            }
+        }
+    )
 }
 
 @Composable

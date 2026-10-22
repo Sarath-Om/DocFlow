@@ -42,6 +42,7 @@ credentials = "1.5.0"
 googleid = "1.1.1"
 biometric = "1.1.0"
 workRuntimeKtx = "2.10.0"
+mlkitTextRecognition = "16.0.1"
 
 
 [libraries]
@@ -99,6 +100,7 @@ googleid = { group = "com.google.android.libraries.identity.googleid", name = "g
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntimeKtx" }
 androidx-work-testing = { group = "androidx.work", name = "work-testing", version.ref = "workRuntimeKtx" }
+mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
 
 
 [plugins]

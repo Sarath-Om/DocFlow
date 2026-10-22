@@ -116,6 +116,7 @@ dependencies {
   implementation(libs.googleid)
   implementation(libs.androidx.biometric)
   implementation(libs.androidx.work.runtime.ktx)
+  implementation(libs.mlkit.text.recognition)
   implementation(libs.firebase.appcheck.recaptcha)
   implementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)

@@ -66,6 +66,21 @@ data class CachedDocumentEntity(
             .map { it.trim() }
             .filter { it.isNotEmpty() }
 
+    /**
+     * Extracts a human-readable matching line or snippet from the ML Kit OCR / PDF content
+     * when full-text search matches inside the stored document body.
+     */
+    fun extractMatchingOcrSnippet(query: String): String? {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty() || isEncrypted) return null
+        val matchingLine = content.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { line ->
+                line.isNotEmpty() && !line.startsWith("===") && line.contains(trimmed, ignoreCase = true)
+            }
+        return matchingLine?.take(140)
+    }
+
     companion object {
         fun buildPreview(content: String, isEncrypted: Boolean): String {
             return if (isEncrypted) {
@@ -136,12 +151,13 @@ data class CachedDocumentEntity(
 
 /**
  * Room FTS4 Virtual Table for high-speed Full-Text Search across
- * document title, contentPreview, tags, category, and fileName.
+ * document title, full ML Kit OCR content, contentPreview, tags, category, and fileName.
  */
 @Fts4(contentEntity = CachedDocumentEntity::class)
 @Entity(tableName = "cached_documents_fts")
 data class CachedDocumentFtsEntity(
     val title: String,
+    val content: String,
     val contentPreview: String,
     val tags: String,
     val category: String,

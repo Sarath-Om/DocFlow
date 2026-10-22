@@ -16,7 +16,7 @@ import androidx.room.RoomDatabase
         PdfAnnotationYMapEntity::class,
         OtaUpdateRecordEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class DocFlowDatabase : RoomDatabase() {

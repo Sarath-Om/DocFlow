@@ -345,7 +345,94 @@ class ExampleRobolectricTest {
     assertTrue(remainingAfterSync.isEmpty())
     assertEquals(0, dao.observePendingSyncCount(userId).first())
   }
+
+  @Test
+  fun `mlkit ocr extracted text from scanned pdf enables full text search in Room FTS4 and snippet extraction`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val userId = "ocr-search-user"
+
+    val page1Bmp = android.graphics.Bitmap.createBitmap(120, 160, android.graphics.Bitmap.Config.ARGB_8888)
+    val page2Bmp = android.graphics.Bitmap.createBitmap(120, 160, android.graphics.Bitmap.Config.ARGB_8888)
+
+    val simulatedMlKitOcrText = buildString {
+      appendLine("=== SECTION 1: SCANNED DOCUMENT ===")
+      appendLine("Title: Vendor Invoice 2026")
+      appendLine("Pages: 2")
+      appendLine()
+      appendLine("=== SECTION 2: OCR TEXT ===")
+      appendLine("=== PAGE 1 OCR TEXT ===")
+      appendLine("ACME SEMICONDUCTOR CORP - INVOICE #INV-98412")
+      appendLine("Total Due: $14,850.00 USD | Net 30 Terms")
+      appendLine()
+      appendLine("=== PAGE 2 OCR TEXT ===")
+      appendLine("Wire Routing Number: 021000021 | Remittance Approved by Chief Financial Officer")
+    }
+
+    val pdfResult = com.example.data.util.ImageProcessingPdfPipeline.convertBitmapsToPdfFile(
+        context = context,
+        fileName = "invoice_98412.pdf",
+        bitmaps = listOf(page1Bmp, page2Bmp),
+        ocrText = simulatedMlKitOcrText
+    ).getOrThrow()
+
+    val scannedPdfDoc = CachedDocumentEntity(
+        id = "pdf-ocr-98412",
+        userId = userId,
+        title = "Vendor Invoice 2026",
+        folderId = "root",
+        category = "Finance",
+        fileType = "pdf",
+        fileName = "invoice_98412.pdf",
+        fileSize = pdfResult.fileSize,
+        content = simulatedMlKitOcrText,
+        contentPreview = CachedDocumentEntity.buildPreview(simulatedMlKitOcrText, false),
+        tags = "pdf, scanned, ocr, mlkit, finance",
+        localFilePath = pdfResult.pdfFile.absolutePath,
+        pageCount = 2L,
+        updatedAtMillis = 1761120000000L
+    )
+
+    val unrelatedPdfDoc = CachedDocumentEntity(
+        id = "pdf-ocr-other",
+        userId = userId,
+        title = "Employee Handbook",
+        folderId = "root",
+        category = "Work",
+        fileType = "pdf",
+        fileName = "handbook.pdf",
+        fileSize = 2048L,
+        content = "Standard vacation policy and office hours.",
+        contentPreview = "Standard vacation policy and office hours.",
+        tags = "pdf, work, hr",
+        pageCount = 5L,
+        updatedAtMillis = 1761110000000L
+    )
+
+    dao.upsertDocuments(listOf(scannedPdfDoc, unrelatedPdfDoc))
+
+    // 1. Verify SQLite FTS4 full-text search finds the PDF by deep Page 2 OCR text ("Remittance")
+    val ftsMatches = dao.searchCachedDocumentsFts(userId, "Remittance*").first()
+    assertEquals(1, ftsMatches.size)
+    assertEquals("pdf-ocr-98412", ftsMatches.first().id)
+
+    // 2. Verify substring search and dedicated stored PDF search find invoice number from Page 1 OCR
+    val pdfMatches = dao.searchStoredPdfDocuments(userId, "INV-98412").first()
+    assertEquals(1, pdfMatches.size)
+    assertEquals("pdf-ocr-98412", pdfMatches.first().id)
+
+    // 3. Verify OCR snippet extractor highlights the exact matching phrase inside the stored PDF
+    val snippet = scannedPdfDoc.extractMatchingOcrSnippet("INV-98412")
+    assertNotNull(snippet)
+    assertTrue(snippet!!.contains("INV-98412"))
+
+    // 4. Verify quick-preview metadata details (page count, size, last modified timestamp)
+    val loadedDoc = dao.getCachedDocumentById(userId, "pdf-ocr-98412")!!
+    assertEquals(2L, loadedDoc.pageCount)
+    assertTrue(loadedDoc.fileSize > 0L)
+    assertEquals(1761120000000L, loadedDoc.updatedAtMillis)
+  }
 }
+
 
 
 

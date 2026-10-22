@@ -120,19 +120,18 @@ object FileParserUtils {
                     pageCount = slideCount.toLong().coerceAtLeast(1L)
                 }
                 "pic" -> {
-                    extractedContent = """
-                        === PIC TO DOC: $title ===
-                        [EMBEDDED_IMAGE_LAYOUT: High-Resolution Visual Frame Included]
-                        
-                        === EXTRACTED TEXT & TABLE BLOCK ===
-                        Source Image: $fileName
-                        • Optical Character & Layout Extraction completed.
-                        • You can convert or edit this picture as PDF, Word (.docx), Excel (.xlsx), or PowerPoint (.pptx) blocks.
-                        
-                        | Extracted Field | Detected Value | Confidence |
-                        | Document Source | $fileName | 99.4% |
-                        | Layout Mode | Hybrid OCR + Image | Verified |
-                    """.trimIndent()
+                    val decodedBmp = ImageProcessingPdfPipeline.decodeBitmapFromUri(context, uri)
+                    val mlKitText = decodedBmp?.let { MultiLanguageOcrEngine.recognizeTextFromBitmapSingle(it) }.orEmpty()
+                    extractedContent = buildString {
+                        appendLine("=== PIC TO DOC: $title ===")
+                        appendLine("Source Image: $fileName")
+                        appendLine("OCR Engine: ML Kit Text Recognition API")
+                        if (mlKitText.isNotBlank()) {
+                            appendLine()
+                            appendLine("=== PAGE 1 OCR TEXT ===")
+                            appendLine(mlKitText)
+                        }
+                    }.trim()
                     pageCount = 1L
                 }
                 else -> {
@@ -440,7 +439,7 @@ object FileParserUtils {
         return sb.toString().trim() to sortedEntries.size.coerceAtLeast(1)
     }
 
-    private fun extractTextFromPdfStream(
+    private suspend fun extractTextFromPdfStream(
         context: Context,
         uri: Uri,
         fileName: String,
@@ -466,8 +465,20 @@ object FileParserUtils {
             }
         } catch (_: Exception) {
         }
-        sb.append("Document ready for structured block editing, Doc-to-Pic export, and instant cloud synchronization.")
-        return sb.toString()
+
+        // Also run ML Kit Text Recognition on rendered PDF pages (up to first 5 pages) for scanned PDFs
+        val maxOcrPages = pageCount.toInt().coerceIn(1, 5)
+        for (pageIdx in 0 until maxOcrPages) {
+            val pageBmp = renderPdfPage(context, uri, pageIdx)
+            if (pageBmp != null) {
+                val ocrPageText = MultiLanguageOcrEngine.recognizeTextFromBitmapSingle(pageBmp)
+                if (ocrPageText.isNotBlank()) {
+                    sb.append("=== PAGE ${pageIdx + 1} OCR TEXT ===\n")
+                    sb.append(ocrPageText).append("\n\n")
+                }
+            }
+        }
+        return sb.toString().trim()
     }
 
     private fun readPlainText(context: Context, uri: Uri): String {

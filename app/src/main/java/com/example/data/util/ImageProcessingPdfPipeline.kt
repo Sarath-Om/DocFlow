@@ -462,7 +462,8 @@ object ImageProcessingPdfPipeline {
     suspend fun convertBitmapsToPdfFile(
         context: Context,
         fileName: String,
-        bitmaps: List<Bitmap>
+        bitmaps: List<Bitmap>,
+        ocrText: String = ""
     ): Result<PdfConversionResult> = withContext(Dispatchers.IO) {
         try {
             val scansDir = File(context.filesDir, "scanned_pdfs")
@@ -493,6 +494,16 @@ object ImageProcessingPdfPipeline {
                         val paint = Paint(Paint.FILTER_BITMAP_FLAG)
                         canvas.drawBitmap(bitmap, srcRect, destRect, paint)
 
+                        if (ocrText.isNotBlank()) {
+                            val ocrPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.argb(3, 0, 0, 0)
+                                textSize = 6f
+                            }
+                            ocrText.lines().take(25).forEachIndexed { lineIdx, line ->
+                                canvas.drawText(line.take(120), 20f, 30f + (lineIdx * 8f), ocrPaint)
+                            }
+                        }
+
                         pdfDocument.finishPage(page)
                     }
 
@@ -507,7 +518,7 @@ object ImageProcessingPdfPipeline {
             }.getOrDefault(false)
 
             if (!wroteViaNativePdf || !outFile.exists() || outFile.length() == 0L) {
-                writeStandardMultiPagePdfFallback(outFile, bitmaps, pageWidth, pageHeight)
+                writeStandardMultiPagePdfFallback(outFile, bitmaps, pageWidth, pageHeight, ocrText)
             }
 
             Result.success(
@@ -527,9 +538,17 @@ object ImageProcessingPdfPipeline {
         outFile: File,
         bitmaps: List<Bitmap>,
         pageWidth: Int,
-        pageHeight: Int
+        pageHeight: Int,
+        ocrText: String = ""
     ) {
         val count = bitmaps.size.coerceAtLeast(1)
+        val sanitizedOcr = ocrText
+            .replace("\\", " ")
+            .replace("(", "[")
+            .replace(")", "]")
+            .replace("\r", " ")
+            .replace("\n", " ")
+            .trim()
         val sb = StringBuilder()
         sb.append("%PDF-1.4\n")
         sb.append("1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n")
@@ -540,7 +559,7 @@ object ImageProcessingPdfPipeline {
             val bmp = bitmaps.getOrNull(i)
             val dims = if (bmp != null) "${bmp.width}x${bmp.height}" else "${pageWidth}x${pageHeight}"
             sb.append(
-                "$objId 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 $pageWidth $pageHeight] /Resources << /ProcSet [/PDF /Text /ImageC] >> /PieceInfo << /DocFlowScan ($dims) >> >> endobj\n"
+                "$objId 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 $pageWidth $pageHeight] /Resources << /ProcSet [/PDF /Text /ImageC] >> /PieceInfo << /DocFlowScan ($dims) /MlKitOcr ($sanitizedOcr) >> >> endobj\n"
             )
         }
         sb.append("trailer << /Root 1 0 R >>\n%%EOF\n")
