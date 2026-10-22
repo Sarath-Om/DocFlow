@@ -37,7 +37,7 @@ service cloud.firestore {
              data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
              data.folderId is string && data.folderId.size() > 0 && data.folderId.size() <= 128 &&
              data.category is string && data.category.size() > 0 && data.category.size() <= 50 &&
-             data.fileType is string && data.fileType in ['pdf', 'docx', 'scanned', 'txt', 'doc'] &&
+             data.fileType is string && data.fileType in ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'csv', 'scanned', 'pic', 'txt'] &&
              data.fileName is string && data.fileName.size() > 0 && data.fileName.size() <= 200 &&
              data.fileSize is int && data.fileSize >= 0 && data.fileSize <= 50000000 &&
              data.content is string && data.content.size() <= 5000000 &&

@@ -31,6 +31,7 @@ abstract class FirestoreEmulatorTestBase {
 
   @Before
   open fun setUpFirebase() {
+    org.junit.Assume.assumeTrue("Firebase emulator is not running", isEmulatorReachable())
     val context = ApplicationProvider.getApplicationContext<Context>()
     val resId = context.resources.getIdentifier("firestore_database_id", "string", context.packageName)
     databaseId = if (resId != 0) context.getString(resId) else "demo-database"
@@ -84,5 +85,16 @@ abstract class FirestoreEmulatorTestBase {
     const val PROJECT_ID = "demo-no-project"
     const val DEFAULT_PASSWORD = "password123"
     const val AUTH_TIMEOUT_MS = 5000L
+
+    fun isEmulatorReachable(): Boolean {
+      return try {
+        java.net.Socket().use { socket ->
+          socket.connect(java.net.InetSocketAddress(EMULATOR_HOST, AUTH_PORT), 300)
+          true
+        }
+      } catch (_: Exception) {
+        false
+      }
+    }
   }
 }

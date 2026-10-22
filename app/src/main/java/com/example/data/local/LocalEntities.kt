@@ -37,7 +37,8 @@ data class CachedDocumentEntity(
     val pageCount: Long = 1L,
     val syncState: String = SyncState.SYNCED.name,
     val lastSyncedAtMillis: Long = System.currentTimeMillis(),
-    val updatedAtMillis: Long = System.currentTimeMillis()
+    val updatedAtMillis: Long = System.currentTimeMillis(),
+    val lastAccessedAtMillis: Long = System.currentTimeMillis()
 ) {
     fun toDocEntity(): DocEntity {
         val ts = Timestamp(Date(updatedAtMillis))
@@ -95,7 +96,8 @@ data class CachedDocumentEntity(
             doc: DocEntity,
             syncState: SyncState = SyncState.SYNCED,
             localFilePath: String? = null,
-            existingTags: String? = null
+            existingTags: String? = null,
+            existingLastAccessedAtMillis: Long? = null
         ): CachedDocumentEntity {
             val updatedMs = doc.updatedAt?.toDate()?.time
                 ?: doc.createdAt?.toDate()?.time
@@ -105,6 +107,7 @@ data class CachedDocumentEntity(
             } else {
                 defaultTagsFor(doc.title, doc.category, doc.fileType)
             }
+            val resolvedAccessedMs = existingLastAccessedAtMillis ?: updatedMs
             return CachedDocumentEntity(
                 id = doc.id,
                 userId = doc.userId,
@@ -124,7 +127,8 @@ data class CachedDocumentEntity(
                 pageCount = doc.pageCount,
                 syncState = syncState.name,
                 lastSyncedAtMillis = System.currentTimeMillis(),
-                updatedAtMillis = updatedMs
+                updatedAtMillis = updatedMs,
+                lastAccessedAtMillis = resolvedAccessedMs
             )
         }
     }
@@ -199,3 +203,35 @@ data class SyncLogEntity(
     val details: String,
     val timestampMillis: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "document_versions")
+data class DocumentVersionEntity(
+    @PrimaryKey val id: String,
+    val documentId: String,
+    val userId: String,
+    val versionNumber: Int,
+    val versionLabel: String,
+    val authorName: String,
+    val stateVector: String,
+    val snapshotContent: String,
+    val byteSize: Long,
+    val isEncrypted: Boolean = false,
+    val createdAtMillis: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "document_comments")
+data class DocumentCommentEntity(
+    @PrimaryKey val id: String,
+    val documentId: String,
+    val userId: String,
+    val authorName: String,
+    val authorRole: String = "Editor",
+    val anchorLineOrText: String,
+    val body: String,
+    val isSuggestion: Boolean = false,
+    val suggestedReplacement: String = "",
+    val status: String = "OPEN", // OPEN, RESOLVED, ACCEPTED, REJECTED
+    val parentCommentId: String? = null,
+    val createdAtMillis: Long = System.currentTimeMillis()
+)
+

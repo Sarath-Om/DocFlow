@@ -10,9 +10,13 @@ import androidx.room.RoomDatabase
         CachedDocumentEntity::class,
         CachedDocumentFtsEntity::class,
         CachedFolderEntity::class,
-        SyncLogEntity::class
+        SyncLogEntity::class,
+        DocumentVersionEntity::class,
+        DocumentCommentEntity::class,
+        PdfAnnotationYMapEntity::class,
+        OtaUpdateRecordEntity::class
     ],
-    version = 2,
+    version = 4,
     exportSchema = false
 )
 abstract class DocFlowDatabase : RoomDatabase() {

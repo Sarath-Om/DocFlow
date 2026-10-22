@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">DocFlow</string>
+    <string name="widget_name">DocFlow Quick Access</string>
+    <string name="widget_description">One-tap access to recently opened documents and camera scanner</string>
 </resources>

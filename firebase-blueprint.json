@@ -2,113 +2,65 @@
   "entities": {
     "Folder": {
       "title": "Folder",
-      "description": "Personalized folder organization for documents",
+      "description": "Personalized user folder for organizing PDF, Word, Excel, PowerPoint, Scanned, and Picture documents",
       "type": "object",
       "properties": {
-        "userId": {
-          "type": "string",
-          "description": "Owner user identifier"
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the folder"
-        },
-        "color": {
-          "type": "string",
-          "description": "Hex color code for the folder"
-        },
-        "icon": {
-          "type": "string",
-          "description": "Icon identifier for the folder"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Creation timestamp; clients must submit FieldValue.serverTimestamp()"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Last update timestamp; clients must submit FieldValue.serverTimestamp()"
-        }
+        "userId": { "type": "string", "description": "Owner UID" },
+        "name": { "type": "string", "description": "Folder display name" },
+        "color": { "type": "string", "description": "Hex color string" },
+        "icon": { "type": "string", "description": "Folder icon identifier" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "name", "color", "icon", "createdAt", "updatedAt"]
     },
     "Document": {
       "title": "Document",
-      "description": "User document (PDF, Word, or scanned document) with metadata and content",
+      "description": "PDF, Word, Excel, PowerPoint, Scanned, or Picture document with optional AES-256 encryption",
       "type": "object",
       "properties": {
-        "userId": {
-          "type": "string",
-          "description": "Owner user identifier"
-        },
-        "title": {
-          "type": "string",
-          "description": "Title of the document"
-        },
-        "folderId": {
-          "type": "string",
-          "description": "Folder ID or 'root'"
-        },
-        "category": {
-          "type": "string",
-          "description": "Document categorization like Work, Personal, Invoices, Contracts, Receipts"
-        },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "title": { "type": "string", "description": "Document title" },
+        "folderId": { "type": "string", "description": "Parent folder ID or 'root'" },
+        "category": { "type": "string", "description": "Document category" },
         "fileType": {
           "type": "string",
-          "description": "Document file format (pdf, docx, scanned)"
+          "enum": ["pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "csv", "scanned", "pic", "txt"]
         },
-        "fileName": {
-          "type": "string",
-          "description": "File name with extension"
-        },
-        "fileSize": {
-          "type": "integer",
-          "description": "Size in bytes"
-        },
-        "content": {
-          "type": "string",
-          "description": "Document text/extracted content or encrypted payload"
-        },
-        "isEncrypted": {
-          "type": "boolean",
-          "description": "Whether document content is encrypted"
-        },
-        "encryptionKeyHint": {
-          "type": "string",
-          "description": "Hint for decryption key if encrypted"
-        },
-        "isOfflineCached": {
-          "type": "boolean",
-          "description": "Whether document is flagged for offline access"
-        },
-        "pageCount": {
-          "type": "integer",
-          "description": "Number of pages in document"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Creation timestamp; clients must submit FieldValue.serverTimestamp()"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Last update timestamp; clients must submit FieldValue.serverTimestamp()"
-        }
+        "fileName": { "type": "string", "description": "Original or generated file name" },
+        "fileSize": { "type": "integer", "description": "File size in bytes" },
+        "content": { "type": "string", "description": "Plain or AES-256 encrypted structured content" },
+        "isEncrypted": { "type": "boolean", "description": "Whether content is AES-256 encrypted" },
+        "encryptionKeyHint": { "type": "string", "description": "Optional hint for passphrase" },
+        "isOfflineCached": { "type": "boolean", "description": "Whether pinned for offline Room access" },
+        "pageCount": { "type": "integer", "description": "Number of pages, slides, or sheets" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "title", "folderId", "category", "fileType", "fileName", "fileSize", "content", "isEncrypted", "isOfflineCached", "createdAt", "updatedAt"]
+      "required": [
+        "userId",
+        "title",
+        "folderId",
+        "category",
+        "fileType",
+        "fileName",
+        "fileSize",
+        "content",
+        "isEncrypted",
+        "isOfflineCached",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
     "/users/{userId}/folders/{folderId}": {
       "schema": { "$ref": "#/entities/Folder" },
-      "description": "Personalized folders owned by a specific user"
+      "description": "User's personalized folders"
     },
     "/users/{userId}/documents/{documentId}": {
       "schema": { "$ref": "#/entities/Document" },
-      "description": "Documents owned by a specific user with real-time sync across devices"
+      "description": "User's synchronized documents across PDF, Word, Excel, PowerPoint, Scanned, and Pic formats"
     }
   }
 }

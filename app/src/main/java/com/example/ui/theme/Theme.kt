@@ -1,6 +1,5 @@
 package com.example.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -9,33 +8,41 @@ import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
     primary = DocBlueDarkPrimary,
-    onPrimary = Color(0xFF00325B),
-    primaryContainer = Color(0xFF004881),
-    onPrimaryContainer = Color(0xFFD1E4FF),
+    onPrimary = Color(0xFF003064),
+    primaryContainer = DocBlueDarkPrimaryContainer,
+    onPrimaryContainer = Color(0xFF002957),
     secondary = DocBlueDarkSecondary,
-    onSecondary = Color(0xFF003549),
-    secondaryContainer = Color(0xFF004D68),
-    onSecondaryContainer = Color(0xFFC2E8FF),
+    onSecondary = Color(0xFF003739),
+    secondaryContainer = DocBlueDarkSecondaryContainer,
+    onSecondaryContainer = Color(0xFF006C71),
     tertiary = DocEmeraldDarkAccent,
-    onTertiary = Color(0xFF003823),
+    onTertiary = Color(0xFF3C0090),
+    tertiaryContainer = DocVioletDarkContainer,
+    onTertiaryContainer = Color(0xFF34007F),
     background = DarkBackground,
     onBackground = DarkOnSurface,
     surface = DarkSurface,
     onSurface = DarkOnSurface,
     surfaceVariant = DarkSurfaceVariant,
-    onSurfaceVariant = DarkOnSurfaceVariant
+    onSurfaceVariant = DarkOnSurfaceVariant,
+    outline = DarkOutline,
+    outlineVariant = DarkOutlineVariant,
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6)
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = DocBluePrimary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD1E4FF),
-    onPrimaryContainer = Color(0xFF001D36),
-    secondary = DocBlueSecondary,
+    primaryContainer = Color(0xFFD6E3FF),
+    onPrimaryContainer = Color(0xFF001B3E),
+    secondary = Color(0xFF006C71),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFC2E8FF),
-    onSecondaryContainer = Color(0xFF001F2A),
-    tertiary = DocEmeraldAccent,
+    secondaryContainer = Color(0xFF63F7FF),
+    onSecondaryContainer = Color(0xFF002021),
+    tertiary = Color(0xFF5700C9),
     onTertiary = Color.White,
     background = LightBackground,
     onBackground = LightOnSurface,
@@ -47,7 +54,7 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun DocFlowTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
@@ -60,7 +67,6 @@ fun DocFlowTheme(
 
 @Composable
 fun MyApplicationTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) = DocFlowTheme(darkTheme = darkTheme, content = content)
-

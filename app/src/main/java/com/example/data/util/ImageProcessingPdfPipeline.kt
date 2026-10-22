@@ -27,11 +27,19 @@ data class PdfConversionResult(
     val pageCount: Int
 )
 
+data class PipelineDocToPicResult(
+    val pageBitmaps: List<Bitmap>,
+    val pageFiles: List<File>,
+    val stitchedBitmap: Bitmap,
+    val stitchedFile: File,
+    val stitchedUri: Uri
+)
+
 object ImageProcessingPdfPipeline {
 
     /**
      * Applies document enhancement filters (Magic Color, B&W High Contrast, Grayscale, Original)
-     * and optional rotation to a captured camera Bitmap.
+     * and optional rotation to a captured camera or gallery Bitmap.
      */
     suspend fun processDocumentBitmap(
         source: Bitmap,
@@ -96,8 +104,8 @@ object ImageProcessingPdfPipeline {
     }
 
     /**
-     * Generates a high-resolution rendered document bitmap from a captured frame or OCR text
-     * so every scanned page has a crisp visual representation ready for PDF conversion.
+     * Generates a high-resolution rendered document bitmap combining the embedded camera/photo bitmap
+     * AND extracted OCR text/table blocks, tailored to the target format (PDF, Word, Excel, PowerPoint).
      */
     suspend fun createHighResDocumentBitmap(
         cameraBitmap: Bitmap?,
@@ -105,81 +113,261 @@ object ImageProcessingPdfPipeline {
         ocrText: String,
         filter: ScanFilter,
         pageIndex: Int,
-        totalPages: Int
+        totalPages: Int,
+        targetFormat: String = "pdf"
     ): Bitmap = withContext(Dispatchers.Default) {
         val width = 1080
         val height = 1520
         val baseBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(baseBitmap)
 
-        // Fill clean paper background
         canvas.drawColor(Color.WHITE)
+
+        val formatColorHex = when (targetFormat.lowercase()) {
+            "pdf" -> "#DC2626"
+            "docx", "doc" -> "#0066FF"
+            "xlsx", "xls", "csv" -> "#059669"
+            "pptx", "ppt" -> "#EA580C"
+            else -> "#6200EA"
+        }
+        val formatLabel = when (targetFormat.lowercase()) {
+            "pdf" -> "PDF DOCUMENT • HYBRID OCR + EMBEDDED IMAGE"
+            "docx", "doc" -> "WORD (.DOCX) • STRUCTURED BLOCKS + EMBEDDED IMAGE"
+            "xlsx", "xls", "csv" -> "EXCEL (.XLSX) • TABLE GRID + EMBEDDED SCAN"
+            "pptx", "ppt" -> "POWERPOINT (.PPTX) • SLIDE DECK + VISUAL FRAME"
+            else -> "DOCFLOW SCAN • HYBRID OCR + IMAGE"
+        }
 
         val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#CBD5E1")
             style = Paint.Style.STROKE
             strokeWidth = 4f
         }
-        canvas.drawRoundRect(RectF(36f, 36f, width - 36f, height - 36f), 16f, 16f, borderPaint)
+        canvas.drawRoundRect(RectF(36f, 36f, width - 36f, height - 36f), 20f, 20f, borderPaint)
 
-        var yOffset = 100f
+        // Format Top Ribbon
+        val ribbonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor(formatColorHex)
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(RectF(36f, 36f, width - 36f, 112f), 20f, 20f, ribbonPaint)
 
-        // Header banner
+        val ribbonTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = 22f
+        }
+        canvas.drawText(formatLabel, 68f, 82f, ribbonTextPaint)
+
+        var yOffset = 165f
+
         val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#1E293B")
+            color = Color.parseColor("#0F172A")
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textSize = 36f
         }
         canvas.drawText(title.take(40), 72f, yOffset, headerPaint)
-        yOffset += 30f
+        yOffset += 26f
 
-        val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#2563EB")
-            style = Paint.Style.FILL
-        }
-        canvas.drawRect(72f, yOffset, 420f, yOffset + 8f, accentPaint)
-        yOffset += 48f
+        canvas.drawRect(72f, yOffset, 440f, yOffset + 6f, ribbonPaint)
+        yOffset += 44f
 
-        // If a real camera frame was captured, embed a cropped preview of the physical capture
+        // Embedded Image Layout section
         if (cameraBitmap != null) {
             val targetRect = RectF(72f, yOffset, width - 72f, yOffset + 460f)
             val srcRect = Rect(0, 0, cameraBitmap.width, cameraBitmap.height)
             canvas.drawBitmap(cameraBitmap, srcRect, targetRect, null)
             canvas.drawRect(targetRect, borderPaint)
             yOffset += 500f
+        } else {
+            // Render a visual diagram frame showing Embedded Visual Layout
+            val frameRect = RectF(72f, yOffset, width - 72f, yOffset + 240f)
+            val frameFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#F1F5F9")
+                style = Paint.Style.FILL
+            }
+            canvas.drawRoundRect(frameRect, 14f, 14f, frameFill)
+            canvas.drawRoundRect(frameRect, 14f, 14f, borderPaint)
+            val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor(formatColorHex)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textSize = 24f
+            }
+            canvas.drawText("Embedded High-Clarity Visual Frame (${filter.label})", 110f, yOffset + 100f, badgePaint)
+            val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#475569")
+                textSize = 20f
+            }
+            canvas.drawText("Combined with editable structured text & table blocks below", 110f, yOffset + 145f, subPaint)
+            yOffset += 280f
         }
 
-        // Draw OCR text lines onto the document page
+        // Draw Structured Text & Table rows
         val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#0F172A")
             typeface = Typeface.MONOSPACE
-            textSize = 24f
+            textSize = 22f
+        }
+        val tableHeaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor(formatColorHex)
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            textSize = 22f
         }
 
         val lines = ocrText.lines()
         for (rawLine in lines) {
+            val isTableLine = rawLine.trim().startsWith("|")
+            val isSectionHeader = rawLine.trim().startsWith("===")
+            val paintToUse = if (isTableLine || isSectionHeader) tableHeaderPaint else bodyPaint
             val wrappedLines = rawLine.chunked(58).ifEmpty { listOf("") }
             for (segment in wrappedLines) {
-                if (yOffset < height - 110f) {
-                    canvas.drawText(segment, 72f, yOffset, bodyPaint)
-                    yOffset += 34f
+                if (yOffset < height - 105f) {
+                    if (isTableLine) {
+                        val rowBg = Paint().apply {
+                            color = Color.parseColor("#F8FAFC")
+                            style = Paint.Style.FILL
+                        }
+                        canvas.drawRect(68f, yOffset - 24f, width - 68f, yOffset + 8f, rowBg)
+                    }
+                    canvas.drawText(segment, 72f, yOffset, paintToUse)
+                    yOffset += 33f
                 }
             }
         }
 
-        // Footer stamp
         val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#64748B")
             textSize = 20f
         }
         canvas.drawText(
-            "DocFlow Physical Scanner • Filter: ${filter.label} • Page $pageIndex of $totalPages",
+            "DocFlow Pic-to-Doc (${targetFormat.uppercase()}) • Filter: ${filter.label} • Page $pageIndex of $totalPages",
             72f,
-            height - 64f,
+            height - 60f,
             footerPaint
         )
 
         processDocumentBitmap(baseBitmap, filter)
+    }
+
+    /**
+     * Converts any document (PDF, Word, Excel, PowerPoint, Scanned, Pic) into:
+     * 1. Individual high-resolution PNG page/slide/sheet Bitmaps & Files
+     * 2. A single vertically stitched tall PNG Bitmap & File combining all pages/slides
+     */
+    suspend fun convertDocumentToPictures(
+        context: Context,
+        docId: String,
+        title: String,
+        fileType: String,
+        plainContent: String,
+        localUri: Uri?
+    ): Result<PipelineDocToPicResult> = withContext(Dispatchers.IO) {
+        try {
+            val outDir = File(context.filesDir, "doc_to_pic")
+            if (!outDir.exists()) {
+                outDir.mkdirs()
+            }
+
+            val pageBitmaps = mutableListOf<Bitmap>()
+
+            // 1. Try rendering from local PDF if available
+            if (localUri != null && (fileType == "pdf" || fileType == "scanned")) {
+                var pageIndex = 0
+                while (pageIndex < 12) {
+                    val bmp = FileParserUtils.renderPdfPage(context, localUri, pageIndex) ?: break
+                    pageBitmaps.add(bmp)
+                    pageIndex++
+                }
+            }
+
+            // 2. If not a binary PDF or if content has multiple sections/slides/sheets, render high-res pages
+            if (pageBitmaps.isEmpty()) {
+                val sections = splitContentIntoVisualPages(plainContent, title, fileType)
+                sections.forEachIndexed { idx, sectionText ->
+                    val bmp = createHighResDocumentBitmap(
+                        cameraBitmap = null,
+                        title = "$title (${idx + 1}/${sections.size})",
+                        ocrText = sectionText,
+                        filter = ScanFilter.ORIGINAL,
+                        pageIndex = idx + 1,
+                        totalPages = sections.size,
+                        targetFormat = fileType
+                    )
+                    pageBitmaps.add(bmp)
+                }
+            }
+
+            val safePrefix = title.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_').ifBlank { "doc" }
+            val pageFiles = mutableListOf<File>()
+            pageBitmaps.forEachIndexed { index, bitmap ->
+                val pageFile = File(outDir, "${safePrefix}_${docId.take(5)}_page_${index + 1}.png")
+                FileOutputStream(pageFile).use { fos ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                    fos.flush()
+                }
+                pageFiles.add(pageFile)
+            }
+
+            // 3. Create Vertically Stitched Single Image combining all pages/slides
+            val stitchWidth = pageBitmaps.maxOf { it.width }.coerceAtLeast(800)
+            val gap = 24
+            val totalHeight = pageBitmaps.sumOf { it.height } + (gap * (pageBitmaps.size - 1).coerceAtLeast(0))
+            val stitchedBitmap = Bitmap.createBitmap(
+                stitchWidth,
+                totalHeight.coerceAtMost(9000),
+                Bitmap.Config.ARGB_8888
+            )
+            val stitchCanvas = Canvas(stitchedBitmap)
+            stitchCanvas.drawColor(Color.parseColor("#E2E8F0"))
+
+            var currentY = 0f
+            val scalePaint = Paint(Paint.FILTER_BITMAP_FLAG)
+            for (bmp in pageBitmaps) {
+                if (currentY + bmp.height <= stitchedBitmap.height) {
+                    val left = ((stitchWidth - bmp.width) / 2f).coerceAtLeast(0f)
+                    stitchCanvas.drawBitmap(bmp, left, currentY, scalePaint)
+                    currentY += bmp.height + gap
+                }
+            }
+
+            val stitchedFile = File(outDir, "${safePrefix}_${docId.take(5)}_stitched_all.png")
+            FileOutputStream(stitchedFile).use { fos ->
+                stitchedBitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                fos.flush()
+            }
+
+            Result.success(
+                PipelineDocToPicResult(
+                    pageBitmaps = pageBitmaps,
+                    pageFiles = pageFiles,
+                    stitchedBitmap = stitchedBitmap,
+                    stitchedFile = stitchedFile,
+                    stitchedUri = Uri.fromFile(stitchedFile)
+                )
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private fun splitContentIntoVisualPages(
+        plainContent: String,
+        title: String,
+        fileType: String
+    ): List<String> {
+        val rawBlocks = plainContent.split(Regex("(?====\\s*(?:SLIDE|SHEET|SECTION|PAGE))"))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
+        if (rawBlocks.size > 1) {
+            return rawBlocks.take(8)
+        }
+
+        val lines = plainContent.lines()
+        if (lines.size <= 24) {
+            return listOf(plainContent.ifBlank { "=== ${fileType.uppercase()} DOCUMENT: $title ===" })
+        }
+        return lines.chunked(24).take(8).map { it.joinToString("\n") }
     }
 
     /**
@@ -204,8 +392,8 @@ object ImageProcessingPdfPipeline {
             val outFile = File(scansDir, safeName)
 
             val pdfDocument = PdfDocument()
-            val pageWidth = 595 // Standard A4 width in PostScript points
-            val pageHeight = 842 // Standard A4 height in PostScript points
+            val pageWidth = 595
+            val pageHeight = 842
 
             try {
                 bitmaps.forEachIndexed { index, bitmap ->

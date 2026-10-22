@@ -12,6 +12,15 @@ interface DocFlowDao {
     @Query("SELECT * FROM cached_documents WHERE userId = :userId AND syncState != 'PENDING_DELETE' ORDER BY updatedAtMillis DESC")
     fun observeCachedDocuments(userId: String): Flow<List<CachedDocumentEntity>>
 
+    @Query("SELECT * FROM cached_documents WHERE userId = :userId AND syncState != 'PENDING_DELETE' ORDER BY lastAccessedAtMillis DESC LIMIT 12")
+    fun observeRecentCachedDocuments(userId: String): Flow<List<CachedDocumentEntity>>
+
+    @Query("SELECT * FROM cached_documents WHERE syncState != 'PENDING_DELETE' ORDER BY lastAccessedAtMillis DESC, updatedAtMillis DESC LIMIT :limit")
+    suspend fun getRecentDocuments(limit: Int = 3): List<CachedDocumentEntity>
+
+    @Query("UPDATE cached_documents SET lastAccessedAtMillis = :accessedAtMillis WHERE id = :docId")
+    suspend fun updateDocumentLastAccessed(docId: String, accessedAtMillis: Long = System.currentTimeMillis())
+
     /**
      * Full-Text Search (FTS4) across title, contentPreview, tags, category, and fileName.
      */
@@ -53,6 +62,9 @@ interface DocFlowDao {
     @Query("SELECT * FROM cached_documents WHERE userId = :userId AND syncState != 'SYNCED'")
     suspend fun getPendingSyncDocuments(userId: String): List<CachedDocumentEntity>
 
+    @Query("SELECT * FROM cached_documents WHERE syncState != 'SYNCED' ORDER BY updatedAtMillis ASC")
+    suspend fun getAllPendingSyncDocuments(): List<CachedDocumentEntity>
+
     @Query("SELECT COUNT(*) FROM cached_documents WHERE userId = :userId AND syncState != 'SYNCED'")
     fun observePendingSyncCount(userId: String): Flow<Int>
 
@@ -68,11 +80,23 @@ interface DocFlowDao {
     @Query("UPDATE cached_documents SET tags = :tags, updatedAtMillis = :updatedAtMillis WHERE id = :docId")
     suspend fun updateDocumentTags(docId: String, tags: String, updatedAtMillis: Long = System.currentTimeMillis())
 
+    @Query("UPDATE cached_documents SET category = :category, updatedAtMillis = :updatedAtMillis WHERE id = :docId")
+    suspend fun updateDocumentCategory(docId: String, category: String, updatedAtMillis: Long = System.currentTimeMillis())
+
+    @Query("SELECT DISTINCT category FROM cached_documents WHERE userId = :userId AND syncState != 'PENDING_DELETE' ORDER BY category ASC")
+    fun observeCategories(userId: String): Flow<List<String>>
+
     @Query("DELETE FROM cached_documents WHERE id = :docId")
     suspend fun deleteDocumentById(docId: String)
 
     @Query("SELECT * FROM cached_folders WHERE userId = :userId AND syncState != 'PENDING_DELETE' ORDER BY name ASC")
     fun observeCachedFolders(userId: String): Flow<List<CachedFolderEntity>>
+
+    @Query("SELECT * FROM cached_folders WHERE syncState != 'SYNCED'")
+    suspend fun getAllPendingSyncFolders(): List<CachedFolderEntity>
+
+    @Query("UPDATE cached_folders SET syncState = :syncState, updatedAtMillis = :syncedAtMillis WHERE id = :folderId")
+    suspend fun updateFolderSyncState(folderId: String, syncState: String, syncedAtMillis: Long = System.currentTimeMillis())
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertFolder(folder: CachedFolderEntity)
@@ -91,4 +115,45 @@ interface DocFlowDao {
 
     @Query("DELETE FROM sync_logs WHERE userId = :userId")
     suspend fun clearSyncLogs(userId: String)
+
+    @Query("SELECT * FROM document_versions WHERE documentId = :docId ORDER BY versionNumber DESC LIMIT 20")
+    fun observeDocumentVersions(docId: String): Flow<List<DocumentVersionEntity>>
+
+    @Query("SELECT * FROM document_versions WHERE userId = :userId ORDER BY createdAtMillis DESC")
+    fun observeAllUserVersions(userId: String): Flow<List<DocumentVersionEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDocumentVersion(version: DocumentVersionEntity)
+
+    @Query("DELETE FROM document_versions WHERE userId = :userId AND versionNumber < :keepMinVersion")
+    suspend fun pruneOldVersions(userId: String, keepMinVersion: Int = 2)
+
+    @Query("SELECT * FROM document_comments WHERE documentId = :docId ORDER BY createdAtMillis DESC")
+    fun observeDocumentComments(docId: String): Flow<List<DocumentCommentEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertDocumentComment(comment: DocumentCommentEntity)
+
+    @Query("UPDATE document_comments SET status = :status WHERE id = :commentId")
+    suspend fun updateCommentStatus(commentId: String, status: String)
+
+    // Y.Map Live PDF Annotation Queries
+    @Query("SELECT * FROM pdf_annotations_ymap WHERE documentId = :docId ORDER BY crdtClock ASC")
+    fun observeDocumentAnnotations(docId: String): Flow<List<PdfAnnotationYMapEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPdfAnnotation(annotation: PdfAnnotationYMapEntity)
+
+    @Query("DELETE FROM pdf_annotations_ymap WHERE ymapKey = :ymapKey")
+    suspend fun deletePdfAnnotation(ymapKey: String)
+
+    @Query("DELETE FROM pdf_annotations_ymap WHERE documentId = :docId AND pageIndex = :pageIndex")
+    suspend fun clearPageAnnotations(docId: String, pageIndex: Int)
+
+    // OTA App Update History Queries
+    @Query("SELECT * FROM ota_update_records WHERE userId = :userId ORDER BY installedAtMillis DESC")
+    fun observeOtaUpdateRecords(userId: String): Flow<List<OtaUpdateRecordEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertOtaUpdateRecord(record: OtaUpdateRecordEntity)
 }
