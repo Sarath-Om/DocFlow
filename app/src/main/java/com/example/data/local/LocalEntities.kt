@@ -9,12 +9,12 @@ import com.google.firebase.Timestamp
 import java.util.Date
 
 enum class SyncState(val label: String) {
-    SYNCED("Cloud Synced"),
+    SYNCED("Saved Locally"),
     LOCAL_ONLY("Local Only"),
-    PENDING_CREATE("Pending Upload"),
-    PENDING_UPDATE("Pending Sync"),
-    PENDING_DELETE("Pending Delete"),
-    FAILED("Sync Error")
+    PENDING_CREATE("Saved Locally"),
+    PENDING_UPDATE("Saved Locally"),
+    PENDING_DELETE("Deleted"),
+    FAILED("Local Error")
 }
 
 @Entity(tableName = "cached_documents")
@@ -35,10 +35,16 @@ data class CachedDocumentEntity(
     val encryptionKeyHint: String? = null,
     val isOfflineCached: Boolean = true,
     val pageCount: Long = 1L,
-    val syncState: String = SyncState.SYNCED.name,
+    val syncState: String = SyncState.LOCAL_ONLY.name,
     val lastSyncedAtMillis: Long = System.currentTimeMillis(),
     val updatedAtMillis: Long = System.currentTimeMillis(),
-    val lastAccessedAtMillis: Long = System.currentTimeMillis()
+    val lastAccessedAtMillis: Long = System.currentTimeMillis(),
+    val isDeleted: Boolean = false,
+    val deletedAtMillis: Long? = null,
+    val isPrivateSafe: Boolean = false,
+    val createdByMe: Boolean = false,
+    val lastPageViewed: Int = 0,
+    val sourceFolderKey: String? = null
 ) {
     fun toDocEntity(): DocEntity {
         val ts = Timestamp(Date(updatedAtMillis))
@@ -84,9 +90,27 @@ data class CachedDocumentEntity(
     companion object {
         fun buildPreview(content: String, isEncrypted: Boolean): String {
             return if (isEncrypted) {
-                "Encrypted AES-256 protected document"
+                "Encrypted AES-256-GCM protected document"
             } else {
                 content.replace(Regex("\\s+"), " ").trim().take(240)
+            }
+        }
+
+        /**
+         * Keyword-based on-device auto-categorization into:
+         * Invoice, ID, Receipt, Contract, Medical, Education, Other
+         */
+        fun autoCategorizeFromText(title: String, bodyText: String, fallbackCategory: String = "Other"): String {
+            val combined = "$title $bodyText".lowercase()
+            return when {
+                combined.contains("invoice") || combined.contains("bill to") || combined.contains("amount due") || combined.contains("remittance") -> "Invoice"
+                combined.contains("passport") || combined.contains("driver license") || combined.contains("national id") || combined.contains("aadhaar") || combined.contains("pan card") || combined.contains("identity") -> "ID"
+                combined.contains("receipt") || combined.contains("paid") || combined.contains("subtotal") || combined.contains("transaction") || combined.contains("merchant") -> "Receipt"
+                combined.contains("agreement") || combined.contains("contract") || combined.contains("clause") || combined.contains("hereby") || combined.contains("nda") || combined.contains("party") -> "Contract"
+                combined.contains("medical") || combined.contains("patient") || combined.contains("prescription") || combined.contains("hospital") || combined.contains("clinic") || combined.contains("diagnosis") -> "Medical"
+                combined.contains("university") || combined.contains("syllabus") || combined.contains("semester") || combined.contains("exam") || combined.contains("lecture") || combined.contains("certificate") || combined.contains("education") -> "Education"
+                fallbackCategory.isNotBlank() && fallbackCategory != "General" && fallbackCategory != "Work" -> fallbackCategory
+                else -> "Other"
             }
         }
 
@@ -109,10 +133,16 @@ data class CachedDocumentEntity(
 
         fun fromDocEntity(
             doc: DocEntity,
-            syncState: SyncState = SyncState.SYNCED,
+            syncState: SyncState = SyncState.LOCAL_ONLY,
             localFilePath: String? = null,
             existingTags: String? = null,
-            existingLastAccessedAtMillis: Long? = null
+            existingLastAccessedAtMillis: Long? = null,
+            isDeleted: Boolean = false,
+            deletedAtMillis: Long? = null,
+            isPrivateSafe: Boolean = false,
+            createdByMe: Boolean = false,
+            lastPageViewed: Int = 0,
+            sourceFolderKey: String? = null
         ): CachedDocumentEntity {
             val updatedMs = doc.updatedAt?.toDate()?.time
                 ?: doc.createdAt?.toDate()?.time
@@ -143,7 +173,13 @@ data class CachedDocumentEntity(
                 syncState = syncState.name,
                 lastSyncedAtMillis = System.currentTimeMillis(),
                 updatedAtMillis = updatedMs,
-                lastAccessedAtMillis = resolvedAccessedMs
+                lastAccessedAtMillis = resolvedAccessedMs,
+                isDeleted = isDeleted,
+                deletedAtMillis = deletedAtMillis,
+                isPrivateSafe = isPrivateSafe,
+                createdByMe = createdByMe,
+                lastPageViewed = lastPageViewed,
+                sourceFolderKey = sourceFolderKey
             )
         }
     }
@@ -171,7 +207,8 @@ data class CachedFolderEntity(
     val name: String,
     val color: String,
     val icon: String,
-    val syncState: String = SyncState.SYNCED.name,
+    val parentFolderId: String? = null,
+    val syncState: String = SyncState.LOCAL_ONLY.name,
     val updatedAtMillis: Long = System.currentTimeMillis()
 ) {
     fun toFolderEntity(): FolderEntity {
@@ -182,6 +219,7 @@ data class CachedFolderEntity(
             name = name,
             color = color,
             icon = icon,
+            parentFolderId = parentFolderId,
             createdAt = ts,
             updatedAt = ts
         )
@@ -190,7 +228,7 @@ data class CachedFolderEntity(
     companion object {
         fun fromFolderEntity(
             folder: FolderEntity,
-            syncState: SyncState = SyncState.SYNCED
+            syncState: SyncState = SyncState.LOCAL_ONLY
         ): CachedFolderEntity {
             val updatedMs = folder.updatedAt?.toDate()?.time
                 ?: folder.createdAt?.toDate()?.time
@@ -201,6 +239,7 @@ data class CachedFolderEntity(
                 name = folder.name,
                 color = folder.color,
                 icon = folder.icon,
+                parentFolderId = folder.parentFolderId,
                 syncState = syncState.name,
                 updatedAtMillis = updatedMs
             )
@@ -241,7 +280,7 @@ data class DocumentCommentEntity(
     val documentId: String,
     val userId: String,
     val authorName: String,
-    val authorRole: String = "Editor",
+    val authorRole: String = "Owner",
     val anchorLineOrText: String,
     val body: String,
     val isSuggestion: Boolean = false,
@@ -250,4 +289,3 @@ data class DocumentCommentEntity(
     val parentCommentId: String? = null,
     val createdAtMillis: Long = System.currentTimeMillis()
 )
-

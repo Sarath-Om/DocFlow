@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DocFlow — Open, Scan and Organize Documents Privately Offline</title>
+  <meta name="description" content="DocFlow is a free, offline-first Android app to open PDF, Word, Excel and PowerPoint files, scan documents with on-device ML Kit OCR, export versions and notes to PDF, and protect files in an AES-256 Private Safe." />
+  <meta property="og:title" content="DocFlow — Open, Scan and Organize Documents Privately Offline" />
+  <meta property="og:description" content="Open PDF and Office files, scan with on-device OCR, convert and export versions or notes to PDF, and lock files with biometrics. Free for Android 8.0+." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#1F6BFF" />
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./config.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Build Output Audit Banner: Automatically visible if any placeholder in config.js is unfilled -->
+  <div id="placeholder-audit-banner" class="placeholder-audit-banner" role="status" hidden>
+    Build Audit Notice: Unfilled placeholder(s) in <code>config.js</code> must be updated before publishing:
+    <span id="placeholder-audit-list"></span>
+  </div>
+
+  <!-- Shared Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="./index.html" class="brand-logo" aria-label="DocFlow Home">
+        <span class="brand-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <line x1="10" y1="9" x2="8" y2="9"></line>
+          </svg>
+        </span>
+        <span>DocFlow</span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary Navigation">
+        <a href="./index.html" class="nav-link" aria-current="page">Home</a>
+        <a href="./privacy.html" class="nav-link">Privacy</a>
+        <a href="./terms.html" class="nav-link">Terms</a>
+      </nav>
+
+      <div class="header-actions">
+        <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" aria-pressed="false" aria-label="Toggle color theme">
+          <span aria-hidden="true">◐</span>
+          <span class="theme-toggle-label">Dark mode</span>
+        </button>
+        <a href="https://github.com/Sarath-Om/DocFlow/releases/download/DocFlow/DocFlow.apk" data-download-link class="btn btn-primary btn-sm">
+          Download APK
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <!-- 1. Hero Section -->
+    <section class="hero-section">
+      <div class="container">
+        <div class="hero-card">
+          <div class="hero-badge">
+            <span>Offline-First Android Document Suite</span>
+          </div>
+          <h1 class="hero-title">Open, scan and organize your documents. Privately, offline.</h1>
+          <p class="hero-subtext">
+            View and annotate PDF, Word, Excel and PowerPoint files, scan pages with on-device OCR, export version snapshots or notes to PDF, and lock sensitive files with AES-256 and biometrics.
+          </p>
+          <div class="hero-cta-group">
+            <a href="https://github.com/Sarath-Om/DocFlow/releases/download/DocFlow/DocFlow.apk" data-download-link class="btn btn-primary">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Download APK</span>
+            </a>
+            <a href="#features" class="btn btn-secondary">See features</a>
+          </div>
+          <p class="hero-meta">
+            <strong>Android 8.0+ · Free · No account needed</strong>
+            <br />
+            Version <span data-config="VERSION" class="placeholder-flag">[VERSION, e.g. 2.4.0]</span>
+            · Size <span data-config="SIZE_MB" class="placeholder-flag">[SIZE_MB, e.g. 18.4 MB]</span>
+            · Released <span data-config="RELEASE_DATE" class="placeholder-flag">[RELEASE_DATE, e.g. October 22, 2026]</span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. App Preview: Three Phone-Frame Mockups (Recent, Tools, Manage) -->
+    <section class="section" aria-labelledby="preview-heading">
+      <div class="container">
+        <div class="section-header">
+          <h2 id="preview-heading" class="section-title">Designed for clarity and speed</h2>
+          <p class="section-subtitle">
+            Clean, distraction-free screens built around how you actually read, scan, convert, and organize documents on Android.
+          </p>
+        </div>
+
+        <div class="phones-grid">
+          <!-- Phone 1: Recent Screen -->
+          <article class="phone-mockup" aria-label="DocFlow Recent Screen Preview">
+            <div class="phone-notch" aria-hidden="true"></div>
+            <div class="phone-top-bar">
+              <span class="phone-screen-title">Recent</span>
+              <span class="phone-pill">FTS4 Indexed</span>
+            </div>
+            <div class="mock-search-bar">Search titles, tags &amp; PDF OCR text…</div>
+            <div class="mock-list-item">
+              <span class="mock-file-badge badge-pdf">PDF</span>
+              <div class="mock-item-text">
+                <div class="mock-item-title">Vendor_Invoice_98412.pdf</div>
+                <div class="mock-item-sub">2 pages · 412 KB · OCR Indexed</div>
+              </div>
+            </div>
+            <div class="mock-list-item">
+              <span class="mock-file-badge badge-docx">DOCX</span>
+              <div class="mock-item-text">
+                <div class="mock-item-title">Master_Services_Agreement.docx</div>
+                <div class="mock-item-sub">6 pages · v3 Snapshot · Work</div>
+              </div>
+            </div>
+            <div class="mock-list-item">
+              <span class="mock-file-badge badge-xlsx">XLSX</span>
+              <div class="mock-item-text">
+                <div class="mock-item-title">Q4_Operating_Budget.xlsx</div>
+                <div class="mock-item-sub">2 sheets · Finance · Offline</div>
+              </div>
+            </div>
+            <div class="mock-list-item">
+              <span class="mock-file-badge badge-pptx">PPTX</span>
+              <div class="mock-item-text">
+                <div class="mock-item-title">Product_Roadmap_Deck.pptx</div>
+                <div class="mock-item-sub">12 slides · Long-press preview</div>
+              </div>
+            </div>
+            <div class="phone-nav-bar" aria-hidden="true">
+              <span class="phone-nav-active">● Recent</span>
+              <span>Tools</span>
+              <span>Manage</span>
+            </div>
+          </article>
+
+          <!-- Phone 2: Tools Screen -->
+          <article class="phone-mockup" aria-label="DocFlow Tools Screen Preview">
+            <div class="phone-notch" aria-hidden="true"></div>
+            <div class="phone-top-bar">
+              <span class="phone-screen-title">Tools</span>
+              <span class="phone-pill">100% On-Device</span>
+            </div>
+            <div class="mock-tools-grid">
+              <div class="mock-tool-tile">
+                <span class="mock-file-badge badge-pdf">SCAN</span>
+                <div class="mock-tool-name">CameraX Scanner</div>
+                <div class="mock-tool-desc">Edge detection &amp; multi-page PDF</div>
+              </div>
+              <div class="mock-tool-tile">
+                <span class="mock-file-badge badge-docx">OCR</span>
+                <div class="mock-tool-name">ML Kit Text OCR</div>
+                <div class="mock-tool-desc">Extract &amp; search scanned text</div>
+              </div>
+              <div class="mock-tool-tile">
+                <span class="mock-file-badge badge-xlsx">PDF</span>
+                <div class="mock-tool-name">Office &amp; Note to PDF</div>
+                <div class="mock-tool-desc">Export docs, versions &amp; notes</div>
+              </div>
+              <div class="mock-tool-tile">
+                <span class="mock-file-badge badge-pptx">PIC</span>
+                <div class="mock-tool-name">Doc-to-Pic Studio</div>
+                <div class="mock-tool-desc">Multi-page or stitched PNG</div>
+              </div>
+              <div class="mock-tool-tile">
+                <span class="mock-file-badge badge-safe">INK</span>
+                <div class="mock-tool-name">PDF Markup</div>
+                <div class="mock-tool-desc">Draw, highlight &amp; text boxes</div>
+              </div>
+              <div class="mock-tool-tile">
+                <span class="mock-file-badge badge-docx">A↔文</span>
+                <div class="mock-tool-name">Summarise &amp; Translate</div>
+                <div class="mock-tool-desc">Offline on-device models</div>
+              </div>
+            </div>
+            <div class="phone-nav-bar" aria-hidden="true">
+              <span>Recent</span>
+              <span class="phone-nav-active">● Tools</span>
+              <span>Manage</span>
+            </div>
+          </article>
+
+          <!-- Phone 3: Manage Screen -->
+          <article class="phone-mockup" aria-label="DocFlow Manage Screen Preview">
+            <div class="phone-notch" aria-hidden="true"></div>
+            <div class="phone-top-bar">
+              <span class="phone-screen-title">Manage</span>
+              <span class="phone-pill">AES-256 Vault</span>
+            </div>
+            <div class="mock-list-item">
+              <span class="mock-file-badge badge-safe">SAFE</span>
+              <div class="mock-item-text">
+                <div class="mock-item-title">Private Safe (Biometric / PIN)</div>
+                <div class="mock-item-sub">AES-256 encrypted local files</div>
+              </div>
+            </div>
+            <div class="mock-list-item">
+              <span class="mock-file-badge badge-docx">DIR</span>
+              <div class="mock-item-text">
+                <div class="mock-item-title">Work &amp; Contracts</div>
+                <div class="mock-item-sub">Smart category · #legal #q4</div>
+              </div>
+            </div>
+            <div class="mock-list-item">
+              <span class="mock-file-badge badge-xlsx">FIN</span>
+              <div class="mock-item-text">
+                <div class="mock-item-title">Finance &amp; Tax Receipts</div>
+                <div class="mock-item-sub">Smart category · #invoice #tax</div>
+              </div>
+            </div>
+            <div class="mock-list-item">
+              <span class="mock-file-badge badge-pdf">VER</span>
+              <div class="mock-item-text">
+                <div class="mock-item-title">Version Snapshots &amp; Notes</div>
+                <div class="mock-item-sub">Export any version or note as PDF</div>
+              </div>
+            </div>
+            <div class="phone-nav-bar" aria-hidden="true">
+              <span>Recent</span>
+              <span>Tools</span>
+              <span class="phone-nav-active">● Manage</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Features Grid -->
+    <section id="features" class="section" aria-labelledby="features-heading">
+      <div class="container">
+        <div class="section-header">
+          <h2 id="features-heading" class="section-title">Everything you need for mobile documents</h2>
+          <p class="section-subtitle">
+            Built with native Android performance, zero ads, and full offline capability.
+          </p>
+        </div>
+
+        <div class="features-grid">
+          <article class="feature-card">
+            <div class="icon-circle icon-blue" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+            </div>
+            <h3 class="feature-title">Open PDF and Word files</h3>
+            <p class="feature-desc">
+              Read and edit PDF, Word (.docx), Excel (.xlsx), CSV, and PowerPoint (.pptx) files with structured block editing, live PDF ink markup, and long-press metadata quick preview.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="icon-circle icon-red" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+            </div>
+            <h3 class="feature-title">Scan documents with OCR</h3>
+            <p class="feature-desc">
+              Capture single or multi-page scans via CameraX with automatic edge detection filters, and run Google ML Kit Text Recognition for instant full-text search inside PDFs.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="icon-circle icon-green" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 3 21 3 21 8"></polyline>
+                <line x1="4" y1="20" x2="21" y2="3"></line>
+                <polyline points="21 16 21 21 16 21"></polyline>
+                <line x1="15" y1="15" x2="21" y2="21"></line>
+              </svg>
+            </div>
+            <h3 class="feature-title">Convert Office files to PDF</h3>
+            <p class="feature-desc">
+              Convert between PDF, Word, Excel, PowerPoint, and high-res PNG images, or export individual document version snapshots and notes directly as standalone PDF files.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="icon-circle icon-amber" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 8l6 6"></path>
+                <path d="M4 14l6-6 2-3"></path>
+                <path d="M2 5h12"></path>
+                <path d="M7 2h1"></path>
+                <path d="M22 22l-5-10-5 10"></path>
+                <path d="M14 18h6"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Summarise and translate on your device</h3>
+            <p class="feature-desc">
+              Extract key document points and translate multi-language text directly on your phone using local ML Kit models without sending your files to external servers.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="icon-circle icon-purple" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Private Safe with PIN/biometric lock</h3>
+            <p class="feature-desc">
+              Protect confidential scans and contracts with AES-256 encryption (PBKDF2 key derivation) and AndroidX BiometricPrompt fingerprint or face authentication.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="icon-circle icon-teal" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Smart folders and categories</h3>
+            <p class="feature-desc">
+              Organize files into custom folders, categories (Work, Personal, Finance, Legal, Invoices), and custom #tags backed by sub-15ms SQLite FTS4 full-text search.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="icon-circle icon-slate" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Dark mode</h3>
+            <p class="feature-desc">
+              Follows your Android system appearance automatically or switches manually between crisp light and low-glare dark themes for comfortable late-night reading.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="icon-circle icon-indigo" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+                <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+                <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+                <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                <line x1="12" y1="20" x2="12.01" y2="20"></line>
+              </svg>
+            </div>
+            <h3 class="feature-title">Works fully offline</h3>
+            <p class="feature-desc">
+              Every core feature—viewing, scanning, ML Kit OCR, PDF annotation, version history, and PDF export—runs locally on your phone with zero internet dependency.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. "Your files stay on your phone" Section -->
+    <section class="section" aria-labelledby="privacy-callout-heading">
+      <div class="container">
+        <div class="card">
+          <h2 id="privacy-callout-heading" class="section-title">Your files stay on your phone</h2>
+          <p class="section-subtitle">
+            DocFlow is built for privacy by design. Your personal documents, tax returns, contracts, and scans belong to you—not a data broker.
+          </p>
+
+          <div class="privacy-callout-grid">
+            <div class="privacy-stat-box">
+              <div class="privacy-stat-title">No servers required</div>
+              <p class="feature-desc">
+                Documents, OCR text indexes, version snapshots, and Private Safe files are stored in the app's private storage on your device.
+              </p>
+            </div>
+            <div class="privacy-stat-box">
+              <div class="privacy-stat-title">No mandatory account</div>
+              <p class="feature-desc">
+                Open, scan, annotate, and export PDFs offline without registering an email address or handing over personal profile data.
+              </p>
+            </div>
+            <div class="privacy-stat-box">
+              <div class="privacy-stat-title">Zero analytics or trackers</div>
+              <p class="feature-desc">
+                No advertising SDKs, no telemetry beacons, no behavioral profiling, and no third-party crash trackers in the app or on this site.
+              </p>
+            </div>
+          </div>
+
+          <hr class="divider" />
+          <p style="margin: 0;">
+            Read the full details in our plain-language <a href="./privacy.html">Privacy Policy</a>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. How to Install (Android Sideload Steps) & 8. SHA-256 Checksum -->
+    <section id="install" class="section" aria-labelledby="install-heading">
+      <div class="container">
+        <div class="section-header">
+          <h2 id="install-heading" class="section-title">How to install DocFlow</h2>
+          <p class="section-subtitle">
+            Install the official APK directly on any Android 8.0+ phone or tablet in four quick steps.
+          </p>
+        </div>
+
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-num" aria-hidden="true">1</div>
+            <h3 class="feature-title">Tap Download APK</h3>
+            <p class="feature-desc">
+              Tap the <a href="https://github.com/Sarath-Om/DocFlow/releases/download/DocFlow/DocFlow.apk" data-download-link>Download APK</a> button on this page to download <code>DocFlow.apk</code> from GitHub Releases.
+            </p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num" aria-hidden="true">2</div>
+            <h3 class="feature-title">Open the downloaded file</h3>
+            <p class="feature-desc">
+              Tap the download complete notification in your browser or locate <code>DocFlow.apk</code> in your phone's <strong>Downloads</strong> folder.
+            </p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num" aria-hidden="true">3</div>
+            <h3 class="feature-title">Allow unknown apps if asked</h3>
+            <p class="feature-desc">
+              If prompted by Android, enable <strong>"Install unknown apps"</strong> for your browser or file manager. You can turn this setting back off right after installing.
+            </p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num" aria-hidden="true">4</div>
+            <h3 class="feature-title">Tap Install and open DocFlow</h3>
+            <p class="feature-desc">
+              Confirm the installation prompt and tap <strong>Open</strong> to start opening, scanning, and organizing your documents offline.
+            </p>
+          </div>
+        </div>
+
+        <div class="sideload-note" role="note">
+          <strong>Direct APK Distribution Note:</strong> DocFlow is distributed directly as an APK from our official GitHub Releases repository and is not distributed through the Google Play Store. Because it is installed outside the Play Store, Android or Google Play Protect may display a standard warning prompt for unfamiliar apps. Always download only from the official link on this website or <a href="https://github.com/Sarath-Om/DocFlow/releases" rel="noopener">GitHub Releases</a>.
+        </div>
+
+        <!-- 8. SHA-256 Checksum Box (Hidden automatically when SHA256_CHECKSUM is empty in config.js) -->
+        <div id="checksum-container" class="checksum-card" hidden>
+          <h3 class="feature-title">Verify APK Integrity (SHA-256 Checksum)</h3>
+          <div class="checksum-row">
+            <code id="checksum-value" class="checksum-code"></code>
+            <button type="button" id="copy-checksum-btn" class="btn btn-secondary btn-sm">Copy SHA-256</button>
+          </div>
+          <p class="feature-desc">
+            <strong>How to verify:</strong> Run <code>sha256sum DocFlow.apk</code> (Linux/macOS/Termux) or <code>CertUtil -hashfile DocFlow.apk SHA256</code> (Windows PowerShell) and confirm the output matches the checksum above.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. FAQ Accordion (Accessible <details> / <summary>) -->
+    <section id="faq" class="section" aria-labelledby="faq-heading">
+      <div class="container-narrow">
+        <div class="section-header">
+          <h2 id="faq-heading" class="section-title">Frequently asked questions</h2>
+          <p class="section-subtitle">
+            Clear answers about pricing, offline operation, storage, and data ownership.
+          </p>
+        </div>
+
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary class="faq-summary">
+              <span>Is it free?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-answer">
+              Yes. DocFlow is completely free to download and use, with no subscriptions, no locked paywalls, and no advertisements.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-summary">
+              <span>Does it need internet?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-answer">
+              No. Viewing, editing, CameraX document scanning, ML Kit OCR text extraction, PDF markup, version snapshots, and exporting documents/versions/notes to PDF all work 100% offline. Internet is only used if you download an optional on-device translation language pack from Google ML Kit model servers or explicitly enable workspace sync.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-summary">
+              <span>Where are my files stored?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-answer">
+              Your imported documents, scanned PDFs, version snapshots, notes, and Private Safe files are stored locally inside DocFlow's private application directory and Room SQLite database on your phone. Other apps cannot read your private app storage unless you explicitly export or share a file.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-summary">
+              <span>Does DocFlow upload my documents?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-answer">
+              In local offline mode, DocFlow never uploads your documents anywhere. All OCR, summarising, translation, and PDF generation run on your device. Any file export or share happens only when you tap Share or Export.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-summary">
+              <span>Which formats are supported?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-answer">
+              DocFlow supports PDF (<code>.pdf</code>), Microsoft Word (<code>.doc</code>, <code>.docx</code>), Microsoft Excel (<code>.xls</code>, <code>.xlsx</code>, <code>.csv</code>), Microsoft PowerPoint (<code>.ppt</code>, <code>.pptx</code>), plain text (<code>.txt</code>), and images (<code>.png</code>, <code>.jpg</code>, <code>.webp</code>). You can also convert documents to high-resolution PNGs or export any document version or note as a PDF file.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-summary">
+              <span>How do I delete my data?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-answer">
+              You can delete individual documents, folders, annotations, or version snapshots directly inside the app. To permanently erase all data at once, uninstall the DocFlow app or open Android <strong>Settings → Apps → DocFlow → Storage &amp; cache → Clear storage</strong>.
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Final Call-to-Action -->
+    <section class="section" aria-labelledby="cta-heading">
+      <div class="container">
+        <div class="hero-card">
+          <h2 id="cta-heading" class="section-title">Ready to take control of your documents?</h2>
+          <p class="hero-subtext">
+            Download the latest DocFlow APK for Android and manage all your PDFs, scans, and Office files privately on your device.
+          </p>
+          <div class="hero-cta-group">
+            <a href="https://github.com/Sarath-Om/DocFlow/releases/download/DocFlow/DocFlow.apk" data-download-link class="btn btn-primary">
+              Download APK
+            </a>
+            <a href="https://github.com/Sarath-Om/DocFlow/releases" rel="noopener" class="btn btn-secondary">
+              View on GitHub Releases
+            </a>
+          </div>
+          <p class="hero-meta">
+            Direct APK download · <span data-config="MIN_ANDROID">Android 8.0+</span> · Version <span data-config="VERSION" class="placeholder-flag">[VERSION, e.g. 2.4.0]</span>
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Shared Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>
+        <strong>DocFlow</strong> · © 2026 <span data-config="DEVELOPER_NAME" class="placeholder-flag">[DEVELOPER / ORGANIZATION NAME]</span>. All rights reserved.
+      </div>
+      <div class="footer-links">
+        <a href="./index.html">Home</a>
+        <a href="./privacy.html">Privacy Policy</a>
+        <a href="./terms.html">Terms of Service</a>
+        <a href="https://github.com/Sarath-Om/DocFlow/releases" rel="noopener">GitHub Releases</a>
+        <span>Contact: <a data-config-mailto="CONTACT_EMAIL" class="placeholder-flag">[EMAIL]</a></span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

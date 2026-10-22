@@ -559,6 +559,8 @@ fun CommentsAndSuggestionsModal(
     onResolveComment: (String) -> Unit,
     onAcceptSuggestion: (DocumentCommentEntity) -> Unit,
     onRejectSuggestion: (DocumentCommentEntity) -> Unit,
+    onExportCommentAsPdf: (DocumentCommentEntity) -> Unit = {},
+    onExportAllNotesAsPdf: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var anchorInput by remember { mutableStateOf("Section 1 / Clause") }
@@ -585,10 +587,33 @@ fun CommentsAndSuggestionsModal(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Anchor comments to text blocks with @mentions, or propose tracked suggestions that owners can accept or reject.",
+                    text = "Anchor comments to text blocks with @mentions, propose tracked suggestions, or export individual notes as standalone PDF files.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                if (comments.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = onExportAllNotesAsPdf,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_all_notes_pdf_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PictureAsPdf,
+                            contentDescription = null,
+                            tint = Color(0xFFDC2626),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Export All Notes (${comments.size}) as PDF",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
 
                 if (currentUserRole.canComment) {
                     Surface(
@@ -773,37 +798,59 @@ fun CommentsAndSuggestionsModal(
                                     }
                                 }
 
-                                if (item.status == "OPEN" && currentUserRole.canEdit) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End,
-                                        verticalAlignment = Alignment.CenterVertically
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { onExportCommentAsPdf(item) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.testTag("export_note_pdf_${item.id}")
                                     ) {
-                                        if (item.isSuggestion) {
-                                            TextButton(
-                                                onClick = { onAcceptSuggestion(item) },
-                                                modifier = Modifier.testTag("accept_suggestion_${item.id}")
-                                            ) {
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF059669), modifier = Modifier.size(15.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Accept & Merge", color = Color(0xFF059669), fontWeight = FontWeight.Bold)
-                                            }
-                                            TextButton(
-                                                onClick = { onRejectSuggestion(item) },
-                                                modifier = Modifier.testTag("reject_suggestion_${item.id}")
-                                            ) {
-                                                Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(15.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Reject", color = Color(0xFFE11D48))
-                                            }
-                                        } else {
-                                            TextButton(
-                                                onClick = { onResolveComment(item.id) },
-                                                modifier = Modifier.testTag("resolve_comment_${item.id}")
-                                            ) {
-                                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(15.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Resolve")
+                                        Icon(
+                                            imageVector = Icons.Default.PictureAsPdf,
+                                            contentDescription = null,
+                                            tint = Color(0xFFDC2626),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Export Note PDF", style = MaterialTheme.typography.labelSmall)
+                                    }
+
+                                    if (item.status == "OPEN" && currentUserRole.canEdit) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.End,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (item.isSuggestion) {
+                                                TextButton(
+                                                    onClick = { onAcceptSuggestion(item) },
+                                                    modifier = Modifier.testTag("accept_suggestion_${item.id}")
+                                                ) {
+                                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF059669), modifier = Modifier.size(15.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Accept & Merge", color = Color(0xFF059669), fontWeight = FontWeight.Bold)
+                                                }
+                                                TextButton(
+                                                    onClick = { onRejectSuggestion(item) },
+                                                    modifier = Modifier.testTag("reject_suggestion_${item.id}")
+                                                ) {
+                                                    Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(15.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Reject", color = Color(0xFFE11D48))
+                                                }
+                                            } else {
+                                                TextButton(
+                                                    onClick = { onResolveComment(item.id) },
+                                                    modifier = Modifier.testTag("resolve_comment_${item.id}")
+                                                ) {
+                                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(15.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Resolve")
+                                                }
                                             }
                                         }
                                     }
@@ -823,7 +870,8 @@ fun CommentsAndSuggestionsModal(
 }
 
 /**
- * Dialog for viewing CRDT Version History Snapshots, saving named versions, and non-destructively restoring any snapshot.
+ * Dialog for viewing CRDT Version History Snapshots, saving named versions, exporting individual versions as PDF,
+ * and non-destructively restoring any snapshot.
  */
 @Composable
 fun VersionHistoryModal(
@@ -832,6 +880,7 @@ fun VersionHistoryModal(
     canRestore: Boolean,
     onCreateNamedVersion: (String) -> Unit,
     onRestoreVersion: (DocumentVersionEntity) -> Unit,
+    onExportVersionAsPdf: (DocumentVersionEntity) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var versionNameInput by remember { mutableStateOf("") }
@@ -855,7 +904,7 @@ fun VersionHistoryModal(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Restoring a snapshot creates a new version checkpoint and never deletes historical versions.",
+                    text = "Export any individual version snapshot as a standalone PDF file, or restore a snapshot to create a new version checkpoint.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -945,11 +994,29 @@ fun VersionHistoryModal(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
-                                if (canRestore && !isLatest) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { onExportVersionAsPdf(ver) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.testTag("export_version_pdf_${ver.versionNumber}")
                                     ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PictureAsPdf,
+                                            contentDescription = null,
+                                            tint = Color(0xFFDC2626),
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Export Version PDF", style = MaterialTheme.typography.labelSmall)
+                                    }
+
+                                    if (canRestore && !isLatest) {
                                         OutlinedButton(
                                             onClick = { onRestoreVersion(ver) },
                                             shape = RoundedCornerShape(10.dp),

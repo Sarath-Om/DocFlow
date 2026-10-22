@@ -81,69 +81,11 @@ const val HOTLINK_COUNSEL_AVATAR_URL =
 fun Modifier.appleCrystalGlassBlur(
     tintColor: Color? = null,
     isDark: Boolean = true,
-    frostAlpha: Float = 0.72f
-): Modifier = this.drawWithContent {
-    val w = size.width
-    val h = size.height
-
-    val baseTop = when {
-        tintColor != null -> tintColor.copy(alpha = if (isDark) 0.20f else 0.16f)
-        isDark -> Color(0xFF1E243B).copy(alpha = frostAlpha)
-        else -> Color(0xFF1A2035).copy(alpha = frostAlpha)
-    }
-    val baseMid = if (isDark) {
-        Color(0xFF131728).copy(alpha = frostAlpha * 0.92f)
-    } else {
-        Color(0xFF141829).copy(alpha = frostAlpha * 0.90f)
-    }
-    val baseBottom = if (isDark) {
-        Color(0xFF0D101D).copy(alpha = frostAlpha * 0.96f)
-    } else {
-        Color(0xFF101424).copy(alpha = frostAlpha * 0.94f)
-    }
-
-    // 1. Translucent frosted glass body
-    drawRect(
-        brush = Brush.linearGradient(
-            colors = listOf(baseTop, baseMid, baseBottom),
-            start = Offset(0f, 0f),
-            end = Offset(w, h)
-        )
-    )
-
-    // 2. Diagonal Apple Crystal Glass optical caustic reflection
-    drawRect(
-        brush = Brush.linearGradient(
-            colors = listOf(
-                Color.White.copy(alpha = 0.11f),
-                (tintColor ?: Color(0xFF00F4FE)).copy(alpha = 0.05f),
-                Color.Transparent
-            ),
-            start = Offset(0f, 0f),
-            end = Offset(w * 0.65f, h * 0.55f)
-        )
-    )
-
-    // 3. Render child composable content
-    drawContent()
-
-    // 4. Specular top-edge crystal rim highlight
-    drawLine(
-        brush = Brush.horizontalGradient(
-            colors = listOf(
-                Color.White.copy(alpha = 0.42f),
-                (tintColor ?: Color(0xFF00F4FE)).copy(alpha = 0.28f),
-                Color.White.copy(alpha = 0.06f)
-            )
-        ),
-        start = Offset(w * 0.05f, 1f),
-        end = Offset(w * 0.95f, 1f),
-        strokeWidth = 1.5f
-    )
-}
+    frostAlpha: Float = 1.0f
+): Modifier = this
 
 /**
- * Hotlinked DocFlow App Icon in a frosted Crystal Glass Material3 Surface tile, with Canvas fallback.
+ * Flat minimal DocFlow App Icon tile.
  */
 @Composable
 fun HotlinkedDocFlowIconBadge(
@@ -154,11 +96,10 @@ fun HotlinkedDocFlowIconBadge(
     Surface(
         modifier = modifier
             .size(size)
-            .clip(shape)
-            .appleCrystalGlassBlur(tintColor = Color(0xFF00F4FE), frostAlpha = 0.45f),
+            .clip(shape),
         shape = shape,
-        color = Color.White.copy(alpha = 0.06f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f))
+        color = Color(0xFF1F6BFF).copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, Color(0xFF1F6BFF).copy(alpha = 0.24f))
     ) {
         Box(
             modifier = Modifier
@@ -166,33 +107,20 @@ fun HotlinkedDocFlowIconBadge(
                 .padding(4.dp),
             contentAlignment = Alignment.Center
         ) {
-            SubcomposeAsyncImage(
-                model = HOTLINK_DOCFLOW_ICON_URL,
-                contentDescription = "DocFlow App Icon",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Fit,
-                loading = {
-                    DocFlowBrandLogo(iconSize = size - 8.dp, showWordmark = false)
-                },
-                error = {
-                    DocFlowBrandLogo(iconSize = size - 8.dp, showWordmark = false)
-                }
-            )
+            DocFlowBrandLogo(iconSize = size - 8.dp, showWordmark = false)
         }
     }
 }
 
 /**
- * Hotlinked Profile / Collaborator Avatar with luminous cyan-to-indigo gradient ring.
+ * Flat Profile / Author Avatar badge.
  */
 @Composable
 fun HotlinkedCrystalAvatar(
     imageUrl: String = HOTLINK_PROFILE_AVATAR_URL,
     contentDescription: String = "Profile",
     size: Dp = 34.dp,
-    ringColors: List<Color> = listOf(Color(0xFF00F4FE), Color(0xFF3E90FF), Color(0xFFA178FF)),
+    ringColors: List<Color> = listOf(Color(0xFF1F6BFF), Color(0xFF1F6BFF)),
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -203,62 +131,26 @@ fun HotlinkedCrystalAvatar(
             .clip(CircleShape)
             .then(clickMod),
         shape = CircleShape,
-        color = Color.Transparent,
-        border = BorderStroke(2.dp, Brush.linearGradient(ringColors))
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(2.dp),
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            SubcomposeAsyncImage(
-                model = imageUrl,
+            Icon(
+                imageVector = Icons.Default.Person,
                 contentDescription = contentDescription,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .background(Color(0xFF10131F)),
-                contentScale = ContentScale.Crop,
-                loading = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFF191B28)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = contentDescription,
-                            tint = Color(0xFF00F4FE),
-                            modifier = Modifier.size(size * 0.55f)
-                        )
-                    }
-                },
-                error = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFF191B28)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = contentDescription,
-                            tint = Color(0xFF00F4FE),
-                            modifier = Modifier.size(size * 0.55f)
-                        )
-                    }
-                }
+                tint = Color(0xFF1F6BFF),
+                modifier = Modifier.size(size * 0.55f)
             )
         }
     }
 }
 
 /**
- * Apple Crystal Glass ambient mesh background built on Material3 `Surface` with
- * hardware Gaussian `Modifier.blur` applied to the chromatic light orbs (`#00F4FE` cyan,
- * `#3E90FF` electric sapphire, `#7000FF` spectral violet, and `#10B981` emerald).
+ * Flat minimal page background (#F0F1F3 in light mode, #0F1113 in dark mode).
+ * No glassmorphism, no blur.
  */
 @Composable
 fun CrystalGlassBackground(
@@ -266,107 +158,30 @@ fun CrystalGlassBackground(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val baseGradient = if (isDark) {
-        Brush.linearGradient(
-            colors = listOf(
-                Color(0xFF070913),
-                Color(0xFF0B0E1C),
-                Color(0xFF101426),
-                Color(0xFF070913)
-            ),
-            start = Offset(0f, 0f),
-            end = Offset(1200f, 2400f)
-        )
-    } else {
-        Brush.linearGradient(
-            colors = listOf(
-                Color(0xFF0B0D1A),
-                Color(0xFF101425),
-                Color(0xFF161B30),
-                Color(0xFF0B0D1A)
-            ),
-            start = Offset(0f, 0f),
-            end = Offset(1200f, 2400f)
-        )
-    }
-
     Surface(
         modifier = modifier.fillMaxSize(),
-        color = Color.Transparent
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(baseGradient)
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            // Blurred ambient light mesh layer for authentic Apple Crystal Glass depth
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(radius = 64.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-            ) {
-                val w = size.width
-                val h = size.height
-
-                // Top-left cyan glow orb
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF00F4FE).copy(alpha = 0.20f), Color.Transparent),
-                        center = Offset(w * 0.12f, h * 0.08f),
-                        radius = w * 0.65f
-                    ),
-                    center = Offset(w * 0.12f, h * 0.08f),
-                    radius = w * 0.65f
-                )
-
-                // Top-right electric indigo/sapphire orb
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF3E90FF).copy(alpha = 0.22f), Color.Transparent),
-                        center = Offset(w * 0.92f, h * 0.26f),
-                        radius = w * 0.72f
-                    ),
-                    center = Offset(w * 0.92f, h * 0.26f),
-                    radius = w * 0.72f
-                )
-
-                // Lower-left spectral purple orb
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF7000FF).copy(alpha = 0.18f), Color.Transparent),
-                        center = Offset(w * 0.10f, h * 0.68f),
-                        radius = w * 0.70f
-                    ),
-                    center = Offset(w * 0.10f, h * 0.68f),
-                    radius = w * 0.70f
-                )
-
-                // Bottom-right cyan/emerald ambient orb
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF10B981).copy(alpha = 0.15f), Color.Transparent),
-                        center = Offset(w * 0.82f, h * 0.90f),
-                        radius = w * 0.60f
-                    ),
-                    center = Offset(w * 0.82f, h * 0.90f),
-                    radius = w * 0.60f
-                )
-            }
             content()
         }
     }
 }
 
 /**
- * Apple Crystal Glass Card built using Material3's `Card` and `Surface` with
- * `Modifier.appleCrystalGlassBlur`, transparent container colors, directional 1dp
- * specular rim border, and colored ambient glow.
+ * Flat minimal Card (#FFFFFF in light mode, #1B1D20 in dark mode) with ~24dp corner radius,
+ * no heavy shadows, no blur.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CrystalGlassCard(
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 22.dp,
+    cornerRadius: Dp = 24.dp,
     isDark: Boolean = true,
     tintColor: Color? = null,
     onClick: (() -> Unit)? = null,
@@ -374,17 +189,6 @@ fun CrystalGlassCard(
     content: @Composable BoxScope.() -> Unit
 ) {
     val shape: Shape = RoundedCornerShape(cornerRadius)
-
-    val specularBorderBrush = Brush.linearGradient(
-        colors = listOf(
-            Color.White.copy(alpha = 0.34f),
-            (tintColor ?: Color(0xFF00F4FE)).copy(alpha = 0.24f),
-            Color.White.copy(alpha = 0.08f)
-        ),
-        start = Offset(0f, 0f),
-        end = Offset(520f, 520f)
-    )
-
     val clickMod = when {
         onClick != null && onLongClick != null -> Modifier.combinedClickable(
             onClick = onClick,
@@ -400,71 +204,44 @@ fun CrystalGlassCard(
 
     Card(
         modifier = modifier
-            .shadow(
-                elevation = 12.dp,
-                shape = shape,
-                ambientColor = (tintColor ?: Color(0xFF00F4FE)).copy(alpha = 0.20f),
-                spotColor = (tintColor ?: Color(0xFF3E90FF)).copy(alpha = 0.24f)
-            )
             .clip(shape)
             .then(clickMod),
         shape = shape,
         colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent,
-            contentColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Surface(
-            modifier = Modifier
-                .appleCrystalGlassBlur(
-                    tintColor = tintColor,
-                    isDark = isDark,
-                    frostAlpha = 0.72f
-                ),
-            shape = shape,
-            color = Color.White.copy(alpha = 0.03f),
-            contentColor = Color.White,
-            tonalElevation = 4.dp,
-            border = BorderStroke(width = 1.dp, brush = specularBorderBrush)
-        ) {
-            Box(content = content)
-        }
+        Box(content = content)
     }
 }
 
 /**
- * Reusable Material3 `Surface` with Apple Crystal Glass blur/refraction and specular rim.
+ * Reusable flat Material3 `Surface` with 16dp-24dp corner radius and thin divider border.
  */
 @Composable
 fun CrystalGlassSurface(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 16.dp,
     tintColor: Color? = null,
-    frostAlpha: Float = 0.62f,
+    frostAlpha: Float = 1.0f,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(cornerRadius)
-    val borderBrush = Brush.linearGradient(
-        colors = listOf(
-            Color.White.copy(alpha = 0.30f),
-            (tintColor ?: Color(0xFF00F4FE)).copy(alpha = 0.20f),
-            Color.White.copy(alpha = 0.06f)
-        )
-    )
     val clickMod = if (onClick != null) Modifier.clickable { onClick() } else Modifier
 
     Surface(
         modifier = modifier
             .clip(shape)
-            .appleCrystalGlassBlur(tintColor = tintColor, frostAlpha = frostAlpha)
             .then(clickMod),
         shape = shape,
-        color = Color.White.copy(alpha = 0.04f),
-        contentColor = Color.White,
-        tonalElevation = 2.dp,
-        border = BorderStroke(1.dp, borderBrush)
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Box(content = content)
     }

@@ -2,50 +2,77 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Crystal Glass UI Palette
-val DocBluePrimary = Color(0xFF0A84FF)
-val DocBlueSecondary = Color(0xFF00F4FE)
-val DocEmeraldAccent = Color(0xFF34D399)
+// DocFlow Flat Minimal Design System Palette
+val DocFlowAccentBlue = Color(0xFF1F6BFF)
+val DocFlowAccentBlueDark = Color(0xFF4785FF)
 
-val DocBlueDarkPrimary = Color(0xFFAAC7FF)
-val DocBlueDarkPrimaryContainer = Color(0xFF3E90FF)
-val DocBlueDarkSecondary = Color(0xFFE6FEFF)
-val DocBlueDarkSecondaryContainer = Color(0xFF00F4FE)
-val DocEmeraldDarkAccent = Color(0xFFD1BCFF)
-val DocVioletDarkContainer = Color(0xFFA178FF)
+// Light Mode Tokens
+val DocFlowLightBackground = Color(0xFFF0F1F3)
+val DocFlowLightCard = Color(0xFFFFFFFF)
+val DocFlowLightTextPrimary = Color(0xFF111111)
+val DocFlowLightTextSecondary = Color(0xFF8A8D93)
+val DocFlowLightDivider = Color(0xFFE5E7EB)
 
-val DarkBackground = Color(0xFF080A14)
-val DarkSurface = Color(0xFF10131F)
-val DarkSurfaceLowest = Color(0xFF0B0D1A)
-val DarkSurfaceLow = Color(0xFF191B28)
-val DarkSurfaceContainer = Color(0xFF1D1F2C)
-val DarkSurfaceHigh = Color(0xFF272937)
-val DarkSurfaceVariant = Color(0xFF323442)
-val DarkOnSurface = Color(0xFFE1E1F3)
-val DarkOnSurfaceVariant = Color(0xFFC0C6D6)
-val DarkOutline = Color(0xFF8B91A0)
-val DarkOutlineVariant = Color(0xFF414754)
+// Dark Mode Tokens
+val DocFlowDarkBackground = Color(0xFF0F1113)
+val DocFlowDarkCard = Color(0xFF1B1D20)
+val DocFlowDarkTextPrimary = Color(0xFFF2F3F5)
+val DocFlowDarkTextSecondary = Color(0xFF9A9DA3)
+val DocFlowDarkDivider = Color(0xFF2A2D32)
 
-val LightBackground = Color(0xFFF4F7FF)
-val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFE9EFFD)
-val LightOnSurface = Color(0xFF0B0D1A)
-val LightOnSurfaceVariant = Color(0xFF414754)
+// Icon Circle & File Format Accents
+val DocFlowRedPdf = Color(0xFFE53935)
+val DocFlowBlueWord = Color(0xFF1F6BFF)
+val DocFlowTealTranslate = Color(0xFF0D9488)
+val DocFlowGreenExcel = Color(0xFF16A34A)
+val DocFlowOrangePpt = Color(0xFFEA580C)
+val DocFlowGrayTxt = Color(0xFF6B7280)
+val DocFlowPurpleOfd = Color(0xFF7C3AED)
 
-val CrystalCyan = Color(0xFF00F4FE)
-val CrystalSapphire = Color(0xFF3E90FF)
-val CrystalViolet = Color(0xFFA178FF)
-val CrystalAmber = Color(0xFFFBBF24)
-val CrystalEmerald = Color(0xFF34D399)
-val CrystalRose = Color(0xFFF43F5E)
+// Legacy compatibility aliases used by sub-components
+val DocBluePrimary = DocFlowAccentBlue
+val DocBlueSecondary = DocFlowTealTranslate
+val DocEmeraldAccent = DocFlowGreenExcel
+
+val DocBlueDarkPrimary = DocFlowAccentBlueDark
+val DocBlueDarkPrimaryContainer = Color(0xFF17397A)
+val DocBlueDarkSecondary = Color(0xFF2DD4BF)
+val DocBlueDarkSecondaryContainer = Color(0xFF115E59)
+val DocEmeraldDarkAccent = Color(0xFF4ADE80)
+val DocVioletDarkContainer = Color(0xFF5B21B6)
+
+val DarkBackground = DocFlowDarkBackground
+val DarkSurface = DocFlowDarkCard
+val DarkSurfaceLowest = Color(0xFF0A0C0E)
+val DarkSurfaceLow = Color(0xFF15171A)
+val DarkSurfaceContainer = DocFlowDarkCard
+val DarkSurfaceHigh = Color(0xFF23262A)
+val DarkSurfaceVariant = Color(0xFF282B30)
+val DarkOnSurface = DocFlowDarkTextPrimary
+val DarkOnSurfaceVariant = DocFlowDarkTextSecondary
+val DarkOutline = Color(0xFF3E4249)
+val DarkOutlineVariant = DocFlowDarkDivider
+
+val LightBackground = DocFlowLightBackground
+val LightSurface = DocFlowLightCard
+val LightSurfaceVariant = Color(0xFFE6E8EC)
+val LightOnSurface = DocFlowLightTextPrimary
+val LightOnSurfaceVariant = DocFlowLightTextSecondary
+
+val CrystalCyan = DocFlowTealTranslate
+val CrystalSapphire = DocFlowAccentBlue
+val CrystalViolet = DocFlowPurpleOfd
+val CrystalAmber = DocFlowOrangePpt
+val CrystalEmerald = DocFlowGreenExcel
+val CrystalRose = DocFlowRedPdf
 
 val FolderColors = listOf(
-    "#00F4FE", // Neon Cyan
-    "#3E90FF", // Electric Sapphire
-    "#A178FF", // Spectral Violet
-    "#34D399", // Emerald
-    "#FBBF24", // Amber
-    "#F43F5E", // Crimson Rose
-    "#2563EB", // Royal Blue
-    "#0891B2"  // Deep Aqua
+    "#1F6BFF", // DocFlow Blue
+    "#E53935", // PDF Red
+    "#0D9488", // Translate Teal
+    "#16A34A", // Green
+    "#EA580C", // Orange
+    "#7C3AED", // Purple
+    "#D97706", // Amber
+    "#6B7280"  // Slate Gray
 )

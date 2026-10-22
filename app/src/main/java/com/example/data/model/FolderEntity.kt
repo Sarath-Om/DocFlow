@@ -10,8 +10,9 @@ data class FolderEntity(
     @DocumentId var id: String = "",
     var userId: String = "",
     var name: String = "",
-    var color: String = "#2563EB",
+    var color: String = "#1F6BFF",
     var icon: String = "folder",
+    var parentFolderId: String? = null,
     @ServerTimestamp var createdAt: Timestamp? = null,
     @ServerTimestamp var updatedAt: Timestamp? = null
 )

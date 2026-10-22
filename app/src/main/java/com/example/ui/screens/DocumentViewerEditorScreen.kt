@@ -230,13 +230,18 @@ fun DocumentViewerEditorScreen(
     ) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onCreateNamedVersion: (versionLabel: String, plainContent: String) -> Unit = { _, _ -> },
     onRestoreVersion: (DocumentVersionEntity, String?, (String) -> Unit) -> Unit = { _, _, _ -> },
+    onExportVersionAsPdf: (DocumentVersionEntity) -> Unit = {},
     onAddComment: (anchorText: String, body: String, isSuggestion: Boolean, suggestedReplacement: String) -> Unit = { _, _, _, _ -> },
     onResolveComment: (String) -> Unit = {},
     onAcceptSuggestion: (DocumentCommentEntity, String, String?, (String) -> Unit) -> Unit = { _, _, _, _ -> },
     onRejectSuggestion: (String) -> Unit = {},
+    onExportCommentAsPdf: (DocumentCommentEntity) -> Unit = {},
+    onExportAllNotesAsPdf: (List<DocumentCommentEntity>) -> Unit = {},
     onInviteCollaborator: (String, CollaboratorRole) -> Unit = { _, _ -> },
     onRevokeCollaboratorAndRotateKey: (String) -> Unit = {},
-    onSwitchCurrentUserRole: (CollaboratorRole) -> Unit = {}
+    onSwitchCurrentUserRole: (CollaboratorRole) -> Unit = {},
+    initialPageIndex: Int = 0,
+    onPageChanged: (Int) -> Unit = {}
 ) {
     BackHandler { onBack() }
 
@@ -268,7 +273,10 @@ fun DocumentViewerEditorScreen(
     var isEditMode by remember { mutableStateOf(false) }
     var showAdvancedToolsDrawer by remember { mutableStateOf(false) }
     var zoomScale by remember { mutableFloatStateOf(1.0f) }
-    var currentPageIndex by remember { mutableIntStateOf(0) }
+    var currentPageIndex by remember(document.id) { mutableIntStateOf(initialPageIndex.coerceAtLeast(0)) }
+    LaunchedEffect(currentPageIndex) {
+        onPageChanged(currentPageIndex)
+    }
     var renderedPdfBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var renderedPicBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
@@ -2867,6 +2875,12 @@ fun DocumentViewerEditorScreen(
             onRejectSuggestion = { suggestion ->
                 onRejectSuggestion(suggestion.id)
             },
+            onExportCommentAsPdf = { noteOrComment ->
+                onExportCommentAsPdf(noteOrComment)
+            },
+            onExportAllNotesAsPdf = {
+                onExportAllNotesAsPdf(comments)
+            },
             onDismiss = { showCommentsModal = false }
         )
     }
@@ -2885,6 +2899,9 @@ fun DocumentViewerEditorScreen(
                     editContent = restoredText
                 }
                 showVersionHistoryModal = false
+            },
+            onExportVersionAsPdf = { ver ->
+                onExportVersionAsPdf(ver)
             },
             onDismiss = { showVersionHistoryModal = false }
         )

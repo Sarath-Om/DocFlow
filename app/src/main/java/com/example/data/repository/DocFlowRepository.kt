@@ -17,77 +17,114 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
-class DocFlowRepository(val db: FirebaseFirestore) {
+class DocFlowRepository(
+    private val firestoreInstance: FirebaseFirestore? = null,
+    val offlineLocalOnly: Boolean = false
+) {
+    val db: FirebaseFirestore
+        get() = firestoreInstance ?: FirebaseFirestore.getInstance()
 
     constructor(context: Context) : this(
-        FirebaseFirestore.getInstance(
-            context.applicationContext.getString(R.string.firestore_database_id)
-        )
+        firestoreInstance = runCatching {
+            FirebaseFirestore.getInstance(
+                context.applicationContext.getString(R.string.firestore_database_id)
+            )
+        }.getOrNull(),
+        offlineLocalOnly = true
     )
 
-    private val auth = Firebase.auth
+    companion object {
+        fun createOfflineLocal(): DocFlowRepository = DocFlowRepository(
+            firestoreInstance = null,
+            offlineLocalOnly = true
+        )
+    }
+
+    private val auth by lazy { runCatching { Firebase.auth }.getOrNull() }
 
     fun requireUserId(): String {
-        return auth.currentUser?.uid
+        if (offlineLocalOnly) {
+            return "local_device_user"
+        }
+        return auth?.currentUser?.uid
             ?: throw IllegalStateException("User must be signed in with Google before accessing Firestore.")
     }
 
-    fun observeFolders(): Flow<List<FolderEntity>> = flow {
-        val uid = requireUserId()
-        val path = "users/$uid/folders"
-        emitAll(
-            db.collection("users").document(uid).collection("folders")
-                .snapshots()
-                .map { snapshot ->
-                    snapshot.toObjects(
-                        FolderEntity::class.java,
-                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
-                    )
-                }
-                .catch { error ->
-                    if (error is Exception) {
-                        handleFirestoreError(error, OperationType.LIST, path)
+    fun observeFolders(): Flow<List<FolderEntity>> {
+        if (offlineLocalOnly || firestoreInstance == null) {
+            return flowOf(emptyList())
+        }
+        return flow {
+            val uid = requireUserId()
+            val path = "users/$uid/folders"
+            emitAll(
+                db.collection("users").document(uid).collection("folders")
+                    .snapshots()
+                    .map { snapshot ->
+                        snapshot.toObjects(
+                            FolderEntity::class.java,
+                            DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                        )
                     }
-                    throw error
-                }
-        )
+                    .catch { error ->
+                        if (error is Exception) {
+                            handleFirestoreError(error, OperationType.LIST, path)
+                        }
+                        throw error
+                    }
+            )
+        }
     }
 
-    fun observeDocuments(folderIdFilter: String? = null): Flow<List<DocEntity>> = flow {
-        val uid = requireUserId()
-        val path = "users/$uid/documents"
-        val query = db.collection("users").document(uid).collection("documents")
-        emitAll(
-            query.snapshots()
-                .map { snapshot ->
-                    val docs = snapshot.toObjects(
-                        DocEntity::class.java,
-                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
-                    )
-                    if (folderIdFilter != null && folderIdFilter != "all") {
-                        docs.filter { it.folderId == folderIdFilter }
-                    } else {
-                        docs
+    fun observeDocuments(folderIdFilter: String? = null): Flow<List<DocEntity>> {
+        if (offlineLocalOnly || firestoreInstance == null) {
+            return flowOf(emptyList())
+        }
+        return flow {
+            val uid = requireUserId()
+            val path = "users/$uid/documents"
+            val query = db.collection("users").document(uid).collection("documents")
+            emitAll(
+                query.snapshots()
+                    .map { snapshot ->
+                        val docs = snapshot.toObjects(
+                            DocEntity::class.java,
+                            DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                        )
+                        if (folderIdFilter != null && folderIdFilter != "all") {
+                            docs.filter { it.folderId == folderIdFilter }
+                        } else {
+                            docs
+                        }
                     }
-                }
-                .catch { error ->
-                    if (error is Exception) {
-                        handleFirestoreError(error, OperationType.LIST, path)
+                    .catch { error ->
+                        if (error is Exception) {
+                            handleFirestoreError(error, OperationType.LIST, path)
+                        }
+                        throw error
                     }
-                    throw error
-                }
-        )
+            )
+        }
     }
 
-    suspend fun createFolder(name: String, color: String = "#2563EB", icon: String = "folder"): Result<String> {
-        val uid = requireUserId()
+    suspend fun createFolder(
+        name: String,
+        color: String = "#1F6BFF",
+        icon: String = "folder",
+        parentFolderId: String? = null
+    ): Result<String> {
         val folderId = "folder_" + UUID.randomUUID().toString().replace("-", "").take(16)
+        if (offlineLocalOnly || firestoreInstance == null) {
+            return Result.success(folderId)
+        }
+        val uid = requireUserId()
         val path = "users/$uid/folders/$folderId"
-        val payload = mapOf(
+        val payload = mutableMapOf<String, Any>(
             "userId" to uid,
             "name" to name.trim(),
             "color" to color,
@@ -95,6 +132,9 @@ class DocFlowRepository(val db: FirebaseFirestore) {
             "createdAt" to FieldValue.serverTimestamp(),
             "updatedAt" to FieldValue.serverTimestamp()
         )
+        if (!parentFolderId.isNullOrBlank()) {
+            payload["parentFolderId"] = parentFolderId
+        }
         return try {
             db.collection("users").document(uid).collection("folders").document(folderId).set(payload).await()
             Result.success(folderId)
@@ -107,6 +147,9 @@ class DocFlowRepository(val db: FirebaseFirestore) {
     }
 
     suspend fun updateFolder(folder: FolderEntity): Result<Unit> {
+        if (offlineLocalOnly || firestoreInstance == null) {
+            return Result.success(Unit)
+        }
         val uid = requireUserId()
         val path = "users/$uid/folders/${folder.id}"
         val updates = mapOf<String, Any>(
@@ -127,6 +170,9 @@ class DocFlowRepository(val db: FirebaseFirestore) {
     }
 
     suspend fun deleteFolder(folderId: String): Result<Unit> {
+        if (offlineLocalOnly || firestoreInstance == null) {
+            return Result.success(Unit)
+        }
         val uid = requireUserId()
         val path = "users/$uid/folders/$folderId"
         return try {
@@ -153,8 +199,11 @@ class DocFlowRepository(val db: FirebaseFirestore) {
         isOfflineCached: Boolean = true,
         pageCount: Long = 1L
     ): Result<String> {
-        val uid = requireUserId()
         val docId = "doc_" + UUID.randomUUID().toString().replace("-", "").take(16)
+        if (offlineLocalOnly || firestoreInstance == null) {
+            return Result.success(docId)
+        }
+        val uid = requireUserId()
         val path = "users/$uid/documents/$docId"
         val payload = mutableMapOf<String, Any>(
             "userId" to uid,
@@ -198,6 +247,9 @@ class DocFlowRepository(val db: FirebaseFirestore) {
         pageCount: Long = 1L,
         fileSize: Long = 0L
     ): Result<Unit> {
+        if (offlineLocalOnly || firestoreInstance == null) {
+            return Result.success(Unit)
+        }
         val uid = requireUserId()
         val path = "users/$uid/documents/$docId"
         val updates = mutableMapOf<String, Any>(
@@ -227,6 +279,9 @@ class DocFlowRepository(val db: FirebaseFirestore) {
     }
 
     suspend fun deleteDocument(docId: String): Result<Unit> {
+        if (offlineLocalOnly || firestoreInstance == null) {
+            return Result.success(Unit)
+        }
         val uid = requireUserId()
         val path = "users/$uid/documents/$docId"
         return try {
@@ -241,6 +296,9 @@ class DocFlowRepository(val db: FirebaseFirestore) {
     }
 
     suspend fun getDocumentById(docId: String): Result<DocEntity?> {
+        if (offlineLocalOnly || firestoreInstance == null) {
+            return Result.success(null)
+        }
         val uid = requireUserId()
         val path = "users/$uid/documents/$docId"
         return try {
@@ -260,7 +318,10 @@ class DocFlowRepository(val db: FirebaseFirestore) {
     }
 
     suspend fun upsertPdfAnnotation(annotation: com.example.data.local.PdfAnnotationYMapEntity): Result<Unit> {
-        val uid = auth.currentUser?.uid ?: annotation.userId.ifBlank { return Result.failure(IllegalStateException("Missing userId")) }
+        if (offlineLocalOnly || firestoreInstance == null) {
+            return Result.success(Unit)
+        }
+        val uid = auth?.currentUser?.uid ?: annotation.userId.ifBlank { return Result.failure(IllegalStateException("Missing userId")) }
         val safeDocId = annotation.documentId.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").ifBlank { "doc_default" }
         val safeKey = annotation.ymapKey.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").ifBlank { "ann_default" }
         val path = "users/$uid/documents/$safeDocId/annotations/$safeKey"
@@ -297,7 +358,10 @@ class DocFlowRepository(val db: FirebaseFirestore) {
     }
 
     suspend fun deletePdfAnnotation(documentId: String, ymapKey: String): Result<Unit> {
-        val uid = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("User not signed in"))
+        if (offlineLocalOnly || firestoreInstance == null) {
+            return Result.success(Unit)
+        }
+        val uid = auth?.currentUser?.uid ?: return Result.failure(IllegalStateException("User not signed in"))
         val safeDocId = documentId.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").ifBlank { "doc_default" }
         val safeKey = ymapKey.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").ifBlank { "ann_default" }
         val path = "users/$uid/documents/$safeDocId/annotations/$safeKey"

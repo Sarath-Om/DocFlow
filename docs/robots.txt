@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sarath-om.github.io/DocFlow/sitemap.xml

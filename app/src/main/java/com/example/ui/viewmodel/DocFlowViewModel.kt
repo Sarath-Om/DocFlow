@@ -114,10 +114,56 @@ class DocFlowViewModel(
                 initialValue = BackgroundSyncWorkerState()
             )
 
+    val cachedFoldersList: StateFlow<List<CachedFolderEntity>> =
+        (dao?.observeCachedFolders(currentUserId) ?: flowOf(emptyList()))
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000L),
+                initialValue = emptyList()
+            )
+
+    val deletedDocuments: StateFlow<List<CachedDocumentEntity>> =
+        (dao?.observeDeletedDocuments(currentUserId) ?: flowOf(emptyList()))
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000L),
+                initialValue = emptyList()
+            )
+
+    val privateSafeDocuments: StateFlow<List<CachedDocumentEntity>> =
+        (dao?.observePrivateSafeDocuments(currentUserId) ?: flowOf(emptyList()))
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000L),
+                initialValue = emptyList()
+            )
+
+    val createdByMeDocuments: StateFlow<List<CachedDocumentEntity>> =
+        (dao?.observeCreatedByMeDocuments(currentUserId) ?: flowOf(emptyList()))
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000L),
+                initialValue = emptyList()
+            )
+
     init {
         appContext?.let { ctx ->
             DocFlowSyncManager.schedulePeriodicBackgroundSync(ctx, currentUserId)
             DocFlowSyncManager.enqueueOfflineSyncWhenConnected(ctx, currentUserId, replaceExisting = false)
+        }
+        viewModelScope.launch {
+            // 30-day auto-purge of Recently deleted items
+            val thirtyDaysAgoMs = System.currentTimeMillis() - (30L * 24L * 60L * 60L * 1000L)
+            dao?.purgeExpiredDeletedDocuments(thirtyDaysAgoMs)
+
+            // Seed default offline starter files once if the local database is empty on first install
+            val prefs = appContext?.getSharedPreferences("docflow_offline_prefs", Context.MODE_PRIVATE)
+            val alreadyInitialized = prefs?.getBoolean("starter_seeded_v1", false) ?: false
+            val existingDocs = dao?.getAllDocumentsForUser(currentUserId) ?: emptyList()
+            if (!alreadyInitialized && existingDocs.isEmpty() && dao != null) {
+                prefs?.edit()?.putBoolean("starter_seeded_v1", true)?.apply()
+                seedSampleWorkspace()
+            }
         }
     }
 
@@ -275,25 +321,30 @@ class DocFlowViewModel(
             initialValue = null
         )
 
-    val foldersState: StateFlow<UiState<List<FolderEntity>>> = repository.observeFolders()
-        .onEach { remoteFolders ->
-            dao?.let { localDao ->
-                val entities = remoteFolders.map { CachedFolderEntity.fromFolderEntity(it, SyncState.SYNCED) }
-                localDao.upsertFolders(entities)
+    val foldersState: StateFlow<UiState<List<FolderEntity>>> = combine(
+        repository.observeFolders()
+            .onEach { remoteFolders ->
+                dao?.let { localDao ->
+                    if (remoteFolders.isNotEmpty()) {
+                        val entities = remoteFolders.map { CachedFolderEntity.fromFolderEntity(it, SyncState.SYNCED) }
+                        localDao.upsertFolders(entities)
+                    }
+                }
             }
+            .catch { emit(emptyList()) },
+        cachedFoldersList
+    ) { remoteFolders, localFolders ->
+        val effectiveFolders = if (localFolders.isNotEmpty()) {
+            localFolders.map { it.toFolderEntity() }
+        } else {
+            remoteFolders
         }
-        .map<List<FolderEntity>, UiState<List<FolderEntity>>> { folders ->
-            UiState.Success(folders.sortedBy { it.name.lowercase() })
-        }
-        .catch { e ->
-            Log.w(TAG, "Error observing folders", e)
-            emit(UiState.Error(e.localizedMessage ?: "Failed to load folders"))
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = UiState.Loading
-        )
+        UiState.Success(effectiveFolders.sortedBy { it.name.lowercase() }) as UiState<List<FolderEntity>>
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000L),
+        initialValue = UiState.Loading
+    )
 
     val documentsState: StateFlow<UiState<List<DocEntity>>> = repository.observeDocuments()
         .onEach { remoteDocs ->
@@ -370,6 +421,10 @@ class DocFlowViewModel(
         val query = params.query.trim()
         val filtered = docs.filter { doc ->
             val cached = cachedMap[doc.id]
+            // Exclude soft-deleted items and Private Safe items from Recent & general search
+            if (cached?.isDeleted == true || cached?.isPrivateSafe == true) {
+                return@filter false
+            }
             val docTags = cached?.parsedTags()?.map { it.lowercase() }?.toSet() ?: emptySet()
 
             val matchesQuery = if (query.isBlank()) {
@@ -408,10 +463,12 @@ class DocFlowViewModel(
             val docType = doc.fileType.lowercase()
             val matchesFileType = when (params.fileType.lowercase()) {
                 "all" -> true
-                "pdf" -> docType == "pdf"
-                "docx" -> docType == "docx" || docType == "doc"
-                "xlsx" -> docType == "xlsx" || docType == "xls" || docType == "csv"
-                "pptx" -> docType == "pptx" || docType == "ppt"
+                "pdf" -> docType == "pdf" || docType == "scanned"
+                "docx", "doc" -> docType == "docx" || docType == "doc"
+                "xlsx", "xls" -> docType == "xlsx" || docType == "xls" || docType == "csv"
+                "pptx", "ppt" -> docType == "pptx" || docType == "ppt"
+                "ofd" -> docType == "ofd"
+                "txt" -> docType == "txt" || docType == "md" || docType == "note"
                 "scanned" -> docType == "scanned"
                 "pic" -> docType == "pic"
                 else -> true
@@ -1007,46 +1064,66 @@ class DocFlowViewModel(
         }
     }
 
-    fun createFolder(name: String, color: String, icon: String) {
+    fun createFolder(name: String, color: String, icon: String, parentFolderId: String? = null) {
         if (name.isBlank()) return
         viewModelScope.launch {
-            val result = repository.createFolder(name = name, color = color, icon = icon)
-            if (result.isSuccess) {
-                val folderId = result.getOrThrow()
-                dao?.upsertFolder(
-                    CachedFolderEntity(
-                        id = folderId,
-                        userId = currentUserId,
-                        name = name.trim(),
-                        color = color,
-                        icon = icon,
-                        syncState = if (_isOfflineMode.value) SyncState.LOCAL_ONLY.name else SyncState.SYNCED.name
-                    )
-                )
-                recordSyncLog(
-                    docId = folderId,
-                    docTitle = name,
-                    action = "FOLDER_CREATE",
-                    status = if (_isOfflineMode.value) "LOCAL_ONLY" else "SYNCED",
-                    details = "Personalized folder '$name' saved to Room & Firestore"
-                )
-                _statusBannerMessage.value = "Folder '$name' created and synced"
-            } else {
-                _statusBannerMessage.value = "Failed to create folder: ${result.exceptionOrNull()?.localizedMessage}"
+            val result = repository.createFolder(
+                name = name,
+                color = color,
+                icon = icon,
+                parentFolderId = parentFolderId
+            )
+            val folderId = result.getOrElse {
+                "folder_" + UUID.randomUUID().toString().replace("-", "").take(16)
             }
+            dao?.upsertFolder(
+                CachedFolderEntity(
+                    id = folderId,
+                    userId = currentUserId,
+                    name = name.trim(),
+                    color = color,
+                    icon = icon,
+                    parentFolderId = parentFolderId,
+                    syncState = SyncState.LOCAL_ONLY.name
+                )
+            )
+            recordSyncLog(
+                docId = folderId,
+                docTitle = name,
+                action = "FOLDER_CREATE",
+                status = "LOCAL_ONLY",
+                details = "Folder '$name' saved to on-device SQLite"
+            )
+            _statusBannerMessage.value = "Folder '$name' created"
+        }
+    }
+
+    fun renameOrUpdateFolder(
+        folderId: String,
+        newName: String,
+        newColor: String,
+        parentFolderId: String? = null
+    ) {
+        if (newName.isBlank()) return
+        viewModelScope.launch {
+            dao?.updateFolderDetails(
+                folderId = folderId,
+                newName = newName.trim(),
+                newColor = newColor,
+                parentFolderId = parentFolderId
+            )
+            _statusBannerMessage.value = "Updated folder '${newName.trim()}'"
         }
     }
 
     fun deleteFolder(folderId: String) {
         viewModelScope.launch {
-            val result = repository.deleteFolder(folderId)
-            if (result.isSuccess) {
-                dao?.deleteFolderById(folderId)
-                if (_selectedFolderId.value == folderId) {
-                    _selectedFolderId.value = "all"
-                }
-                _statusBannerMessage.value = "Folder deleted"
+            repository.deleteFolder(folderId)
+            dao?.deleteFolderById(folderId)
+            if (_selectedFolderId.value == folderId) {
+                _selectedFolderId.value = "all"
             }
+            _statusBannerMessage.value = "Folder deleted"
         }
     }
 
@@ -1065,10 +1142,13 @@ class DocFlowViewModel(
         localPdfPath: String? = null,
         generatedPdfUri: Uri? = null,
         customTags: String = "",
+        createdByMe: Boolean = true,
+        sourceFolderKey: String? = null,
         onCreated: (String) -> Unit = {}
     ) {
         if (title.isBlank()) return
         viewModelScope.launch {
+            val autoCategory = CachedDocumentEntity.autoCategorizeFromText(title, plainContent, category)
             val finalContent = if (isEncrypted && password.isNotBlank()) {
                 CryptoUtils.encrypt(plainContent, password)
             } else {
@@ -1083,7 +1163,7 @@ class DocFlowViewModel(
             val result = repository.createDocument(
                 title = title,
                 folderId = folderId.ifBlank { "root" },
-                category = category.ifBlank { "General" },
+                category = autoCategory,
                 fileType = fileType,
                 fileName = fileName,
                 fileSize = sizeBytes,
@@ -1093,51 +1173,49 @@ class DocFlowViewModel(
                 isOfflineCached = isOfflineCached,
                 pageCount = pageCount
             )
-            if (result.isSuccess) {
-                val id = result.getOrThrow()
-                if (generatedPdfUri != null) {
-                    _localDocumentUris.value = _localDocumentUris.value + (id to generatedPdfUri)
-                }
-                val syncState = if (_isOfflineMode.value) SyncState.LOCAL_ONLY else SyncState.SYNCED
-                val resolvedTags = CachedDocumentEntity.defaultTagsFor(title, category, fileType, customTags)
-                val preview = CachedDocumentEntity.buildPreview(plainContent, isEncrypted && password.isNotBlank())
-                dao?.upsertDocument(
-                    CachedDocumentEntity(
-                        id = id,
-                        userId = currentUserId,
-                        title = title.trim(),
-                        folderId = folderId.ifBlank { "root" },
-                        category = category.ifBlank { "General" },
-                        fileType = fileType.lowercase(),
-                        fileName = fileName,
-                        fileSize = sizeBytes,
-                        content = finalContent,
-                        contentPreview = preview,
-                        tags = resolvedTags,
-                        localFilePath = localPdfPath,
-                        isEncrypted = isEncrypted && password.isNotBlank(),
-                        encryptionKeyHint = if (isEncrypted) encryptionKeyHint else null,
-                        isOfflineCached = isOfflineCached,
-                        pageCount = pageCount,
-                        syncState = syncState.name
-                    )
-                )
-                recordSyncLog(
-                    docId = id,
-                    docTitle = title,
-                    action = if (localPdfPath != null) "PIC_TO_DOC_${fileType.uppercase()}" else "DOC_CREATE_${fileType.uppercase()}",
-                    status = syncState.label,
-                    details = "Indexed in Room FTS4 ($pageCount pg, ${sizeBytes / 1024} KB)"
-                )
-                _statusBannerMessage.value = "'$title' (${fileType.uppercase()}) indexed in Room FTS & synced"
-                appContext?.let { ctx ->
-                    DocFlowAppWidgetProvider.notifyDocumentOpened(ctx)
-                    DocFlowSyncManager.enqueueOfflineSyncWhenConnected(ctx, currentUserId, replaceExisting = true)
-                }
-                onCreated(id)
-            } else {
-                _statusBannerMessage.value = "Sync error: ${result.exceptionOrNull()?.localizedMessage}"
+            val id = result.getOrElse {
+                "doc_" + UUID.randomUUID().toString().replace("-", "").take(16)
             }
+            if (generatedPdfUri != null) {
+                _localDocumentUris.value = _localDocumentUris.value + (id to generatedPdfUri)
+            }
+            val resolvedTags = CachedDocumentEntity.defaultTagsFor(title, autoCategory, fileType, customTags)
+            val preview = CachedDocumentEntity.buildPreview(plainContent, isEncrypted && password.isNotBlank())
+            dao?.upsertDocument(
+                CachedDocumentEntity(
+                    id = id,
+                    userId = currentUserId,
+                    title = title.trim(),
+                    folderId = folderId.ifBlank { "root" },
+                    category = autoCategory,
+                    fileType = fileType.lowercase(),
+                    fileName = fileName,
+                    fileSize = sizeBytes,
+                    content = finalContent,
+                    contentPreview = preview,
+                    tags = resolvedTags,
+                    localFilePath = localPdfPath,
+                    isEncrypted = isEncrypted && password.isNotBlank(),
+                    encryptionKeyHint = if (isEncrypted) encryptionKeyHint else null,
+                    isOfflineCached = isOfflineCached,
+                    pageCount = pageCount,
+                    syncState = SyncState.LOCAL_ONLY.name,
+                    createdByMe = createdByMe,
+                    sourceFolderKey = sourceFolderKey
+                )
+            )
+            recordSyncLog(
+                docId = id,
+                docTitle = title,
+                action = if (localPdfPath != null) "PIC_TO_DOC_${fileType.uppercase()}" else "DOC_CREATE_${fileType.uppercase()}",
+                status = "SAVED_LOCALLY",
+                details = "Indexed in local SQLite FTS4 ($pageCount pg, ${sizeBytes / 1024} KB)"
+            )
+            _statusBannerMessage.value = "'$title' (${fileType.uppercase()}) saved on device"
+            appContext?.let { ctx ->
+                DocFlowAppWidgetProvider.notifyDocumentOpened(ctx)
+            }
+            onCreated(id)
         }
     }
 
@@ -1436,174 +1514,541 @@ class DocFlowViewModel(
     }
 
     fun deleteDocument(docId: String) {
+        softDeleteDocument(docId)
+    }
+
+    fun softDeleteDocument(docId: String) {
         viewModelScope.launch {
             val title = cachedDocumentsMap.value[docId]?.title ?: "Document"
-            val result = repository.deleteDocument(docId)
-            if (result.isSuccess) {
-                dao?.deleteDocumentById(docId)
-                recordSyncLog(
-                    docId = docId,
-                    docTitle = title,
-                    action = "DOC_DELETE",
-                    status = "SYNCED",
-                    details = "Removed from Room FTS4 cache & Cloud storage"
-                )
-                _statusBannerMessage.value = "Document deleted from Room cache and cloud"
+            dao?.softDeleteDocument(docId, System.currentTimeMillis())
+            _statusBannerMessage.value = "Moved '$title' to Recently deleted (auto-purged in 30 days)"
+        }
+    }
+
+    fun softDeleteDocuments(docIds: Set<String>) {
+        if (docIds.isEmpty()) return
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            docIds.forEach { id ->
+                dao?.softDeleteDocument(id, now)
             }
+            _statusBannerMessage.value = "Moved ${docIds.size} item(s) to Recently deleted"
+        }
+    }
+
+    fun restoreDeletedDocument(docId: String) {
+        viewModelScope.launch {
+            dao?.restoreSoftDeletedDocument(docId, System.currentTimeMillis())
+            _statusBannerMessage.value = "Restored document from Recently deleted"
+        }
+    }
+
+    fun permanentlyDeleteDocument(docId: String) {
+        viewModelScope.launch {
+            val cached = deletedDocuments.value.find { it.id == docId } ?: cachedDocumentsMap.value[docId]
+            cached?.localFilePath?.let { path ->
+                runCatching { File(path).delete() }
+            }
+            repository.deleteDocument(docId)
+            dao?.deleteDocumentById(docId)
+            _statusBannerMessage.value = "Permanently deleted '${cached?.title ?: "Document"}'"
+        }
+    }
+
+    fun emptyRecentlyDeleted() {
+        viewModelScope.launch {
+            deletedDocuments.value.forEach { doc ->
+                doc.localFilePath?.let { path -> runCatching { File(path).delete() } }
+            }
+            dao?.emptyRecentlyDeleted(currentUserId)
+            _statusBannerMessage.value = "Emptied Recently deleted"
+        }
+    }
+
+    fun moveToPrivateSafe(docId: String, pinPassword: String) {
+        viewModelScope.launch {
+            val existing = cachedDocumentsMap.value[docId] ?: return@launch
+            val plainText = if (existing.isEncrypted) {
+                existing.content
+            } else {
+                existing.content
+            }
+            val encryptedBody = if (existing.isEncrypted) {
+                existing.content
+            } else {
+                CryptoUtils.encrypt(plainText, pinPassword.ifBlank { "1234" })
+            }
+            dao?.updatePrivateSafeState(
+                docId = docId,
+                isPrivateSafe = true,
+                isEncrypted = true,
+                content = encryptedBody,
+                keyHint = "Private Safe AES-256-GCM"
+            )
+            _statusBannerMessage.value = "Moved '${existing.title}' to Private Safe (AES-256-GCM encrypted)"
+        }
+    }
+
+    fun removeFromPrivateSafe(docId: String, pinPassword: String) {
+        viewModelScope.launch {
+            val existing = privateSafeDocuments.value.find { it.id == docId } ?: return@launch
+            val decryptedBody = if (existing.isEncrypted) {
+                runCatching { CryptoUtils.decrypt(existing.content, pinPassword.ifBlank { "1234" }) }
+                    .getOrDefault(existing.content)
+            } else {
+                existing.content
+            }
+            dao?.updatePrivateSafeState(
+                docId = docId,
+                isPrivateSafe = false,
+                isEncrypted = false,
+                content = decryptedBody,
+                keyHint = null
+            )
+            _statusBannerMessage.value = "Removed '${existing.title}' from Private Safe"
+        }
+    }
+
+    fun moveDocumentsToFolder(docIds: Set<String>, targetFolderId: String) {
+        if (docIds.isEmpty()) return
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            docIds.forEach { docId ->
+                dao?.moveDocumentToFolder(docId, targetFolderId, now)
+            }
+            _statusBannerMessage.value = "Moved ${docIds.size} document(s) to folder"
+        }
+    }
+
+    fun batchTagDocuments(docIds: Set<String>, tagInput: String) {
+        val cleanTags = tagInput.split(",")
+            .map { it.trim().lowercase().removePrefix("#") }
+            .filter { it.isNotEmpty() }
+        if (docIds.isEmpty() || cleanTags.isEmpty()) return
+        viewModelScope.launch {
+            docIds.forEach { id ->
+                val existing = cachedDocumentsMap.value[id] ?: return@forEach
+                val merged = (existing.parsedTags().map { it.lowercase() } + cleanTags).distinct().joinToString(", ")
+                dao?.updateDocumentTags(id, merged)
+            }
+            _statusBannerMessage.value = "Tagged ${docIds.size} document(s) with ${cleanTags.joinToString(", ") { "#$it" }}"
+        }
+    }
+
+    fun updateDocumentLastPage(docId: String, pageIndex: Int) {
+        viewModelScope.launch {
+            dao?.updateDocumentLastPage(docId, pageIndex)
+        }
+    }
+
+    fun convertFileToPdfAndSave(
+        context: Context,
+        sourceDoc: DocEntity,
+        onCreated: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val plainText = if (sourceDoc.isEncrypted) {
+                "Encrypted Document: ${sourceDoc.title}"
+            } else {
+                sourceDoc.content
+            }
+            val exportRes = PdfLibAnnotationEngine.exportAnnotatedPdf(
+                context = context,
+                document = sourceDoc,
+                plainContent = plainText,
+                annotations = emptyList(),
+                isBiometricSigned = false,
+                signerName = "DocFlow Local Converter",
+                signerEmail = ""
+            )
+            val pdfObj = exportRes.getOrNull()
+            val cleanName = sourceDoc.title.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+                .ifBlank { "converted" } + ".pdf"
+            createOrScanDocument(
+                title = "${sourceDoc.title} (PDF)",
+                folderId = sourceDoc.folderId,
+                category = sourceDoc.category,
+                fileType = "pdf",
+                fileName = pdfObj?.pdfFile?.name ?: cleanName,
+                plainContent = plainText,
+                isEncrypted = false,
+                password = "",
+                encryptionKeyHint = null,
+                isOfflineCached = true,
+                pageCount = sourceDoc.pageCount.coerceAtLeast(1L),
+                localPdfPath = pdfObj?.pdfFile?.absolutePath,
+                generatedPdfUri = pdfObj?.shareUri,
+                customTags = "converted-pdf, created-by-me, ${sourceDoc.fileType.lowercase()}",
+                createdByMe = true,
+                onCreated = onCreated
+            )
+            _statusBannerMessage.value = "Converted '${sourceDoc.title}' to PDF in Created by me"
+        }
+    }
+
+    fun saveSummaryAsNote(
+        sourceDoc: DocEntity,
+        summaryResult: com.example.data.util.ExtractiveSummaryResult,
+        onCreated: (String) -> Unit = {}
+    ) {
+        val noteTitle = "Summary — ${sourceDoc.title}"
+        val noteBody = buildString {
+            appendLine("=== ON-DEVICE EXTRACTIVE SUMMARY: ${sourceDoc.title} ===")
+            appendLine("Words: ${summaryResult.wordCount} • Sentences: ${summaryResult.sentenceCount} • Compression: ${summaryResult.compressionRatioPercent}%")
+            if (summaryResult.topKeywords.isNotEmpty()) {
+                appendLine("Key Terms: ${summaryResult.topKeywords.joinToString(", ")}")
+            }
+            appendLine()
+            appendLine(summaryResult.executiveSummary)
+            appendLine()
+            appendLine("=== KEY POINTS ===")
+            summaryResult.bulletPoints.forEach { bullet ->
+                appendLine("• $bullet")
+            }
+        }.trim()
+        val cleanName = sourceDoc.title.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_') + "_summary.txt"
+        createOrScanDocument(
+            title = noteTitle,
+            folderId = sourceDoc.folderId,
+            category = sourceDoc.category,
+            fileType = "txt",
+            fileName = cleanName,
+            plainContent = noteBody,
+            isEncrypted = false,
+            password = "",
+            encryptionKeyHint = null,
+            isOfflineCached = true,
+            pageCount = 1L,
+            customTags = "summary, note, on-device-ai, created-by-me",
+            createdByMe = true,
+            onCreated = onCreated
+        )
+    }
+
+    fun saveTranslationDocument(
+        context: Context,
+        sourceDoc: DocEntity,
+        translatedText: String,
+        targetLang: com.example.data.util.TranslationLanguage,
+        exportAsPdf: Boolean,
+        onCreated: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val transTitle = "${sourceDoc.title} (${targetLang.displayName})"
+            val ext = if (exportAsPdf) "pdf" else "txt"
+            val cleanBase = sourceDoc.title.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+                .ifBlank { "translated" } + "_${targetLang.code}.$ext"
+
+            var pdfPath: String? = null
+            var pdfUri: Uri? = null
+            if (exportAsPdf) {
+                val tempDoc = sourceDoc.copy(title = transTitle, fileName = cleanBase)
+                val res = PdfLibAnnotationEngine.exportAnnotatedPdf(
+                    context = context,
+                    document = tempDoc,
+                    plainContent = translatedText,
+                    annotations = emptyList(),
+                    isBiometricSigned = false,
+                    signerName = "DocFlow Offline Translator",
+                    signerEmail = ""
+                ).getOrNull()
+                pdfPath = res?.pdfFile?.absolutePath
+                pdfUri = res?.shareUri
+            }
+
+            createOrScanDocument(
+                title = transTitle,
+                folderId = sourceDoc.folderId,
+                category = sourceDoc.category,
+                fileType = ext,
+                fileName = cleanBase,
+                plainContent = translatedText,
+                isEncrypted = false,
+                password = "",
+                encryptionKeyHint = null,
+                isOfflineCached = true,
+                pageCount = sourceDoc.pageCount.coerceAtLeast(1L),
+                localPdfPath = pdfPath,
+                generatedPdfUri = pdfUri,
+                customTags = "translated, ${targetLang.code}, ${targetLang.displayName.lowercase()}, created-by-me",
+                createdByMe = true,
+                onCreated = onCreated
+            )
+            _statusBannerMessage.value = "Saved ${targetLang.displayName} translation as ${ext.uppercase()} in Created by me"
+        }
+    }
+
+    fun exportBackupArchive(
+        context: Context,
+        passphrase: String,
+        onExported: (File) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val docs = dao?.getAllDocumentsForUser(currentUserId) ?: emptyList()
+            val folders = dao?.getAllFoldersForUser(currentUserId) ?: emptyList()
+            val res = com.example.data.util.OnDeviceAiAndBackupEngine.exportEncryptedDocFlowBackup(
+                context = context,
+                passphrase = passphrase,
+                documents = docs,
+                folders = folders
+            )
+            res.onSuccess { file ->
+                _statusBannerMessage.value = "Exported encrypted backup: ${file.name} (${docs.size} files)"
+                onExported(file)
+            }.onFailure { err ->
+                _statusBannerMessage.value = "Backup export failed: ${err.localizedMessage}"
+            }
+        }
+    }
+
+    fun importBackupArchive(
+        context: Context,
+        uri: Uri,
+        passphrase: String,
+        onImported: (Int) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val rawEncrypted = runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+            }.getOrNull()
+            if (rawEncrypted.isNullOrBlank()) {
+                _statusBannerMessage.value = "Selected backup file is empty or unreadable"
+                return@launch
+            }
+            val parsedRes = com.example.data.util.OnDeviceAiAndBackupEngine.parseEncryptedDocFlowBackup(
+                encryptedContent = rawEncrypted,
+                passphrase = passphrase,
+                targetUserId = currentUserId
+            )
+            parsedRes.onSuccess { (folders, docs) ->
+                dao?.upsertFolders(folders)
+                dao?.upsertDocuments(docs)
+                _statusBannerMessage.value = "Restored ${docs.size} document(s) & ${folders.size} folder(s) from encrypted .docflow backup"
+                onImported(docs.size)
+            }.onFailure {
+                _statusBannerMessage.value = "Decryption failed: Invalid backup passphrase or corrupted .docflow file"
+            }
+        }
+    }
+
+    fun clearThumbnailAndTempCache(context: Context) {
+        viewModelScope.launch {
+            runCatching {
+                context.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
+            }
+            _statusBannerMessage.value = "Cleared local thumbnail & temporary cache"
         }
     }
 
     fun seedSampleWorkspace() {
         viewModelScope.launch {
-            val folderWorkRes = repository.createFolder("Work & Contracts", "#2563EB", "work")
-            val folderFinanceRes = repository.createFolder("Excel & Finance", "#059669", "receipt")
-            val folderDecksRes = repository.createFolder("PowerPoint & Scans", "#EA580C", "scanner")
+            val folderWorkRes = repository.createFolder("Work & Contracts", "#1F6BFF", "work")
+            val folderFinanceRes = repository.createFolder("Finance & Invoices", "#16A34A", "receipt")
+            val folderDecksRes = repository.createFolder("Scans & Archives", "#EA580C", "scanner")
 
-            val workFolderId = folderWorkRes.getOrDefault("root")
-            val financeFolderId = folderFinanceRes.getOrDefault("root")
-            val decksFolderId = folderDecksRes.getOrDefault("root")
+            val workFolderId = folderWorkRes.getOrDefault("folder_work")
+            val financeFolderId = folderFinanceRes.getOrDefault("folder_finance")
+            val decksFolderId = folderDecksRes.getOrDefault("folder_scans")
+
+            dao?.upsertFolders(
+                listOf(
+                    CachedFolderEntity(
+                        id = workFolderId,
+                        userId = currentUserId,
+                        name = "Work & Contracts",
+                        color = "#1F6BFF",
+                        icon = "work",
+                        parentFolderId = null
+                    ),
+                    CachedFolderEntity(
+                        id = financeFolderId,
+                        userId = currentUserId,
+                        name = "Finance & Invoices",
+                        color = "#16A34A",
+                        icon = "receipt",
+                        parentFolderId = null
+                    ),
+                    CachedFolderEntity(
+                        id = decksFolderId,
+                        userId = currentUserId,
+                        name = "Scans & Archives",
+                        color = "#EA580C",
+                        icon = "scanner",
+                        parentFolderId = workFolderId // nested subfolder example
+                    )
+                )
+            )
 
             createOrScanDocument(
                 title = "Q4 Executive Financial Summary",
                 folderId = financeFolderId,
-                category = "Invoices",
+                category = "Invoice",
                 fileType = "pdf",
                 fileName = "Q4_Financial_Summary_2026.pdf",
                 plainContent = """
                     === SECTION 1: EXECUTIVE FINANCIAL SUMMARY (PDF) ===
-                    Total recurring revenue increased by 28.4% quarter-over-quarter, driven by enterprise cloud adoption and cross-platform document workflow automation.
+                    Total recurring revenue increased by 28.4% quarter-over-quarter, driven by enterprise document workflow automation and local on-device indexing.
                     
                     | Metric | Q3 Actual | Q4 Actual | YoY Change |
                     | Gross Margin | 74.1% | 76.2% | +2.1% |
                     | Operating Cash Flow | $3.95M | $4.82M | +22.0% |
-                    | Cloud Sync Uptime | 99.95% | 99.99% | +0.04% |
+                    | On-Device Search Speed | 18 ms | 11 ms | -38% |
                     
                     === SECTION 2: ACTION ITEMS & APPROVALS ===
                     • Finalize vendor invoices by Friday 5:00 PM
-                    • Convert physical tax receipts to Excel (.xlsx) or PDF using Pic-to-Doc
-                    • Export board slides to high-res images via Doc-to-Pic
+                    • Convert physical tax receipts to PDF using the local scanner
+                    • Verify quarterly budget numbers before board review
                 """.trimIndent(),
                 isEncrypted = false,
                 password = "",
                 encryptionKeyHint = null,
                 isOfflineCached = true,
                 pageCount = 4L,
-                customTags = "finance, q4, executive, revenue, pdf"
+                customTags = "finance, q4, executive, invoice, pdf",
+                createdByMe = true,
+                sourceFolderKey = "download"
             )
 
             createOrScanDocument(
-                title = "Master Cloud Services Agreement",
+                title = "Master Services & Privacy Agreement",
                 folderId = workFolderId,
-                category = "Contracts",
+                category = "Contract",
                 fileType = "docx",
                 fileName = "Master_Services_Agreement_v3.docx",
                 plainContent = """
                     === SECTION 1: SCOPE OF SERVICES (WORD DOCX) ===
-                    Provider shall deliver real-time document synchronization, end-to-end AES-256 encryption, and cross-platform PDF, Word, Excel, and PowerPoint editing capabilities across all authorized endpoints.
+                    This Master Services Agreement governs on-device document management, local AES-256-GCM encryption, and cross-format PDF, Word, Excel, and PowerPoint viewing and editing.
                     
                     | Clause ID | Topic | Security Tier | Status |
-                    | SEC-101 | Zero-Trust Rules | Enterprise | Approved |
-                    | SEC-204 | Room FTS4 Cache | Local Vault | Active |
+                    | SEC-101 | Zero-Server Storage | On-Device SQLite | Approved |
+                    | SEC-204 | Private Safe Vault | AES-256-GCM + Biometric | Active |
                     
-                    === SECTION 2: REAL-TIME COLLABORATION ===
-                    Edits made to this Word document synchronize across all connected devices within seconds. You can edit any clause or table block directly in the DocFlow Structured Editor.
+                    === SECTION 2: DATA PRIVACY & RETENTION ===
+                    All documents, annotations, OCR text, and folders remain strictly in app-private storage on the user's device. No telemetry or document contents are transmitted externally.
                 """.trimIndent(),
                 isEncrypted = false,
                 password = "",
                 encryptionKeyHint = null,
                 isOfflineCached = true,
                 pageCount = 6L,
-                customTags = "contract, legal, word, docx, agreement"
+                customTags = "contract, legal, word, docx, agreement",
+                createdByMe = true,
+                sourceFolderKey = "whatsapp"
             )
 
             createOrScanDocument(
-                title = "2026 Enterprise Revenue & Budget Sheet",
+                title = "2026 Operating Budget & Expense Ledger",
                 folderId = financeFolderId,
-                category = "Invoices",
+                category = "Receipt",
                 fileType = "xlsx",
-                fileName = "Enterprise_Revenue_Budget_2026.xlsx",
+                fileName = "Operating_Budget_Ledger_2026.xlsx",
                 plainContent = """
                     === SHEET 1: QUARTERLY REVENUE BREAKDOWN (EXCEL XLSX) ===
                     | Department | Q1 (USD K) | Q2 (USD K) | Q3 (USD K) | Q4 (USD K) | Annual Total |
-                    | Cloud Platform | $1,420 | $1,680 | $1,940 | $2,410 | $7,450 |
+                    | Core Engineering | $1,420 | $1,680 | $1,940 | $2,410 | $7,450 |
                     | Mobile Suite | $850 | $920 | $1,100 | $1,360 | $4,230 |
                     | Security Vault | $610 | $740 | $890 | $1,120 | $3,360 |
-                    | Total Revenue | $2,880 | $3,340 | $3,930 | $4,890 | $15,040 |
+                    | Total Budget | $2,880 | $3,340 | $3,930 | $4,890 | $15,040 |
                     
                     === SHEET 2: EXPENSE & HEADCOUNT ALLOCATION ===
                     | Cost Center | Budgeted | Actual | Variance |
                     | R&D Engineering | $3,200 | $3,140 | -$60 (Under) |
-                    | Cloud Infra | $980 | $950 | -$30 (Under) |
+                    | QA & Testing | $980 | $950 | -$30 (Under) |
                 """.trimIndent(),
                 isEncrypted = false,
                 password = "",
                 encryptionKeyHint = null,
                 isOfflineCached = true,
                 pageCount = 2L,
-                customTags = "excel, xlsx, spreadsheet, budget, table, finance"
+                customTags = "excel, xlsx, spreadsheet, budget, receipt",
+                createdByMe = false,
+                sourceFolderKey = "download"
             )
 
             createOrScanDocument(
-                title = "Product Strategy & Omnichannel Deck",
+                title = "Product Architecture & Roadmap Deck",
                 folderId = decksFolderId,
-                category = "Work",
+                category = "Education",
                 fileType = "pptx",
-                fileName = "Product_Strategy_Deck_2026.pptx",
+                fileName = "Product_Architecture_Deck.pptx",
                 plainContent = """
-                    === SLIDE 1: DocFlow Universal Office Vision ===
-                    • Unified Opener & Structured Editor for PDF, Word, Excel, and PowerPoint
-                    • Instant Pic-to-Doc & Doc-to-Pic conversion across all formats
-                    • Apple Crystal Glass UI with real-time multi-device cloud sync
+                    === SLIDE 1: DocFlow Offline Architecture ===
+                    • 100% On-Device Opener, Scanner & Manager for PDF, Word, Excel, PowerPoint, OFD, and TXT
+                    • Local SQLite FTS4 Full-Text Search across titles, tags, and ML Kit OCR text
+                    • Flat, minimal Material UI with Light (#F0F1F3) and Dark (#0F1113) themes
                     
-                    === SLIDE 2: Key Performance & Conversion Benchmarks ===
-                    | Capability | Processing Latency | Offline Support |
-                    | Pic-to-Doc (OCR + Image) | < 0.8 sec | 100% Local |
-                    | Doc-to-Pic (Multi & Stitch) | < 0.6 sec | 100% Local |
-                    | Room FTS4 Full-Text Search | < 15 ms | Instant |
-                    
-                    === SLIDE 3: Q4 Rollout Milestones ===
-                    • Launch Excel & PowerPoint structured block editing
-                    • Enable 1-tap Stitched Tall Image export for mobile sharing
+                    === SLIDE 2: On-Device AI & Security Benchmarks ===
+                    | Capability | Engine | Network Required |
+                    | Document Scanner + OCR | CameraX + ML Kit | Offline |
+                    | Extractive Summarizer | Local TextRank / TF-IDF | Offline |
+                    | Private Safe Encryption | AES-256-GCM + PBKDF2 | Offline |
                 """.trimIndent(),
                 isEncrypted = false,
                 password = "",
                 encryptionKeyHint = null,
                 isOfflineCached = true,
                 pageCount = 3L,
-                customTags = "powerpoint, pptx, presentation, slides, strategy"
+                customTags = "powerpoint, pptx, presentation, slides, roadmap",
+                createdByMe = true,
+                sourceFolderKey = "bluetooth"
             )
 
             createOrScanDocument(
-                title = "Confidential IP Filing (Encrypted Scan)",
-                folderId = decksFolderId,
-                category = "Legal",
-                fileType = "scanned",
-                fileName = "Scan_IP_Filing_Encrypted.pdf",
+                title = "Fixed-Layout Tax Clearance Certificate",
+                folderId = financeFolderId,
+                category = "ID",
+                fileType = "ofd",
+                fileName = "Tax_Clearance_Certificate_2026.ofd",
                 plainContent = """
-                    === SECTION 1: CONFIDENTIAL PATENT & IP FILING ===
-                    Scan ID: SCN-2026-8841 • Encryption: AES-256-CBC Verified
-                    This physical document was scanned directly into DocFlow and encrypted with passphrase '1234'.
+                    === OFD FIXED-LAYOUT ARCHIVE: OFFICIAL TAX CLEARANCE ===
+                    Certificate No: OFD-2026-99412 • Standard: GB/T 33190 Fixed-Layout Document
+                    Taxpayer Identification Verified • Status: Compliant & Cleared
                     
-                    | Claim No | Patent Scope | Filing Status |
-                    | CLM-01 | Delta Sync for PDF/DOCX/XLSX/PPTX | Granted |
-                    | CLM-02 | Hybrid OCR + Image Pic-to-Doc Engine | Verified |
+                    | Field | Value | Verification |
+                    | Document Standard | Open Fixed-layout Document (OFD) | Validated |
+                    | Issuing Authority | Regional Revenue Directorate | Digital Seal |
                 """.trimIndent(),
-                isEncrypted = true,
-                password = "1234",
-                encryptionKeyHint = "Default Demo PIN: 1234",
+                isEncrypted = false,
+                password = "",
+                encryptionKeyHint = null,
                 isOfflineCached = true,
-                pageCount = 2L,
-                customTags = "patent, confidential, scan, encrypted, vault, legal"
+                pageCount = 1L,
+                customTags = "ofd, certificate, tax, id, archive",
+                createdByMe = false,
+                sourceFolderKey = "download"
+            )
+
+            createOrScanDocument(
+                title = "Field Research & Release Notes",
+                folderId = workFolderId,
+                category = "Other",
+                fileType = "txt",
+                fileName = "Field_Research_Notes.txt",
+                plainContent = """
+                    === PLAIN TEXT NOTES: RELEASE CHECKLIST ===
+                    1. Verify PDF viewer page jump, zoom, thumbnail strip, and full-text search.
+                    2. Verify Word (.docx) editor autosave and local 20-version history.
+                    3. Test multi-page scanner edge crop, B&W filter, and Hindi + English OCR.
+                    4. Confirm Private Safe PIN/biometric lock hides files from Recent and Search.
+                """.trimIndent(),
+                isEncrypted = false,
+                password = "",
+                encryptionKeyHint = null,
+                isOfflineCached = true,
+                pageCount = 1L,
+                customTags = "txt, notes, checklist, research",
+                createdByMe = true,
+                sourceFolderKey = "whatsapp"
             )
 
             recordSyncLog(
                 docId = "seed_workspace",
-                docTitle = "Starter Office Suite",
+                docTitle = "Offline Starter Documents",
                 action = "WORKSPACE_INIT",
-                status = "SYNCED",
-                details = "Seeded PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx) & Encrypted Scan"
+                status = "LOCAL_ONLY",
+                details = "Seeded PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), OFD (.ofd) & Text (.txt)"
             )
-            _statusBannerMessage.value = "Loaded sample PDF, Word, Excel, PowerPoint & Encrypted Scan!"
+            _statusBannerMessage.value = "Loaded offline sample documents (PDF, DOC, XLS, PPT, OFD, TXT)"
         }
     }
 
@@ -2113,6 +2558,174 @@ class DocFlowViewModel(
                 plainContent = plainContent,
                 exportedPdfResult = resultObj
             )
+        }
+    }
+
+    /**
+     * Exports an individual document version snapshot as a standalone PDF file,
+     * saves it into the local Room FTS4 workspace, and opens the Android share sheet.
+     */
+    fun exportVersionSnapshotAsPdf(
+        context: Context,
+        doc: DocEntity,
+        version: DocumentVersionEntity
+    ) {
+        viewModelScope.launch {
+            val exportRes = PdfLibAnnotationEngine.exportVersionSnapshotToPdf(
+                context = context,
+                document = doc,
+                version = version
+            )
+            val resultObj = exportRes.getOrNull()
+            if (resultObj != null) {
+                val versionTitle = "${doc.title} — v${version.versionNumber} (${version.versionLabel})"
+                createOrScanDocument(
+                    title = versionTitle,
+                    folderId = doc.folderId,
+                    category = doc.category,
+                    fileType = "pdf",
+                    fileName = resultObj.pdfFile.name,
+                    plainContent = version.snapshotContent,
+                    isEncrypted = false,
+                    password = "",
+                    encryptionKeyHint = null,
+                    isOfflineCached = true,
+                    pageCount = 1L,
+                    localPdfPath = resultObj.pdfFile.absolutePath,
+                    generatedPdfUri = resultObj.shareUri,
+                    customTags = "pdf, version-export, v${version.versionNumber}, snapshot"
+                )
+                recordSyncLog(
+                    docId = doc.id,
+                    docTitle = doc.title,
+                    action = "EXPORT_VERSION_PDF",
+                    status = "READY",
+                    details = "Exported version v${version.versionNumber} (${version.versionLabel}) to ${resultObj.pdfFile.name}"
+                )
+                _statusBannerMessage.value = "Exported version v${version.versionNumber} ('${version.versionLabel}') as PDF (${resultObj.pdfFile.name})"
+                PdfLibAnnotationEngine.launchSystemShareSheet(
+                    context = context,
+                    document = doc,
+                    plainContent = version.snapshotContent,
+                    exportedPdfResult = resultObj
+                )
+            } else {
+                _statusBannerMessage.value = "Failed to export version PDF: ${exportRes.exceptionOrNull()?.localizedMessage}"
+            }
+        }
+    }
+
+    /**
+     * Exports an individual document note/comment or tracked suggestion as a standalone PDF file,
+     * saves it into the local Room FTS4 workspace, and opens the Android share sheet.
+     */
+    fun exportCommentOrNoteAsPdf(
+        context: Context,
+        doc: DocEntity,
+        comment: DocumentCommentEntity
+    ) {
+        viewModelScope.launch {
+            val exportRes = PdfLibAnnotationEngine.exportNoteOrCommentToPdf(
+                context = context,
+                document = doc,
+                comment = comment
+            )
+            val resultObj = exportRes.getOrNull()
+            if (resultObj != null) {
+                val noteTitle = "${doc.title} — Note (${comment.authorName})"
+                val noteSummary = buildString {
+                    appendLine("=== DOCUMENT NOTE EXPORT: ${doc.title} ===")
+                    appendLine("Author: ${comment.authorName} (${comment.authorRole}) • Status: ${comment.status}")
+                    appendLine("Anchor: \"${comment.anchorLineOrText}\"")
+                    appendLine()
+                    appendLine(comment.body)
+                    if (comment.isSuggestion && comment.suggestedReplacement.isNotBlank()) {
+                        appendLine("\n+ Proposed Replacement: ${comment.suggestedReplacement}")
+                    }
+                }
+                createOrScanDocument(
+                    title = noteTitle,
+                    folderId = doc.folderId,
+                    category = "Notes",
+                    fileType = "pdf",
+                    fileName = resultObj.pdfFile.name,
+                    plainContent = noteSummary,
+                    isEncrypted = false,
+                    password = "",
+                    encryptionKeyHint = null,
+                    isOfflineCached = true,
+                    pageCount = 1L,
+                    localPdfPath = resultObj.pdfFile.absolutePath,
+                    generatedPdfUri = resultObj.shareUri,
+                    customTags = "pdf, note-export, comment, ${comment.status.lowercase()}"
+                )
+                recordSyncLog(
+                    docId = doc.id,
+                    docTitle = doc.title,
+                    action = "EXPORT_NOTE_PDF",
+                    status = "READY",
+                    details = "Exported note by ${comment.authorName} to ${resultObj.pdfFile.name}"
+                )
+                _statusBannerMessage.value = "Exported note by ${comment.authorName} as PDF (${resultObj.pdfFile.name})"
+                PdfLibAnnotationEngine.launchSystemShareSheet(
+                    context = context,
+                    document = doc,
+                    plainContent = noteSummary,
+                    exportedPdfResult = resultObj
+                )
+            } else {
+                _statusBannerMessage.value = "Failed to export note PDF: ${exportRes.exceptionOrNull()?.localizedMessage}"
+            }
+        }
+    }
+
+    /**
+     * Exports all notes, threaded comments, tracked suggestions, and PDF sticky/text-box notes
+     * on a document into a consolidated PDF report.
+     */
+    fun exportAllNotesAsPdf(
+        context: Context,
+        doc: DocEntity,
+        comments: List<DocumentCommentEntity>,
+        annotations: List<PdfAnnotationYMapEntity>
+    ) {
+        viewModelScope.launch {
+            val exportRes = PdfLibAnnotationEngine.exportAllNotesToPdf(
+                context = context,
+                document = doc,
+                comments = comments,
+                stickyNotes = annotations
+            )
+            val resultObj = exportRes.getOrNull()
+            if (resultObj != null) {
+                val reportTitle = "${doc.title} — Consolidated Notes Report"
+                val reportText = comments.joinToString("\n\n") { c ->
+                    "[${c.status}] ${c.authorName}: ${c.body}"
+                }
+                createOrScanDocument(
+                    title = reportTitle,
+                    folderId = doc.folderId,
+                    category = "Notes",
+                    fileType = "pdf",
+                    fileName = resultObj.pdfFile.name,
+                    plainContent = reportText.ifBlank { "Consolidated PDF notes report for ${doc.title}" },
+                    isEncrypted = false,
+                    password = "",
+                    encryptionKeyHint = null,
+                    isOfflineCached = true,
+                    pageCount = 1L,
+                    localPdfPath = resultObj.pdfFile.absolutePath,
+                    generatedPdfUri = resultObj.shareUri,
+                    customTags = "pdf, notes-report, comments"
+                )
+                _statusBannerMessage.value = "Exported ${resultObj.annotationCount} note(s) as PDF (${resultObj.pdfFile.name})"
+                PdfLibAnnotationEngine.launchSystemShareSheet(
+                    context = context,
+                    document = doc,
+                    plainContent = reportText,
+                    exportedPdfResult = resultObj
+                )
+            }
         }
     }
 

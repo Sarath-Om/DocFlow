@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service — DocFlow</title>
+  <meta name="description" content="Terms of Service for the DocFlow Android application." />
+  <meta property="og:title" content="Terms of Service — DocFlow" />
+  <meta property="og:description" content="Terms of Service governing installation and use of DocFlow." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#1F6BFF" />
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./config.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Build Output Audit Banner -->
+  <div id="placeholder-audit-banner" class="placeholder-audit-banner" role="status" hidden>
+    Build Audit Notice: Unfilled placeholder(s) in <code>config.js</code> must be updated before publishing:
+    <span id="placeholder-audit-list"></span>
+  </div>
+
+  <!-- Shared Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="./index.html" class="brand-logo" aria-label="DocFlow Home">
+        <span class="brand-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <line x1="10" y1="9" x2="8" y2="9"></line>
+          </svg>
+        </span>
+        <span>DocFlow</span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary Navigation">
+        <a href="./index.html" class="nav-link">Home</a>
+        <a href="./privacy.html" class="nav-link">Privacy</a>
+        <a href="./terms.html" class="nav-link" aria-current="page">Terms</a>
+      </nav>
+
+      <div class="header-actions">
+        <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" aria-pressed="false" aria-label="Toggle color theme">
+          <span aria-hidden="true">◐</span>
+          <span class="theme-toggle-label">Dark mode</span>
+        </button>
+        <a href="https://github.com/Sarath-Om/DocFlow/releases/download/DocFlow/DocFlow.apk" data-download-link class="btn btn-primary btn-sm">
+          Download APK
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="container-narrow">
+    <header class="legal-header">
+      <h1 class="section-title">Terms of Service</h1>
+      <p class="legal-meta">
+        Effective date: <span data-config="EFFECTIVE_DATE" class="placeholder-flag">[DATE]</span>
+        · Last updated: <span data-config="LAST_UPDATED_DATE" class="placeholder-flag">[DATE]</span>
+      </p>
+    </header>
+
+    <!-- Table of Contents -->
+    <nav class="toc-card" aria-label="Table of Contents">
+      <strong>Table of Contents</strong>
+      <ol class="toc-list">
+        <li><a href="#acceptance">Acceptance of terms</a></li>
+        <li><a href="#the-app">The app</a></li>
+        <li><a href="#license">License</a></li>
+        <li><a href="#your-content">Your content and responsibility</a></li>
+        <li><a href="#installation">Installation</a></li>
+        <li><a href="#backups-data-loss">Backups and data loss</a></li>
+        <li><a href="#ai-features">AI features</a></li>
+        <li><a href="#third-party">Third-party components</a></li>
+        <li><a href="#warranties">Disclaimer of warranties</a></li>
+        <li><a href="#liability">Limitation of liability</a></li>
+        <li><a href="#termination">Termination</a></li>
+        <li><a href="#changes">Changes to the app or terms</a></li>
+        <li><a href="#governing-law">Governing law</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ol>
+    </nav>
+
+    <!-- 1. Acceptance of terms -->
+    <section id="acceptance" class="legal-section">
+      <h2>1. Acceptance of terms</h2>
+      <p>
+        By downloading, installing, or using the DocFlow Android application ("the App") or visiting this website, you agree to be bound by these Terms of Service ("Terms") between you and <span data-config="DEVELOPER_NAME" class="placeholder-flag">[DEVELOPER / ORGANIZATION NAME]</span>. If you do not agree to these Terms, do not install or use the App.
+      </p>
+    </section>
+
+    <!-- 2. The app -->
+    <section id="the-app" class="legal-section">
+      <h2>2. The app</h2>
+      <p>
+        DocFlow is a free tool to open, scan, convert, annotate, export (including exporting individual document versions or notes as PDF files), and organize documents on your Android device.
+      </p>
+    </section>
+
+    <!-- 3. License -->
+    <section id="license" class="legal-section">
+      <h2>3. License</h2>
+      <p>
+        Subject to your compliance with these Terms, <span data-config="DEVELOPER_NAME" class="placeholder-flag">[DEVELOPER / ORGANIZATION NAME]</span> grants you a personal, non-exclusive, non-transferable, revocable license to install and use the App on Android devices that you own or control.
+      </p>
+      <p>
+        You may not reverse engineer, decompile, redistribute for commercial resale, or remove copyright or attribution notices from the App, except to the extent that applicable law or an applicable open-source license expressly permits you to do so.
+        Open-source license status: <span data-config="OPEN_SOURCE_LICENSE" class="placeholder-flag">[OPEN-SOURCE LICENSE, if any]</span>.
+      </p>
+    </section>
+
+    <!-- 4. Your content and responsibility -->
+    <section id="your-content" class="legal-section">
+      <h2>4. Your content and responsibility</h2>
+      <p>
+        Your files, scans, version snapshots, annotations, and notes remain yours. We claim no ownership rights over any document you open, create, scan, or export with DocFlow.
+      </p>
+      <p>
+        You are solely responsible for ensuring that you have the legal right to scan, store, convert, translate, annotate, or share the documents you process in the App, and you agree not to use DocFlow for any unlawful purpose.
+      </p>
+    </section>
+
+    <!-- 5. Installation -->
+    <section id="installation" class="legal-section">
+      <h2>5. Installation</h2>
+      <p>
+        DocFlow is distributed as a direct Android package (<code>.apk</code>) and is not distributed through the Google Play Store. You download and install the APK at your own risk.
+      </p>
+      <p>
+        To protect your device against tampered copies, you should download DocFlow only from the official download link on this website (<a href="https://github.com/Sarath-Om/DocFlow/releases/download/DocFlow/DocFlow.apk" data-download-link>https://github.com/Sarath-Om/DocFlow/releases/download/DocFlow/DocFlow.apk</a>) or our official <a href="https://github.com/Sarath-Om/DocFlow/releases" rel="noopener">GitHub Releases page</a>, and verify the APK's SHA-256 checksum before installing.
+      </p>
+    </section>
+
+    <!-- 6. Backups and data loss -->
+    <section id="backups-data-loss" class="legal-section">
+      <h2>6. Backups and data loss</h2>
+      <p>
+        Because your documents and Private Safe files are stored locally on your device, you are solely responsible for maintaining independent backups of your important files.
+      </p>
+      <p>
+        We do not hold copies of your local files, PINs, passphrases, or AES-256 encryption keys. <strong>Lost PINs, forgotten passphrases, and lost encryption keys cannot be recovered by us under any circumstances.</strong>
+      </p>
+    </section>
+
+    <!-- 7. AI features -->
+    <section id="ai-features" class="legal-section">
+      <h2>7. AI features</h2>
+      <p>
+        Optical Character Recognition (OCR), document summaries, and translations in DocFlow are generated automatically on your device and may contain recognition inaccuracies, omissions, or translation errors.
+      </p>
+      <p>
+        These outputs are provided for convenience only. You must verify all critical text against the original document and <strong>must not rely on automated OCR, summaries, or translations for legal, medical, tax, or financial decisions</strong>.
+      </p>
+    </section>
+
+    <!-- 8. Third-party components -->
+    <section id="third-party" class="legal-section">
+      <h2>8. Third-party components</h2>
+      <p>
+        The App incorporates open-source Android Jetpack libraries, document parsing utilities, and Google ML Kit (for on-device text recognition and language packs). Those third-party components are governed by their respective licenses and terms of service.
+      </p>
+    </section>
+
+    <!-- 9. Disclaimer of warranties -->
+    <section id="warranties" class="legal-section">
+      <h2>9. Disclaimer of warranties</h2>
+      <p>
+        DocFlow is provided free of charge on an <strong>"AS IS"</strong> and <strong>"AS AVAILABLE"</strong> basis, without warranties of any kind, whether express, implied, or statutory, including without limitation any implied warranties of merchantability, fitness for a particular purpose, accuracy, or non-infringement.
+      </p>
+    </section>
+
+    <!-- 10. Limitation of liability -->
+    <section id="liability" class="legal-section">
+      <h2>10. Limitation of liability</h2>
+      <p>
+        To the maximum extent permitted by applicable law, <span data-config="DEVELOPER_NAME" class="placeholder-flag">[DEVELOPER / ORGANIZATION NAME]</span> shall not be liable for any loss of data, corrupted files, inability to decrypt locked files, device damage, or any indirect, incidental, special, consequential, or punitive damages arising out of or related to your use of or inability to use the App.
+      </p>
+    </section>
+
+    <!-- 11. Termination -->
+    <section id="termination" class="legal-section">
+      <h2>11. Termination</h2>
+      <p>
+        You may stop using DocFlow and terminate these Terms at any time simply by uninstalling the App from your device. Your rights under this license will terminate automatically if you fail to comply with any provision of these Terms.
+      </p>
+    </section>
+
+    <!-- 12. Changes to the app or terms -->
+    <section id="changes" class="legal-section">
+      <h2>12. Changes to the app or terms</h2>
+      <p>
+        We may update the App or modify these Terms from time to time. Updated Terms will be posted on this page with a revised "Last updated" date. Continued use of the App after changes become effective constitutes acceptance of the revised Terms.
+      </p>
+    </section>
+
+    <!-- 13. Governing law -->
+    <section id="governing-law" class="legal-section">
+      <h2>13. Governing law</h2>
+      <p>
+        These Terms are governed by and construed in accordance with the laws of India, without regard to conflict-of-law principles. Any disputes arising under or in connection with these Terms shall be subject to the exclusive jurisdiction of the competent courts at <span data-config="GOVERNING_CITY_STATE" class="placeholder-flag">[CITY, STATE]</span>, India.
+      </p>
+    </section>
+
+    <!-- 14. Contact -->
+    <section id="contact" class="legal-section">
+      <h2>14. Contact</h2>
+      <p>
+        Questions about these Terms of Service can be sent to <span data-config="DEVELOPER_NAME" class="placeholder-flag">[DEVELOPER / ORGANIZATION NAME]</span> at:
+        <br />
+        Email: <a data-config-mailto="CONTACT_EMAIL" class="placeholder-flag">[EMAIL]</a>
+      </p>
+    </section>
+  </main>
+
+  <!-- Shared Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>
+        <strong>DocFlow</strong> · © 2026 <span data-config="DEVELOPER_NAME" class="placeholder-flag">[DEVELOPER / ORGANIZATION NAME]</span>. All rights reserved.
+      </div>
+      <div class="footer-links">
+        <a href="./index.html">Home</a>
+        <a href="./privacy.html">Privacy Policy</a>
+        <a href="./terms.html">Terms of Service</a>
+        <a href="https://github.com/Sarath-Om/DocFlow/releases" rel="noopener">GitHub Releases</a>
+        <span>Contact: <a data-config-mailto="CONTACT_EMAIL" class="placeholder-flag">[EMAIL]</a></span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — DocFlow</title>
+  <meta name="description" content="DocFlow Privacy Policy. DocFlow does not collect, sell or share your personal data. Your documents stay on your device." />
+  <meta property="og:title" content="Privacy Policy — DocFlow" />
+  <meta property="og:description" content="Plain-language Privacy Policy for the DocFlow Android document scanner and viewer." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#1F6BFF" />
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./config.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Build Output Audit Banner -->
+  <div id="placeholder-audit-banner" class="placeholder-audit-banner" role="status" hidden>
+    Build Audit Notice: Unfilled placeholder(s) in <code>config.js</code> must be updated before publishing:
+    <span id="placeholder-audit-list"></span>
+  </div>
+
+  <!-- Shared Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="./index.html" class="brand-logo" aria-label="DocFlow Home">
+        <span class="brand-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <line x1="10" y1="9" x2="8" y2="9"></line>
+          </svg>
+        </span>
+        <span>DocFlow</span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary Navigation">
+        <a href="./index.html" class="nav-link">Home</a>
+        <a href="./privacy.html" class="nav-link" aria-current="page">Privacy</a>
+        <a href="./terms.html" class="nav-link">Terms</a>
+      </nav>
+
+      <div class="header-actions">
+        <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" aria-pressed="false" aria-label="Toggle color theme">
+          <span aria-hidden="true">◐</span>
+          <span class="theme-toggle-label">Dark mode</span>
+        </button>
+        <a href="https://github.com/Sarath-Om/DocFlow/releases/download/DocFlow/DocFlow.apk" data-download-link class="btn btn-primary btn-sm">
+          Download APK
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="container-narrow">
+    <header class="legal-header">
+      <h1 class="section-title">Privacy Policy</h1>
+      <p class="legal-meta">
+        Effective date: <span data-config="EFFECTIVE_DATE" class="placeholder-flag">[DATE]</span>
+        · Last updated: <span data-config="LAST_UPDATED_DATE" class="placeholder-flag">[DATE]</span>
+      </p>
+    </header>
+
+    <!-- 1. Summary (Boxed) -->
+    <section id="summary" class="summary-box" aria-labelledby="summary-heading">
+      <h2 id="summary-heading">1. Summary</h2>
+      <p>
+        DocFlow does not collect, sell or share your personal data. Your documents stay on your device.
+      </p>
+    </section>
+
+    <!-- Table of Contents -->
+    <nav class="toc-card" aria-label="Table of Contents">
+      <strong>Table of Contents</strong>
+      <ol class="toc-list">
+        <li><a href="#summary">Summary</a></li>
+        <li><a href="#who-we-are">Who we are</a></li>
+        <li><a href="#what-we-do-not-collect">Information we do NOT collect</a></li>
+        <li><a href="#stored-on-device">Information stored on your device only</a></li>
+        <li><a href="#permissions">Permissions and why</a></li>
+        <li><a href="#network-use">Network use</a></li>
+        <li><a href="#on-device-processing">On-device processing</a></li>
+        <li><a href="#encryption-security">Encryption and security</a></li>
+        <li><a href="#backups-sharing">Backups and sharing</a></li>
+        <li><a href="#retention-deletion">Data retention and deletion</a></li>
+        <li><a href="#childrens-privacy">Children's privacy</a></li>
+        <li><a href="#your-rights">Your rights</a></li>
+        <li><a href="#policy-changes">Changes to this policy</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ol>
+    </nav>
+
+    <!-- 2. Who we are -->
+    <section id="who-we-are" class="legal-section">
+      <h2>2. Who we are</h2>
+      <p>
+        DocFlow is developed and maintained by <span data-config="DEVELOPER_NAME" class="placeholder-flag">[DEVELOPER / ORGANIZATION NAME]</span>.
+        If you have any questions about this Privacy Policy or how the app handles your files, you can reach us at
+        <a data-config-mailto="CONTACT_EMAIL" class="placeholder-flag">[EMAIL]</a>.
+      </p>
+    </section>
+
+    <!-- 3. Information we do NOT collect -->
+    <section id="what-we-do-not-collect" class="legal-section">
+      <h2>3. Information we do NOT collect</h2>
+      <p>When you use DocFlow in offline mode, we do not collect, log, store, or transmit any of the following:</p>
+      <ul>
+        <li><strong>No mandatory accounts:</strong> You can open, scan, edit, annotate, and export documents offline without creating an account.</li>
+        <li><strong>No names, phone numbers, or contact lists:</strong> We do not read your address book or profile details.</li>
+        <li><strong>No analytics or telemetry:</strong> Neither the Android app nor this website includes Google Analytics, Firebase Analytics, Mixpanel, cookies, or behavioral tracking scripts.</li>
+        <li><strong>No advertising IDs:</strong> DocFlow contains zero advertisements and never requests the Android Advertising ID (AAID).</li>
+        <li><strong>No third-party crash reporting:</strong> We do not bundle third-party crash-reporting SDKs that silently upload stack traces or device identifiers.</li>
+        <li><strong>No location data:</strong> DocFlow never requests coarse or fine GPS/network location permissions.</li>
+        <li><strong>No document contents sent to us:</strong> Your PDFs, Office files, scans, OCR text, versions, and notes are processed locally on your device.</li>
+      </ul>
+    </section>
+
+    <!-- 4. Information stored on your device only -->
+    <section id="stored-on-device" class="legal-section">
+      <h2>4. Information stored on your device only</h2>
+      <p>
+        Your documents, scans, ML Kit OCR text, version history snapshots, notes/comments, PDF ink annotations, folders, custom tags, app settings, and Private Safe contents live inside the app's private storage directory (<code>files/docflow_documents/</code>, <code>files/scanned_pdfs/</code>, <code>files/annotated_pdfs/</code>) and local Room SQLite database (<code>docflow_local_cache.db</code> with FTS4 full-text search index) on your phone.
+      </p>
+      <p>
+        Android isolates this private storage so other apps cannot read it, and we have no technical means to access files stored on your device. If you optionally sign in and enable workspace cloud sync, your selected workspace records are synchronized with your own authenticated cloud database; you can enable <strong>Offline-First Room FTS4 Mode</strong> at any time so all activity stays strictly local.
+      </p>
+    </section>
+
+    <!-- 5. Permissions and why -->
+    <section id="permissions" class="legal-section">
+      <h2>5. Permissions and why</h2>
+      <p>DocFlow follows the principle of least privilege and requests only the permissions required for the features you actively use:</p>
+      <ul>
+        <li><strong>Camera (<code>android.permission.CAMERA</code>):</strong> Used only when you open the document scanner to capture physical pages with CameraX. Marked as non-required hardware so DocFlow installs on devices without a camera.</li>
+        <li><strong>Storage / folder access via the system picker:</strong> DocFlow does <em>not</em> request broad storage permissions (such as <code>READ_EXTERNAL_STORAGE</code> or <code>MANAGE_EXTERNAL_STORAGE</code>). Instead, it uses Android's built-in system file picker (Storage Access Framework) and <code>VIEW</code> / <code>SEND</code> intents so the app only accesses the specific files or folders (such as Downloads) that you explicitly choose.</li>
+        <li><strong>Biometrics (<code>android.permission.USE_BIOMETRIC</code>):</strong> Optional. Used via Android's system <code>BiometricPrompt</code> to unlock Private Safe documents, the app entry lock, and biometric document signatures. Your fingerprint or face data is handled strictly by the Android operating system and is never exposed to DocFlow.</li>
+        <li><strong>Notifications:</strong> Requested only if a specific feature needs to show status notifications.</li>
+      </ul>
+      <p>
+        Each permission is optional and can be revoked at any time in your phone's <strong>Android Settings → Apps → DocFlow → Permissions</strong>.
+      </p>
+    </section>
+
+    <!-- 6. Network use -->
+    <section id="network-use" class="legal-section">
+      <h2>6. Network use</h2>
+      <p>
+        DocFlow works offline. In offline mode, the only network activity is the optional one-time download of on-device recognition or translation language packs, fetched directly from Google's ML Kit model servers by the Google ML Kit libraries included in the app. No document content is ever sent during model downloads. Google's own terms of service and privacy policy apply to those model downloads.
+      </p>
+      <p>
+        When you download the DocFlow APK file from GitHub Releases, that download is served by GitHub, Inc., which operates under GitHub's own privacy policy.
+      </p>
+    </section>
+
+    <!-- 7. On-device processing -->
+    <section id="on-device-processing" class="legal-section">
+      <h2>7. On-device processing</h2>
+      <p>
+        All document processing—including CameraX edge detection, Google ML Kit Optical Character Recognition (OCR), full-text FTS4 indexing, summarising, translation, Office-to-PDF conversion, and exporting individual document versions or notes to PDF—runs locally on your device's processor.
+      </p>
+    </section>
+
+    <!-- 8. Encryption and security -->
+    <section id="encryption-security" class="legal-section">
+      <h2>8. Encryption and security</h2>
+      <p>
+        Optional file encryption and Private Safe protection use <strong>AES-256</strong> (with PBKDF2-HMAC-SHA256 key derivation and random cryptographic salts/initialization vectors) alongside hardware-backed authentication through the Android Keystore and <code>androidx.biometric</code>.
+      </p>
+      <p>
+        <strong>Important warning:</strong> Because we never store or transmit your PIN, passphrase, or encryption keys, <strong>if you forget your PIN/passphrase or lose your device, we cannot recover your encrypted files</strong>. While we use industry-standard cryptography, no software or device can guarantee absolute security.
+      </p>
+    </section>
+
+    <!-- 9. Backups and sharing -->
+    <section id="backups-sharing" class="legal-section">
+      <h2>9. Backups and sharing</h2>
+      <p>
+        Automatic OS cloud backup is disabled (<code>android:allowBackup="false"</code>) to prevent silent background uploads of your private documents. Any export (such as exporting an annotated PDF, exporting a specific document version snapshot or note as a PDF, or exporting PNG images), backup (<code>.docflow</code>), or share via Android's system share sheet is started explicitly by you and goes only to the destination app or folder you choose.
+      </p>
+    </section>
+
+    <!-- 10. Data retention and deletion -->
+    <section id="retention-deletion" class="legal-section">
+      <h2>10. Data retention and deletion</h2>
+      <p>
+        Your files, OCR indexes, version history, and notes remain on your device until you delete them inside the app, move items to Recently deleted (auto-purged after 30 days), clear the app's storage in Android Settings, or uninstall DocFlow. We hold no copy of your local files.
+      </p>
+    </section>
+
+    <!-- 11. Children's privacy -->
+    <section id="childrens-privacy" class="legal-section">
+      <h2>11. Children's privacy</h2>
+      <p>
+        DocFlow is a general-audience productivity tool and is not directed at children under 13 (or the minimum age required in your jurisdiction). We do not knowingly collect personal data from children or anyone else.
+      </p>
+    </section>
+
+    <!-- 12. Your rights -->
+    <section id="your-rights" class="legal-section">
+      <h2>12. Your rights</h2>
+      <p>
+        Because we hold no personal data about you on our servers when you use DocFlow offline, there is no personal profile for us to access, correct, export, or delete on our side—you exercise full control directly inside the app on your device.
+      </p>
+      <p>
+        This local-first architecture is designed to respect your privacy principles under India's <strong>Digital Personal Data Protection Act, 2023 (DPDP Act)</strong> and similar data protection laws to the extent they apply. If you contact us by email, you may request deletion of your email correspondence at any time.
+      </p>
+    </section>
+
+    <!-- 13. Changes to this policy -->
+    <section id="policy-changes" class="legal-section">
+      <h2>13. Changes to this policy</h2>
+      <p>
+        If we update this Privacy Policy to reflect new app features or legal requirements, we will post the updated policy on this page and revise the "Last updated" date at the top.
+      </p>
+    </section>
+
+    <!-- 14. Contact -->
+    <section id="contact" class="legal-section">
+      <h2>14. Contact</h2>
+      <p>
+        For any privacy-related questions or requests, please contact <span data-config="DEVELOPER_NAME" class="placeholder-flag">[DEVELOPER / ORGANIZATION NAME]</span> at:
+        <br />
+        Email: <a data-config-mailto="CONTACT_EMAIL" class="placeholder-flag">[EMAIL]</a>
+      </p>
+    </section>
+  </main>
+
+  <!-- Shared Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>
+        <strong>DocFlow</strong> · © 2026 <span data-config="DEVELOPER_NAME" class="placeholder-flag">[DEVELOPER / ORGANIZATION NAME]</span>. All rights reserved.
+      </div>
+      <div class="footer-links">
+        <a href="./index.html">Home</a>
+        <a href="./privacy.html">Privacy Policy</a>
+        <a href="./terms.html">Terms of Service</a>
+        <a href="https://github.com/Sarath-Om/DocFlow/releases" rel="noopener">GitHub Releases</a>
+        <span>Contact: <a data-config-mailto="CONTACT_EMAIL" class="placeholder-flag">[EMAIL]</a></span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

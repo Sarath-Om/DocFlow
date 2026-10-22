@@ -431,7 +431,81 @@ class ExampleRobolectricTest {
     assertTrue(loadedDoc.fileSize > 0L)
     assertEquals(1761120000000L, loadedDoc.updatedAtMillis)
   }
+
+  @Test
+  fun `export individual document version and note as pdf files generates valid pdf and indexes in Room`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val userId = "pdf-export-user"
+
+    val versionSnapshot = com.example.data.local.DocumentVersionEntity(
+        id = "ver-701",
+        documentId = "doc-contract-7",
+        versionNumber = 3,
+        versionLabel = "Final Board Review Draft",
+        authorName = "Sarath Om",
+        contentSnapshot = "SECTION 1: MASTER AGREEMENT\nAll document versions stay local on your phone.\n Verified clause 4.2.",
+        createdAtMillis = 1761125000000L
+    )
+
+    val versionPdfResult = com.example.data.util.PdfLibAnnotationEngine.exportVersionSnapshotToPdf(
+        context = context,
+        documentTitle = "Master Service Agreement",
+        version = versionSnapshot
+    )
+    assertTrue(versionPdfResult.isSuccess)
+    val exportedVer = versionPdfResult.getOrThrow()
+    assertTrue(exportedVer.pdfFile.exists())
+    assertTrue(exportedVer.fileSize > 0L)
+    assertTrue(exportedVer.pageCount >= 1)
+
+    val noteEntity = com.example.data.local.DocumentCommentEntity(
+        id = "note-901",
+        documentId = "doc-contract-7",
+        authorName = "Legal Counsel",
+        authorRole = "EDITOR",
+        anchorText = "Clause 4.2 Liability Cap",
+        commentBody = "Ensure liability cap matches the offline privacy warranty.",
+        isSuggestion = true,
+        suggestedReplacement = "Liability is strictly capped at zero for free local APK distribution.",
+        isResolved = false,
+        createdAtMillis = 1761126000000L
+    )
+
+    val notePdfResult = com.example.data.util.PdfLibAnnotationEngine.exportNoteOrCommentToPdf(
+        context = context,
+        documentTitle = "Master Service Agreement",
+        comment = noteEntity
+    )
+    assertTrue(notePdfResult.isSuccess)
+    val exportedNote = notePdfResult.getOrThrow()
+    assertTrue(exportedNote.pdfFile.exists())
+    assertTrue(exportedNote.fileSize > 0L)
+    assertTrue(exportedNote.pageCount >= 1)
+
+    // Store the exported version PDF in Room and verify it is searchable
+    val versionDocEntity = CachedDocumentEntity(
+        id = "exported-ver-doc-1",
+        userId = userId,
+        title = "Master Service Agreement - v3 (Final Board Review Draft)",
+        folderId = "root",
+        category = "Work",
+        fileType = "pdf",
+        fileName = exportedVer.pdfFile.name,
+        fileSize = exportedVer.fileSize,
+        content = versionSnapshot.contentSnapshot,
+        tags = "pdf, version-export, v3",
+        localFilePath = exportedVer.pdfFile.absolutePath,
+        pageCount = exportedVer.pageCount.toLong()
+    )
+    dao.upsertDocument(versionDocEntity)
+
+    val retrieved = dao.getCachedDocumentById(userId, "exported-ver-doc-1")
+    assertNotNull(retrieved)
+    assertEquals("pdf", retrieved!!.fileType)
+    assertTrue(retrieved.parsedTags().contains("version-export"))
+  }
 }
+
 
 
 

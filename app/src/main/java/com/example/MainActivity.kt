@@ -683,6 +683,9 @@ private fun AuthenticatedWorkspace(
                     onRestoreVersion = { version, password, onRestoredContent ->
                         viewModel.restoreVersionSnapshot(activeDoc, version, password, onRestoredContent)
                     },
+                    onExportVersionAsPdf = { version ->
+                        viewModel.exportVersionSnapshotAsPdf(context, activeDoc, version)
+                    },
                     onAddComment = { anchorText, body, isSuggestion, suggestedReplacement ->
                         viewModel.addCommentOrSuggestion(activeDoc, anchorText, body, isSuggestion, suggestedReplacement)
                     },
@@ -694,6 +697,12 @@ private fun AuthenticatedWorkspace(
                     },
                     onRejectSuggestion = { commentId ->
                         viewModel.rejectSuggestion(commentId)
+                    },
+                    onExportCommentAsPdf = { comment ->
+                        viewModel.exportCommentOrNoteAsPdf(context, activeDoc, comment)
+                    },
+                    onExportAllNotesAsPdf = { allComments ->
+                        viewModel.exportAllNotesAsPdf(context, activeDoc, allComments)
                     },
                     onInviteCollaborator = { email, role ->
                         viewModel.inviteCollaborator(email, role)
