@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -96,6 +97,7 @@ import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.DocumentViewerEditorScreen
 import com.example.ui.screens.ManageScreen
 import com.example.ui.screens.ScannerScreen
+import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.StorageDashboardScreen
 import com.example.ui.screens.ToolsScreen
 import com.example.ui.theme.BadgePdfRed
@@ -135,6 +137,7 @@ enum class BottomNavTab(
 
 sealed interface AppScreen {
     data object MainTabs : AppScreen
+    data object Settings : AppScreen
     data object StorageDashboard : AppScreen
     data object Scanner : AppScreen
     data object BatchProcessor : AppScreen
@@ -235,8 +238,12 @@ private fun OfflineDocFlowWorkspace(
     var showSettingsSheet by remember { mutableStateOf(false) }
 
     // Optional App-Entry Biometric Lock Gate
-    var appEntryBiometricGateEnabled by remember { mutableStateOf(false) }
-    var isAppEntryUnlocked by remember { mutableStateOf(true) }
+    var appEntryBiometricGateEnabled by remember {
+        mutableStateOf(OnDeviceAiAndBackupEngine.isAppLockEnabled(context))
+    }
+    var isAppEntryUnlocked by remember {
+        mutableStateOf(!OnDeviceAiAndBackupEngine.isAppLockEnabled(context))
+    }
 
     val documentsState by viewModel.documentsState.collectAsStateWithLifecycle()
     val filteredDocuments by viewModel.filteredDocuments.collectAsStateWithLifecycle()
@@ -407,7 +414,7 @@ private fun OfflineDocFlowWorkspace(
 
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
-                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                contentWindowInsets = WindowInsets.safeDrawing,
                 bottomBar = {
                     FlatBottomNavigationBar(
                         activeTab = activeTab,
@@ -507,7 +514,7 @@ private fun OfflineDocFlowWorkspace(
                                 recentCachedDocuments = recentCachedDocuments,
                                 onOpenStorageDashboard = { currentScreen = AppScreen.StorageDashboard },
                                 activeCollaborators = activeCollaborators,
-                                onOpenOtaAndSettings = { showSettingsSheet = true },
+                                onOpenOtaAndSettings = { currentScreen = AppScreen.Settings },
                                 backgroundSyncWorkerState = backgroundSyncWorkerState,
                                 onTriggerWorkManagerSync = viewModel::triggerWorkManagerSupabaseSync,
                                 onBatchSoftDelete = viewModel::softDeleteDocuments,
@@ -523,7 +530,7 @@ private fun OfflineDocFlowWorkspace(
                                 onOpenSearch = {
                                     activeTab = BottomNavTab.RECENT
                                 },
-                                onOpenSettings = { showSettingsSheet = true },
+                                onOpenSettings = { currentScreen = AppScreen.Settings },
                                 onOpenScanner = { currentScreen = AppScreen.Scanner },
                                 onOpenBatchProcessor = { currentScreen = AppScreen.BatchProcessor },
                                 onConvertDocumentToPdf = { sourceDoc ->
@@ -595,7 +602,7 @@ private fun OfflineDocFlowWorkspace(
                                 deletedDocs = deletedDocuments,
                                 folders = folders,
                                 onOpenSearch = { activeTab = BottomNavTab.RECENT },
-                                onOpenSettings = { showSettingsSheet = true },
+                                onOpenSettings = { currentScreen = AppScreen.Settings },
                                 onOpenDocument = { doc ->
                                     viewModel.recordDocumentAccessed(doc.id)
                                     currentScreen = AppScreen.DocumentDetail(doc.id)
@@ -632,6 +639,41 @@ private fun OfflineDocFlowWorkspace(
                     }
                 }
             }
+        }
+
+        is AppScreen.Settings -> {
+            BackHandler { currentScreen = AppScreen.MainTabs }
+            SettingsScreen(
+                themeMode = themeMode,
+                biometricVaultEnabled = biometricVaultEnabled,
+                appEntryBiometricGateEnabled = appEntryBiometricGateEnabled,
+                storageSummary = storageDashboardSummary,
+                totalDocumentsCount = allDocs.size,
+                deletedDocumentsCount = deletedDocuments.size,
+                privateSafeCount = privateSafeDocuments.size,
+                onBack = { currentScreen = AppScreen.MainTabs },
+                onSelectThemeMode = viewModel::setThemeMode,
+                onToggleBiometricVault = viewModel::toggleBiometricVault,
+                onToggleAppEntryBiometricGate = {
+                    val next = !appEntryBiometricGateEnabled
+                    appEntryBiometricGateEnabled = next
+                    OnDeviceAiAndBackupEngine.setAppLockEnabled(context, next)
+                    if (next) {
+                        isAppEntryUnlocked = false
+                    }
+                },
+                onOpenStorageDashboard = { currentScreen = AppScreen.StorageDashboard },
+                onClearCacheAndCompact = {
+                    viewModel.clearThumbnailAndTempCache(context)
+                    viewModel.compactSnapshotsAndCache()
+                },
+                onExportBackup = { passphrase ->
+                    viewModel.exportBackupArchive(context, passphrase)
+                },
+                onImportBackupUri = { uri, passphrase ->
+                    viewModel.importBackupArchive(context, uri, passphrase)
+                }
+            )
         }
 
         is AppScreen.StorageDashboard -> {

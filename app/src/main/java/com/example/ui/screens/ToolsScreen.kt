@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -69,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -128,10 +130,24 @@ fun ToolsScreen(
         }
     }
 
-    LazyColumn(
+    val configuration = LocalConfiguration.current
+    val screenWidthDp = configuration.screenWidthDp
+    val headerFontSize = when {
+        screenWidthDp < 350 -> 30.sp
+        screenWidthDp < 390 -> 34.sp
+        else -> 38.sp
+    }
+
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.TopCenter
+    ) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .widthIn(max = 720.dp)
             .padding(horizontal = 16.dp)
             .testTag("tools_screen_list"),
         contentPadding = PaddingValues(top = 12.dp, bottom = 100.dp),
@@ -142,16 +158,20 @@ fun ToolsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(top = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Tools",
-                    fontSize = 38.sp,
+                    fontSize = headerFontSize,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.testTag("tools_screen_title")
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("tools_screen_title")
                 )
 
                 Row(
@@ -290,6 +310,7 @@ fun ToolsScreen(
                 )
             }
         }
+    }
     }
 
     // Modal 1: Convert to PDF

@@ -518,10 +518,36 @@ class ExampleRobolectricTest {
     assertEquals("pdf", retrieved!!.fileType)
     assertTrue(retrieved.parsedTags().contains("version-export"))
   }
+
+  @Test
+  fun `settings preferences persist light mode default language pin and legal urls`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+
+    // Verify Light Mode is the default
+    assertEquals("LIGHT", com.example.data.util.OnDeviceAiAndBackupEngine.getSavedThemeModeName(context))
+    com.example.data.util.OnDeviceAiAndBackupEngine.saveThemeModeName(context, "DARK")
+    assertEquals("DARK", com.example.data.util.OnDeviceAiAndBackupEngine.getSavedThemeModeName(context))
+    com.example.data.util.OnDeviceAiAndBackupEngine.saveThemeModeName(context, "LIGHT")
+    assertEquals("LIGHT", com.example.data.util.OnDeviceAiAndBackupEngine.getSavedThemeModeName(context))
+
+    // Verify primary language selection
+    com.example.data.util.OnDeviceAiAndBackupEngine.setPrimaryLanguage(
+        context,
+        com.example.data.util.TranslationLanguage.HINDI
+    )
+    assertEquals(
+        com.example.data.util.TranslationLanguage.HINDI,
+        com.example.data.util.OnDeviceAiAndBackupEngine.getPrimaryLanguage(context)
+    )
+
+    // Verify Private Safe PIN set, verify, and reset
+    com.example.data.util.OnDeviceAiAndBackupEngine.setPrivateSafePin(context, "5678")
+    assertTrue(com.example.data.util.OnDeviceAiAndBackupEngine.hasPrivateSafePin(context))
+    assertTrue(com.example.data.util.OnDeviceAiAndBackupEngine.verifyPrivateSafePin(context, "5678"))
+    com.example.data.util.OnDeviceAiAndBackupEngine.clearPrivateSafePin(context)
+
+    // Verify Privacy Policy and Terms of Service links
+    assertEquals("https://doceflow.site.je/privacy/", com.example.data.util.OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL)
+    assertEquals("https://doceflow.site.je/terms/", com.example.data.util.OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL)
+  }
 }
-
-
-
-
-
-

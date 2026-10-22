@@ -40,10 +40,17 @@ object OnDeviceAiAndBackupEngine {
 
     private const val PREFS_NAME = "docflow_offline_prefs"
     private const val KEY_DOWNLOADED_LANG_PACKS = "downloaded_lang_packs"
+    private const val KEY_PRIMARY_LANGUAGE = "primary_language_code"
+    private const val KEY_THEME_MODE = "theme_mode_pref"
     private const val KEY_PIN_HASH = "private_safe_pin_hash"
     private const val KEY_APP_LOCK_ENABLED = "app_lock_enabled"
     private const val KEY_BIOMETRIC_ENABLED = "biometric_unlock_enabled"
     private const val KEY_LOCK_TIMEOUT_MINUTES = "lock_timeout_minutes"
+
+    const val PRIVACY_POLICY_URL = "https://doceflow.site.je/privacy/"
+    const val TERMS_OF_SERVICE_URL = "https://doceflow.site.je/terms/"
+    const val APP_VERSION_NAME = "1.0.0"
+    const val APP_VERSION_BUILD = 100
 
     private val STOP_WORDS = setOf(
         "the", "and", "for", "that", "this", "with", "from", "are", "was", "were", "have",
@@ -399,6 +406,33 @@ object OnDeviceAiAndBackupEngine {
     }
 
     // =========================================================================
+    // General Settings: Theme (Default Light Mode) & Primary Language
+    // =========================================================================
+
+    fun getSavedThemeModeName(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_THEME_MODE, "LIGHT") ?: "LIGHT"
+    }
+
+    fun saveThemeModeName(context: Context, modeName: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_THEME_MODE, modeName).apply()
+    }
+
+    fun getPrimaryLanguage(context: Context): TranslationLanguage {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val code = prefs.getString(KEY_PRIMARY_LANGUAGE, "en") ?: "en"
+        return TranslationLanguage.entries.find { it.code.equals(code, ignoreCase = true) }
+            ?: TranslationLanguage.ENGLISH
+    }
+
+    fun setPrimaryLanguage(context: Context, language: TranslationLanguage) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_PRIMARY_LANGUAGE, language.code).apply()
+        markLanguagePackDownloaded(context, language.code)
+    }
+
+    // =========================================================================
     // Private Safe PIN & App Lock Settings (Stored Locally on Device)
     // =========================================================================
 
@@ -413,12 +447,37 @@ object OnDeviceAiAndBackupEngine {
         prefs.edit().putString(KEY_PIN_HASH, hashed).apply()
     }
 
+    fun clearPrivateSafePin(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().remove(KEY_PIN_HASH).apply()
+    }
+
     fun verifyPrivateSafePin(context: Context, pin: String): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val stored = prefs.getString(KEY_PIN_HASH, null) ?: return pin == "1234"
         return runCatching {
             CryptoUtils.decrypt(stored, pin).getOrNull() == "DOCFLOW_SAFE_VERIFIED"
         }.getOrDefault(false)
+    }
+
+    fun isBiometricUnlockEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_BIOMETRIC_ENABLED, true)
+    }
+
+    fun setBiometricUnlockEnabled(context: Context, enabled: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, enabled).apply()
+    }
+
+    fun isAppLockEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_APP_LOCK_ENABLED, false)
+    }
+
+    fun setAppLockEnabled(context: Context, enabled: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_APP_LOCK_ENABLED, enabled).apply()
     }
 
     fun getLockTimeoutMinutes(context: Context): Int {
@@ -429,6 +488,25 @@ object OnDeviceAiAndBackupEngine {
     fun setLockTimeoutMinutes(context: Context, minutes: Int) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putInt(KEY_LOCK_TIMEOUT_MINUTES, minutes).apply()
+    }
+
+    fun calculateCacheAndTempBytes(context: Context): Long {
+        fun folderBytes(dir: File?): Long {
+            if (dir == null || !dir.exists()) return 0L
+            return dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+        }
+        return runCatching {
+            folderBytes(context.cacheDir) + folderBytes(context.externalCacheDir)
+        }.getOrDefault(0L)
+    }
+
+    fun clearCacheAndTempFiles(context: Context): Long {
+        val before = calculateCacheAndTempBytes(context)
+        runCatching {
+            context.cacheDir?.listFiles()?.forEach { it.deleteRecursively() }
+            context.externalCacheDir?.listFiles()?.forEach { it.deleteRecursively() }
+        }
+        return before
     }
 
     // =========================================================================

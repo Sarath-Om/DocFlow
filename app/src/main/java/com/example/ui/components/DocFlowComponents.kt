@@ -21,12 +21,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -63,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -98,43 +102,71 @@ fun DocFlowScreenHeader(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    onNavigateBack: (() -> Unit)? = null,
+    backTestTag: String = "header_back_button",
     actions: List<DocFlowHeaderAction> = emptyList()
 ) {
+    val configuration = LocalConfiguration.current
+    val screenWidthDp = configuration.screenWidthDp
+    val sideMargin = DocFlowTokens.adaptiveScreenMargin(screenWidthDp)
+    val titleStyle = DocFlowTokens.adaptiveLargeTitleStyle(screenWidthDp)
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(
-                start = DocFlowTokens.screenSideMargin,
+                start = if (onNavigateBack != null) DocFlowTokens.space2 else sideMargin,
                 end = DocFlowTokens.space2,
                 top = DocFlowTokens.space3,
                 bottom = DocFlowTokens.space2
             ),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = DocFlowTokens.largeTitleStyle,
-                color = DocFlowTokens.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (!subtitle.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(DocFlowTokens.space1))
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space1)
+        ) {
+            if (onNavigateBack != null) {
+                IconButton(
+                    onClick = onNavigateBack,
+                    modifier = Modifier
+                        .size(DocFlowTokens.minTouchTarget)
+                        .clip(CircleShape)
+                        .testTag(backTestTag)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = DocFlowTokens.textPrimary
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = subtitle,
-                    style = DocFlowTokens.captionStyle,
-                    color = DocFlowTokens.textSecondary,
+                    text = title,
+                    style = titleStyle,
+                    color = DocFlowTokens.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (!subtitle.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(DocFlowTokens.space1))
+                    Text(
+                        text = subtitle,
+                        style = DocFlowTokens.captionStyle,
+                        color = DocFlowTokens.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
         if (actions.isNotEmpty()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space1)
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 actions.forEach { action ->
                     IconButton(
@@ -617,6 +649,8 @@ fun DocFlowBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
                 .padding(
                     start = DocFlowTokens.cardPaddingMax,
                     end = DocFlowTokens.cardPaddingMax,
@@ -665,7 +699,10 @@ fun DocFlowDialog(
             )
         },
         text = {
-            Column(content = content)
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                content = content
+            )
         },
         confirmButton = {
             Button(

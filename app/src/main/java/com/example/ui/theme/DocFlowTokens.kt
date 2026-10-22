@@ -115,6 +115,15 @@ object DocFlowTokens {
     val cardPaddingMax: Dp = 20.dp
     val minTouchTarget: Dp = 48.dp
     val dividerThickness: Dp = 1.dp
+    val maxContentWidth: Dp = 720.dp
+
+    fun adaptiveScreenMargin(screenWidthDp: Int): Dp {
+        return when {
+            screenWidthDp < 360 -> 12.dp
+            screenWidthDp >= 600 -> 24.dp
+            else -> 16.dp
+        }
+    }
 
     // -------------------------------------------------------------------------
     // 4. Typography (Roboto / Inter System Sans)
@@ -126,6 +135,14 @@ object DocFlowTokens {
         lineHeight = 46.sp,
         letterSpacing = (-0.5).sp
     )
+
+    fun adaptiveLargeTitleStyle(screenWidthDp: Int): TextStyle {
+        return when {
+            screenWidthDp < 350 -> largeTitleStyle.copy(fontSize = 30.sp, lineHeight = 36.sp)
+            screenWidthDp < 390 -> largeTitleStyle.copy(fontSize = 34.sp, lineHeight = 40.sp)
+            else -> largeTitleStyle
+        }
+    }
 
     val sectionLabelStyle: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,

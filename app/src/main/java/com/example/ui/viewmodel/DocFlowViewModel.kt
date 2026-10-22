@@ -216,13 +216,22 @@ class DocFlowViewModel(
     private val _isOfflineMode = MutableStateFlow(false)
     val isOfflineMode: StateFlow<Boolean> = _isOfflineMode.asStateFlow()
 
-    private val _themeMode = MutableStateFlow(ThemeMode.SYSTEM)
+    private val _themeMode = MutableStateFlow(
+        appContext?.let { ctx ->
+            val saved = com.example.data.util.OnDeviceAiAndBackupEngine.getSavedThemeModeName(ctx)
+            runCatching { ThemeMode.valueOf(saved) }.getOrDefault(ThemeMode.LIGHT)
+        } ?: ThemeMode.LIGHT
+    )
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
     private val _selectedTagFilters = MutableStateFlow<Set<String>>(emptySet())
     val selectedTagFilters: StateFlow<Set<String>> = _selectedTagFilters.asStateFlow()
 
-    private val _biometricVaultEnabled = MutableStateFlow(true)
+    private val _biometricVaultEnabled = MutableStateFlow(
+        appContext?.let { ctx ->
+            com.example.data.util.OnDeviceAiAndBackupEngine.isBiometricUnlockEnabled(ctx)
+        } ?: true
+    )
     val biometricVaultEnabled: StateFlow<Boolean> = _biometricVaultEnabled.asStateFlow()
 
     private val _statusBannerMessage = MutableStateFlow<String?>(null)
@@ -645,15 +654,19 @@ class DocFlowViewModel(
     }
 
     fun toggleThemeMode() {
-        _themeMode.value = when (_themeMode.value) {
-            ThemeMode.SYSTEM -> ThemeMode.DARK
-            ThemeMode.DARK -> ThemeMode.LIGHT
-            ThemeMode.LIGHT -> ThemeMode.SYSTEM
+        val next = when (_themeMode.value) {
+            ThemeMode.LIGHT -> ThemeMode.DARK
+            ThemeMode.DARK -> ThemeMode.SYSTEM
+            ThemeMode.SYSTEM -> ThemeMode.LIGHT
         }
+        setThemeMode(next)
     }
 
     fun setThemeMode(mode: ThemeMode) {
         _themeMode.value = mode
+        appContext?.let { ctx ->
+            com.example.data.util.OnDeviceAiAndBackupEngine.saveThemeModeName(ctx, mode.name)
+        }
     }
 
     fun toggleTagFilter(tag: String) {
