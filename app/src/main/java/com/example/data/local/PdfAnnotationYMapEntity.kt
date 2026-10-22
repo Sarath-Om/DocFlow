@@ -6,8 +6,9 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 enum class PdfMarkupTool(val label: String) {
-    PEN("Pen"),
-    HIGHLIGHT("Highlighter"),
+    PEN("Draw"),
+    HIGHLIGHT("Highlight"),
+    TEXT_BOX("Text Box"),
     MARKER("Marker"),
     STICKY_NOTE("Sticky Note"),
     ERASER("Eraser"),
@@ -16,7 +17,8 @@ enum class PdfMarkupTool(val label: String) {
 
 /**
  * Represents a live-synchronized Y.Map CRDT entry for PDF & Document Annotations
- * (freehand Pen strokes, glowing Amber Highlighter rectangles/paths, Marker strokes, and Sticky Notes).
+ * (freehand Draw strokes, Highlight paths, Text Boxes, Marker strokes, and Sticky Notes)
+ * stored locally in Room and synced to Firebase via WorkManager.
  */
 @Entity(
     tableName = "pdf_annotations_ymap",
@@ -42,7 +44,8 @@ data class PdfAnnotationYMapEntity(
     val stickyNoteText: String = "",
     val authorName: String = "",
     val crdtClock: Long = System.currentTimeMillis(),
-    val updatedAtMillis: Long = System.currentTimeMillis()
+    val updatedAtMillis: Long = System.currentTimeMillis(),
+    val syncState: String = SyncState.PENDING_CREATE.name
 ) {
     fun decodeNormalizedPoints(): List<Offset> {
         if (normalizedPointsEncoded.isBlank()) return emptyList()

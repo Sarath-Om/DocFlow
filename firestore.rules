@@ -94,6 +94,20 @@ service cloud.firestore {
                          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'folderId', 'category', 'content', 'isEncrypted', 'encryptionKeyHint', 'isOfflineCached', 'pageCount', 'fileSize', 'updatedAt']);
 
         allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(documentId);
+
+        match /annotations/{annotationId} {
+          allow get, list: if isSignedIn() && request.auth.uid == userId && isValidId(documentId);
+          allow create, update: if isSignedIn() &&
+                                   request.auth.uid == userId &&
+                                   isValidId(documentId) &&
+                                   isValidId(annotationId) &&
+                                   incoming().userId == userId &&
+                                   incoming().documentId == documentId &&
+                                   incoming().toolType is string &&
+                                   incoming().colorHex is string &&
+                                   incoming().pageIndex is int;
+          allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(documentId) && isValidId(annotationId);
+        }
       }
     }
   }

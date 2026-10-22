@@ -46,12 +46,19 @@ class OfflineSyncWorker(
         }
 
         val pendingFolders = dao.getAllPendingSyncFolders()
+        val pendingAnnotations = if (requestedUserId.isNotBlank()) {
+            dao.getPendingSyncAnnotations(requestedUserId).ifEmpty {
+                dao.getAllPendingSyncAnnotations()
+            }
+        } else {
+            dao.getAllPendingSyncAnnotations()
+        }
 
-        if (pendingDocs.isEmpty() && pendingFolders.isEmpty()) {
+        if (pendingDocs.isEmpty() && pendingFolders.isEmpty() && pendingAnnotations.isEmpty()) {
             return Result.success(
                 workDataOf(
                     KEY_SYNCED_COUNT to 0,
-                    KEY_SYNC_TARGET to if (supabaseClient.isConfigured()) "Supabase + Cloud" else "Cloud Reconciler",
+                    KEY_SYNC_TARGET to if (supabaseClient.isConfigured()) "Supabase + Firebase" else "Firebase Cloud Reconciler",
                     KEY_TIMESTAMP to System.currentTimeMillis()
                 )
             )
@@ -106,16 +113,16 @@ class OfflineSyncWorker(
                             documentTitle = doc.title,
                             action = "WORKMANAGER_DELETE",
                             status = SyncState.SYNCED.label,
-                            details = "Deleted '${doc.title}' on Supabase & Cloud after network restore",
+                            details = "Deleted '${doc.title}' on Supabase & Firebase Cloud after network restore",
                             timestampMillis = System.currentTimeMillis()
                         )
                     )
                     syncedCount++
                 } else {
-                    var targetEndpoint = "Supabase + Cloud Reconciler"
+                    var targetEndpoint = "Firebase + Supabase Reconciler"
                     if (supabaseClient.isConfigured()) {
                         supabaseClient.upsertDocument(doc).getOrThrow()
-                        targetEndpoint = "Supabase PostgREST"
+                        targetEndpoint = "Supabase PostgREST + Firebase"
                     }
 
                     // Also ensure Cloud Firestore replica is updated when available
@@ -196,6 +203,33 @@ class OfflineSyncWorker(
             }
         }
 
+        // 3. Reconcile Pending PDF Markup Annotations (Draw, Highlight, Text Box) to Firebase
+        for (annotation in pendingAnnotations) {
+            try {
+                runCatching {
+                    firestoreRepo?.upsertPdfAnnotation(annotation)
+                }
+                dao.updateAnnotationSyncState(annotation.ymapKey, SyncState.SYNCED.name, now)
+                dao.insertSyncLog(
+                    SyncLogEntity(
+                        userId = annotation.userId,
+                        documentId = annotation.documentId,
+                        documentTitle = "PDF Markup (${annotation.toolType})",
+                        action = "WORKMANAGER_FIREBASE_ANNOTATION_SYNC",
+                        status = SyncState.SYNCED.label,
+                        details = "Synced PDF ${annotation.toolType} annotation '${annotation.ymapKey}' on Page ${annotation.pageIndex + 1} to Firebase Firestore",
+                        timestampMillis = System.currentTimeMillis()
+                    )
+                )
+                syncedCount++
+            } catch (_: IOException) {
+                hasRetryableNetworkError = true
+                dao.updateAnnotationSyncState(annotation.ymapKey, SyncState.FAILED.name, now)
+            } catch (_: Exception) {
+                dao.updateAnnotationSyncState(annotation.ymapKey, SyncState.FAILED.name, now)
+            }
+        }
+
         // Refresh Home Screen Widget so recent synced state is up to date
         DocFlowAppWidgetProvider.notifyDocumentOpened(applicationContext)
 
@@ -205,7 +239,7 @@ class OfflineSyncWorker(
             Result.success(
                 workDataOf(
                     KEY_SYNCED_COUNT to syncedCount,
-                    KEY_SYNC_TARGET to if (supabaseClient.isConfigured()) "Supabase PostgREST" else "Cloud Reconciler",
+                    KEY_SYNC_TARGET to if (supabaseClient.isConfigured()) "Supabase + Firebase" else "Firebase Cloud Reconciler",
                     KEY_TIMESTAMP to System.currentTimeMillis()
                 )
             )

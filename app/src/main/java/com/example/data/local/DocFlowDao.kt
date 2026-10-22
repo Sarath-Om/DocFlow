@@ -65,7 +65,12 @@ interface DocFlowDao {
     @Query("SELECT * FROM cached_documents WHERE syncState != 'SYNCED' ORDER BY updatedAtMillis ASC")
     suspend fun getAllPendingSyncDocuments(): List<CachedDocumentEntity>
 
-    @Query("SELECT COUNT(*) FROM cached_documents WHERE userId = :userId AND syncState != 'SYNCED'")
+    @Query(
+        """
+        SELECT (SELECT COUNT(*) FROM cached_documents WHERE userId = :userId AND syncState != 'SYNCED') +
+               (SELECT COUNT(*) FROM pdf_annotations_ymap WHERE userId = :userId AND syncState != 'SYNCED')
+        """
+    )
     fun observePendingSyncCount(userId: String): Flow<Int>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -140,6 +145,15 @@ interface DocFlowDao {
     // Y.Map Live PDF Annotation Queries
     @Query("SELECT * FROM pdf_annotations_ymap WHERE documentId = :docId ORDER BY crdtClock ASC")
     fun observeDocumentAnnotations(docId: String): Flow<List<PdfAnnotationYMapEntity>>
+
+    @Query("SELECT * FROM pdf_annotations_ymap WHERE userId = :userId AND syncState != 'SYNCED' ORDER BY crdtClock ASC")
+    suspend fun getPendingSyncAnnotations(userId: String): List<PdfAnnotationYMapEntity>
+
+    @Query("SELECT * FROM pdf_annotations_ymap WHERE syncState != 'SYNCED' ORDER BY crdtClock ASC")
+    suspend fun getAllPendingSyncAnnotations(): List<PdfAnnotationYMapEntity>
+
+    @Query("UPDATE pdf_annotations_ymap SET syncState = :syncState, updatedAtMillis = :syncedAtMillis WHERE ymapKey = :ymapKey")
+    suspend fun updateAnnotationSyncState(ymapKey: String, syncState: String, syncedAtMillis: Long = System.currentTimeMillis())
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertPdfAnnotation(annotation: PdfAnnotationYMapEntity)

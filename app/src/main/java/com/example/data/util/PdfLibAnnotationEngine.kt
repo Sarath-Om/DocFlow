@@ -239,7 +239,7 @@ object PdfLibAnnotationEngine {
             val parsedColor = runCatching { Color.parseColor(entry.colorHex) }.getOrDefault(Color.parseColor("#FBBF24"))
             val points = entry.decodeNormalizedPoints()
 
-            if (tool == PdfMarkupTool.STICKY_NOTE && entry.stickyNoteText.isNotBlank()) {
+            if ((tool == PdfMarkupTool.STICKY_NOTE || tool == PdfMarkupTool.TEXT_BOX) && entry.stickyNoteText.isNotBlank()) {
                 val anchor = points.firstOrNull()
                 val nx = (anchor?.x ?: 0.55f) * canvasWidth
                 val ny = (anchor?.y ?: 0.45f) * canvasHeight
@@ -250,8 +250,8 @@ object PdfLibAnnotationEngine {
                     (ny + 140f).coerceAtMost(canvasHeight - 100f)
                 )
                 val noteBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.parseColor("#1D2238")
-                    alpha = 235
+                    color = if (tool == PdfMarkupTool.TEXT_BOX) Color.parseColor("#0F172A") else Color.parseColor("#1D2238")
+                    alpha = 240
                     style = Paint.Style.FILL
                 }
                 val noteStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -271,8 +271,13 @@ object PdfLibAnnotationEngine {
                     color = Color.WHITE
                     textSize = 20f
                 }
+                val headerLabel = if (tool == PdfMarkupTool.TEXT_BOX) {
+                    "${entry.authorName.ifBlank { "Collaborator" }} (Text Box):"
+                } else {
+                    "${entry.authorName.ifBlank { "Collaborator" }} (Y.Map Note):"
+                }
                 canvas.drawText(
-                    "${entry.authorName.ifBlank { "Collaborator" }} (Y.Map Note):",
+                    headerLabel,
                     noteRect.left + 20f,
                     noteRect.top + 38f,
                     authorPaint

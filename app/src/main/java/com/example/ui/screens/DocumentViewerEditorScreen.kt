@@ -63,6 +63,7 @@ import androidx.compose.material.icons.filled.Slideshow
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ZoomIn
@@ -109,6 +110,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -803,6 +805,19 @@ fun DocumentViewerEditorScreen(
                                             onUndoAnnotation(pageAnnotations)
                                         },
                                         testTag = "pdf_tool_eraser"
+                                    )
+
+                                    // Text Box Tool (Add Text Boxes onto PDF)
+                                    MarkupToolButton(
+                                        icon = Icons.Default.TextFields,
+                                        label = "Text Box",
+                                        selected = selectedMarkupTool == PdfMarkupTool.TEXT_BOX,
+                                        activeColor = CrystalCyan,
+                                        onClick = {
+                                            selectedMarkupTool = PdfMarkupTool.TEXT_BOX
+                                            showStickyNoteDialog = true
+                                        },
+                                        testTag = "pdf_tool_textbox"
                                     )
 
                                     // Sticky Note / Ruler
@@ -1730,70 +1745,31 @@ fun DocumentViewerEditorScreen(
                                     )
                                 }
 
-                                // Clause 4: Glowing Amber Highlighted Text + Crystal Frosted Glass Comment Popover
+                                // Active Open Comment Popover (Only rendered when a real open comment exists)
                                 val activeOpenComment = comments.firstOrNull { it.status == "OPEN" }
-                                val highlightedAnchorText = activeOpenComment?.anchorLineOrText
-                                    ?.takeIf { it.isNotBlank() }
-                                    ?: "In no event shall either party's aggregate liability exceed 200% of total fees paid under this schedule."
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
+                                if (activeOpenComment != null && !inlineCommentResolved) {
                                     Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(Color.White.copy(alpha = 0.025f))
-                                            .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(14.dp))
-                                            .padding(14.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "4. Liability & Indemnification Cap",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White
-                                            )
-                                            Surface(
-                                                color = CrystalAmber.copy(alpha = 0.2f),
-                                                shape = RoundedCornerShape(6.dp)
+                                        if (activeOpenComment.anchorLineOrText.isNotBlank()) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(CrystalAmber.copy(alpha = 0.22f))
+                                                    .border(1.dp, CrystalAmber.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                                                    .padding(10.dp)
                                             ) {
                                                 Text(
-                                                    text = "Y.MAP HIGHLIGHT",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = CrystalAmber,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 9.sp,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    text = activeOpenComment.anchorLineOrText,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = Color(0xFFFEF3C7),
+                                                    fontWeight = FontWeight.Medium
                                                 )
                                             }
                                         }
 
-                                        // Glowing Amber Highlighted Clause Box
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(CrystalAmber.copy(alpha = 0.22f))
-                                                .border(1.dp, CrystalAmber.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
-                                                .padding(10.dp)
-                                        ) {
-                                            Text(
-                                                text = highlightedAnchorText,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = Color(0xFFFEF3C7),
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        }
-                                    }
-
-                                    // Crystal Frosted Glass Comment Popover (Matching Uploaded Screenshot 1)
-                                    if (!inlineCommentResolved) {
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -1808,7 +1784,7 @@ fun DocumentViewerEditorScreen(
                                             ) {
                                                 HotlinkedCrystalAvatar(
                                                     imageUrl = HOTLINK_COUNSEL_AVATAR_URL,
-                                                    contentDescription = "Counsel Avatar",
+                                                    contentDescription = "Author Avatar",
                                                     size = 32.dp,
                                                     ringColors = listOf(CrystalAmber, CrystalCyan)
                                                 )
@@ -1822,13 +1798,13 @@ fun DocumentViewerEditorScreen(
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
                                                         Text(
-                                                            text = activeOpenComment?.authorName ?: "Sarah Lin (Counsel)",
+                                                            text = activeOpenComment.authorName,
                                                             style = MaterialTheme.typography.labelSmall,
                                                             fontWeight = FontWeight.Bold,
                                                             color = Color.White
                                                         )
                                                         Text(
-                                                            text = "2m ago",
+                                                            text = activeOpenComment.authorRole,
                                                             style = MaterialTheme.typography.labelSmall,
                                                             color = CrystalAmber,
                                                             fontWeight = FontWeight.Medium,
@@ -1836,8 +1812,7 @@ fun DocumentViewerEditorScreen(
                                                         )
                                                     }
                                                     Text(
-                                                        text = activeOpenComment?.body
-                                                            ?: "Confirming the 200% cap aligns with our Q4 enterprise policy.",
+                                                        text = activeOpenComment.body,
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = Color.White.copy(alpha = 0.9f),
                                                         fontSize = 11.5.sp
@@ -1880,11 +1855,7 @@ fun DocumentViewerEditorScreen(
                                                                 .background(Color.White.copy(alpha = 0.06f))
                                                                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                                                                 .clickable {
-                                                                    if (activeOpenComment != null) {
-                                                                        onResolveComment(activeOpenComment.id)
-                                                                    } else {
-                                                                        inlineCommentResolved = true
-                                                                    }
+                                                                    onResolveComment(activeOpenComment.id)
                                                                 }
                                                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                                                         ) {
@@ -1914,7 +1885,7 @@ fun DocumentViewerEditorScreen(
                                     }
                                 }
 
-                                // Section 5: Signatures Required (Executed Counterparty + Luminous Frosted Glass Signature Card)
+                                // Biometric Signature Section (Real User Signature Status)
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1923,7 +1894,7 @@ fun DocumentViewerEditorScreen(
                                 ) {
                                     HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                                     Text(
-                                        text = "5. SIGNATURES REQUIRED",
+                                        text = "DOCUMENT EXECUTION & BIOMETRIC SIGNATURE",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = DarkOutline,
                                         fontWeight = FontWeight.Bold,
@@ -1934,52 +1905,6 @@ fun DocumentViewerEditorScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        // Counterparty Executed Signature Box
-                                        Column(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(14.dp))
-                                                .background(Color.White.copy(alpha = 0.03f))
-                                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
-                                                .padding(12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = "COUNTERPARTY",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = DarkOutline,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 9.sp
-                                                )
-                                                Text(
-                                                    text = "✓ Signed",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = CrystalEmerald,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 9.sp
-                                                )
-                                            }
-                                            Text(
-                                                text = "Alex Mercer",
-                                                style = MaterialTheme.typography.titleMedium.copy(
-                                                    fontStyle = FontStyle.Italic,
-                                                    fontFamily = FontFamily.Serif
-                                                ),
-                                                color = Color.White.copy(alpha = 0.9f),
-                                                modifier = Modifier.padding(vertical = 2.dp)
-                                            )
-                                            Text(
-                                                text = "VP Operations • Verified",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = DarkOutline,
-                                                fontSize = 9.sp
-                                            )
-                                        }
 
                                         // Luminous Frosted Glass Interactive Signature Card (Biometric Protected)
                                         Column(
@@ -2082,7 +2007,7 @@ fun DocumentViewerEditorScreen(
                                 }
                             }
 
-                            // Interactive PDF-Lib + Y.Map Live Canvas Overlay (Draw, Highlight, Marker, Sticky Notes)
+                            // Interactive PDF-Lib + Y.Map Live Canvas Overlay (Draw, Highlight, Marker, Text Box, Sticky Notes)
                             Canvas(
                                 modifier = Modifier
                                     .matchParentSize()
@@ -2091,7 +2016,9 @@ fun DocumentViewerEditorScreen(
                                             Modifier
                                                 .pointerInput(selectedMarkupTool, selectedMarkupColorHex, currentPageIndex) {
                                                     detectTapGestures { tapOffset ->
-                                                        if (selectedMarkupTool == PdfMarkupTool.STICKY_NOTE && size.width > 0 && size.height > 0) {
+                                                        if ((selectedMarkupTool == PdfMarkupTool.STICKY_NOTE || selectedMarkupTool == PdfMarkupTool.TEXT_BOX) &&
+                                                            size.width > 0 && size.height > 0
+                                                        ) {
                                                             pendingStickyNormX = (tapOffset.x / size.width.toFloat()).coerceIn(0.05f, 0.85f)
                                                             pendingStickyNormY = (tapOffset.y / size.height.toFloat()).coerceIn(0.05f, 0.85f)
                                                             showStickyNoteDialog = true
@@ -2103,6 +2030,7 @@ fun DocumentViewerEditorScreen(
                                                         onDragStart = { startOffset ->
                                                             if (selectedMarkupTool != PdfMarkupTool.ERASER &&
                                                                 selectedMarkupTool != PdfMarkupTool.STICKY_NOTE &&
+                                                                selectedMarkupTool != PdfMarkupTool.TEXT_BOX &&
                                                                 size.width > 0 && size.height > 0
                                                             ) {
                                                                 activeDragPoints.clear()
@@ -2117,6 +2045,7 @@ fun DocumentViewerEditorScreen(
                                                         onDrag = { change, _ ->
                                                             if (selectedMarkupTool != PdfMarkupTool.ERASER &&
                                                                 selectedMarkupTool != PdfMarkupTool.STICKY_NOTE &&
+                                                                selectedMarkupTool != PdfMarkupTool.TEXT_BOX &&
                                                                 size.width > 0 && size.height > 0
                                                             ) {
                                                                 change.consume()
@@ -2179,16 +2108,43 @@ fun DocumentViewerEditorScreen(
                                             )
                                         )
                                     }
-                                    if (entry.toolType == PdfMarkupTool.STICKY_NOTE.name && entry.stickyNoteText.isNotBlank()) {
+                                    if ((entry.toolType == PdfMarkupTool.STICKY_NOTE.name || entry.toolType == PdfMarkupTool.TEXT_BOX.name) &&
+                                        entry.stickyNoteText.isNotBlank()
+                                    ) {
                                         val anchor = points.firstOrNull() ?: Offset(0.2f, 0.3f)
-                                        val noteX = (anchor.x * size.width).coerceIn(16f, (size.width - 140f).coerceAtLeast(20f))
-                                        val noteY = (anchor.y * size.height).coerceIn(16f, (size.height - 64f).coerceAtLeast(20f))
+                                        val isTextBox = entry.toolType == PdfMarkupTool.TEXT_BOX.name
+                                        val boxW = if (isTextBox) 210f else 150f
+                                        val boxH = 52f
+                                        val noteX = (anchor.x * size.width).coerceIn(16f, (size.width - boxW - 16f).coerceAtLeast(20f))
+                                        val noteY = (anchor.y * size.height).coerceIn(16f, (size.height - boxH - 16f).coerceAtLeast(20f))
                                         drawRoundRect(
-                                            color = Color(0xE6FBBF24),
+                                            color = if (isTextBox) Color(0xEB0F172A) else Color(0xE6FBBF24),
                                             topLeft = Offset(noteX, noteY),
-                                            size = Size(132f, 44f),
+                                            size = Size(boxW, boxH),
                                             cornerRadius = CornerRadius(12f, 12f)
                                         )
+                                        if (isTextBox) {
+                                            drawRoundRect(
+                                                color = baseColor,
+                                                topLeft = Offset(noteX, noteY),
+                                                size = Size(boxW, boxH),
+                                                cornerRadius = CornerRadius(12f, 12f),
+                                                style = Stroke(width = 2.5f)
+                                            )
+                                        }
+                                        drawContext.canvas.nativeCanvas.apply {
+                                            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                                color = if (isTextBox) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+                                                textSize = 24f
+                                                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                            }
+                                            drawText(
+                                                entry.stickyNoteText.take(22),
+                                                noteX + 12f,
+                                                noteY + 34f,
+                                                paint
+                                            )
+                                        }
                                     }
                                 }
 
@@ -2223,9 +2179,12 @@ fun DocumentViewerEditorScreen(
                             }
                         }
 
-                        // Sticky Notes List Summary if any Y.Map sticky notes exist on this page
+                        // Text Boxes & Sticky Notes List Summary if any exist on this page
                         val stickyNotesOnPage = remember(pageAnnotations) {
-                            pageAnnotations.filter { it.toolType == PdfMarkupTool.STICKY_NOTE.name && it.stickyNoteText.isNotBlank() }
+                            pageAnnotations.filter {
+                                (it.toolType == PdfMarkupTool.STICKY_NOTE.name || it.toolType == PdfMarkupTool.TEXT_BOX.name) &&
+                                    it.stickyNoteText.isNotBlank()
+                            }
                         }
                         if (stickyNotesOnPage.isNotEmpty()) {
                             CrystalGlassCard(
@@ -2243,7 +2202,7 @@ fun DocumentViewerEditorScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "Y.Map Live PDF Sticky Notes (${stickyNotesOnPage.size})",
+                                            text = "PDF Text Boxes & Sticky Notes (${stickyNotesOnPage.size})",
                                             style = MaterialTheme.typography.labelMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = CrystalAmber
@@ -2253,8 +2212,9 @@ fun DocumentViewerEditorScreen(
                                         }
                                     }
                                     stickyNotesOnPage.forEach { note ->
+                                        val prefix = if (note.toolType == PdfMarkupTool.TEXT_BOX.name) "📝 [Text Box]" else "📌 [Sticky Note]"
                                         Text(
-                                            text = "📌 ${note.authorName}: ${note.stickyNoteText}",
+                                            text = "$prefix ${note.authorName}: ${note.stickyNoteText}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = Color.White
                                         )
@@ -2645,24 +2605,32 @@ fun DocumentViewerEditorScreen(
         }
     }
 
-    // Add Y.Map Sticky Note Dialog
+    // Add PDF Text Box or Sticky Note Dialog
     if (showStickyNoteDialog) {
+        val isTextBoxMode = selectedMarkupTool == PdfMarkupTool.TEXT_BOX
         AlertDialog(
             onDismissRequest = { showStickyNoteDialog = false },
             title = {
-                Text("Add Live Y.Map Sticky Note", fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (isTextBoxMode) "Add PDF Text Box Annotation" else "Add Live Y.Map Sticky Note",
+                    fontWeight = FontWeight.Bold
+                )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "This sticky note is stored as a Y.Map entry on Page ${currentPageIndex + 1} and baked into exported PDFs via PdfLibAnnotationEngine.",
+                        text = if (isTextBoxMode) {
+                            "Place a text box directly onto Page ${currentPageIndex + 1}. Saved locally in Room and synced via WorkManager to Firebase."
+                        } else {
+                            "This sticky note is stored as a Y.Map entry on Page ${currentPageIndex + 1} and synced via WorkManager to Firebase."
+                        },
                         style = MaterialTheme.typography.bodySmall
                     )
                     OutlinedTextField(
                         value = stickyNoteDraftText,
                         onValueChange = { stickyNoteDraftText = it },
-                        label = { Text("Sticky Note Text") },
-                        placeholder = { Text("e.g., Verify clause 4 liability cap before execution") },
+                        label = { Text(if (isTextBoxMode) "Text Box Content" else "Sticky Note Text") },
+                        placeholder = { Text(if (isTextBoxMode) "Enter annotation text..." else "Enter note text...") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("sticky_note_text_input")
@@ -2673,9 +2641,14 @@ fun DocumentViewerEditorScreen(
                 Button(
                     onClick = {
                         if (stickyNoteDraftText.isNotBlank()) {
+                            val toolToSave = if (selectedMarkupTool == PdfMarkupTool.TEXT_BOX) {
+                                PdfMarkupTool.TEXT_BOX
+                            } else {
+                                PdfMarkupTool.STICKY_NOTE
+                            }
                             onUpsertAnnotation(
                                 currentPageIndex,
-                                PdfMarkupTool.STICKY_NOTE,
+                                toolToSave,
                                 selectedMarkupColorHex,
                                 12f,
                                 listOf(Offset(pendingStickyNormX, pendingStickyNormY)),
@@ -2688,7 +2661,7 @@ fun DocumentViewerEditorScreen(
                     enabled = stickyNoteDraftText.isNotBlank(),
                     modifier = Modifier.testTag("confirm_sticky_note_button")
                 ) {
-                    Text("Save Y.Map Note")
+                    Text(if (isTextBoxMode) "Add Text Box" else "Save Y.Map Note")
                 }
             },
             dismissButton = {

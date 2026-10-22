@@ -957,20 +957,26 @@ class DocFlowViewModel(
                 } else {
                     repository.db.enableNetwork()
                     val pendingDocs = dao?.getPendingSyncDocuments(currentUserId) ?: emptyList()
+                    val pendingAnnotations = dao?.getPendingSyncAnnotations(currentUserId) ?: emptyList()
+                    val totalPending = pendingDocs.size + pendingAnnotations.size
                     appContext?.let { ctx ->
                         DocFlowSyncManager.enqueueOfflineSyncWhenConnected(ctx, currentUserId, replaceExisting = true)
                     }
                     pendingDocs.forEach { pending ->
                         dao?.updateDocumentSyncState(pending.id, SyncState.SYNCED.name)
                     }
+                    pendingAnnotations.forEach { ann ->
+                        repository.upsertPdfAnnotation(ann)
+                        dao?.updateAnnotationSyncState(ann.ymapKey, SyncState.SYNCED.name)
+                    }
                     recordSyncLog(
                         docId = "system",
-                        docTitle = "WorkManager Supabase Sync",
+                        docTitle = "WorkManager Firebase & Supabase Sync",
                         action = "WORKMANAGER_RESYNC",
                         status = "SYNCED",
-                        details = "Network restored: WorkManager uploaded ${pendingDocs.size} queued local change(s) to Supabase & Cloud"
+                        details = "Network restored: WorkManager uploaded $totalPending queued local change(s) (${pendingDocs.size} docs, ${pendingAnnotations.size} PDF annotations) to Firebase & Supabase"
                     )
-                    _statusBannerMessage.value = "Network restored: WorkManager synced ${pendingDocs.size} queued change(s) to Supabase"
+                    _statusBannerMessage.value = "Network restored: WorkManager synced $totalPending queued change(s) to Firebase & Supabase"
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Error toggling network mode", e)
@@ -981,6 +987,8 @@ class DocFlowViewModel(
     fun triggerWorkManagerSupabaseSync() {
         viewModelScope.launch {
             val pendingDocs = dao?.getPendingSyncDocuments(currentUserId) ?: emptyList()
+            val pendingAnnotations = dao?.getPendingSyncAnnotations(currentUserId) ?: emptyList()
+            val totalPending = pendingDocs.size + pendingAnnotations.size
             appContext?.let { ctx ->
                 DocFlowSyncManager.enqueueOfflineSyncWhenConnected(ctx, currentUserId, replaceExisting = true)
             }
@@ -989,12 +997,12 @@ class DocFlowViewModel(
                 docTitle = "WorkManager Sync Dispatcher",
                 action = "WORKMANAGER_DISPATCHED",
                 status = if (_isOfflineMode.value) "QUEUED_FOR_NETWORK" else "RUNNING",
-                details = "Scheduled WorkManager OneTimeWorkRequest (${pendingDocs.size} pending item(s)) with NetworkType.CONNECTED constraint"
+                details = "Scheduled WorkManager OneTimeWorkRequest ($totalPending pending item(s): ${pendingDocs.size} docs, ${pendingAnnotations.size} PDF annotations) with NetworkType.CONNECTED constraint"
             )
             _statusBannerMessage.value = if (_isOfflineMode.value) {
-                "WorkManager queued ${pendingDocs.size} pending change(s) — will auto-upload to Supabase when online"
+                "WorkManager queued $totalPending pending change(s) — will auto-upload to Firebase & Supabase when online"
             } else {
-                "WorkManager background sync dispatched to Supabase (${pendingDocs.size} pending item(s))"
+                "WorkManager background sync dispatched to Firebase & Supabase ($totalPending pending item(s))"
             }
         }
     }
@@ -1945,7 +1953,7 @@ class DocFlowViewModel(
         normalizedPoints: List<Offset>,
         stickyNoteText: String = ""
     ) {
-        if (!_currentUserRole.value.canEdit && tool != PdfMarkupTool.STICKY_NOTE) {
+        if (!_currentUserRole.value.canEdit && tool != PdfMarkupTool.STICKY_NOTE && tool != PdfMarkupTool.TEXT_BOX) {
             _statusBannerMessage.value = "Viewer role cannot add PDF ink or highlight strokes"
             return
         }
@@ -1953,6 +1961,7 @@ class DocFlowViewModel(
             val now = System.currentTimeMillis()
             val ymapKey = "ymap_${doc.id}_p${pageIndex}_${UUID.randomUUID().toString().take(8)}"
             val encodedPoints = PdfAnnotationYMapEntity.encodeNormalizedPoints(normalizedPoints)
+            val initialSyncState = if (_isOfflineMode.value) SyncState.PENDING_CREATE.name else SyncState.PENDING_CREATE.name
             val entry = PdfAnnotationYMapEntity(
                 ymapKey = ymapKey,
                 documentId = doc.id,
@@ -1965,18 +1974,32 @@ class DocFlowViewModel(
                 stickyNoteText = stickyNoteText,
                 authorName = currentUserDisplayName.ifBlank { "You" },
                 crdtClock = now,
+                syncState = initialSyncState,
                 updatedAtMillis = now
             )
             dao?.upsertPdfAnnotation(entry)
+
+            // Schedule WorkManager background sync with Firebase
+            appContext?.let { ctx ->
+                DocFlowSyncManager.enqueueOfflineSyncWhenConnected(ctx, currentUserId, replaceExisting = true)
+            }
+
+            if (!_isOfflineMode.value) {
+                val firebaseRes = repository.upsertPdfAnnotation(entry)
+                if (firebaseRes.isSuccess) {
+                    dao?.updateAnnotationSyncState(ymapKey, SyncState.SYNCED.name, now)
+                }
+            }
+
             recordSyncLog(
                 docId = doc.id,
                 docTitle = doc.title,
                 action = "YMAP_PDF_${tool.name}",
-                status = if (_isOfflineMode.value) "OFFLINE_QUEUED" else "YMAP_SYNCED",
-                details = "Synced Y.Map key '$ymapKey' (${tool.label} on Page ${pageIndex + 1})"
+                status = if (_isOfflineMode.value) "QUEUED_WORKMANAGER" else "FIREBASE_SYNCED",
+                details = "Saved PDF annotation '$ymapKey' (${tool.label} on Page ${pageIndex + 1}) to Room & queued WorkManager Firebase sync"
             )
-            if (tool == PdfMarkupTool.STICKY_NOTE && stickyNoteText.isNotBlank()) {
-                _statusBannerMessage.value = "Added Y.Map Sticky Note on Page ${pageIndex + 1}"
+            if ((tool == PdfMarkupTool.STICKY_NOTE || tool == PdfMarkupTool.TEXT_BOX) && stickyNoteText.isNotBlank()) {
+                _statusBannerMessage.value = "Added ${tool.label} on Page ${pageIndex + 1} (Synced via WorkManager & Firebase)"
             }
         }
     }
@@ -1991,6 +2014,7 @@ class DocFlowViewModel(
         val last = annotations.maxByOrNull { it.crdtClock } ?: return
         viewModelScope.launch {
             dao?.deletePdfAnnotation(last.ymapKey)
+            repository.deletePdfAnnotation(last.documentId, last.ymapKey)
             _statusBannerMessage.value = "Undid Y.Map ${last.toolType.lowercase()} entry (${last.ymapKey.takeLast(6)})"
         }
     }

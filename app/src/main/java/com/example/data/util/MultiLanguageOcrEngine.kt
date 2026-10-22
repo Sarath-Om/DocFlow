@@ -138,7 +138,7 @@ object MultiLanguageOcrEngine {
     }
 
     /**
-     * Generates accurate multi-language OCR text and structured table blocks for scanned or imported images.
+     * Generates clean multi-language scan metadata for real captured or imported pages without mock invoice items.
      */
     fun extractMultiLanguageOcr(
         presetCategory: String,
@@ -146,137 +146,24 @@ object MultiLanguageOcrEngine {
         pageCount: Int,
         documentTitle: String
     ): Pair<String, LanguageDetectionResult> {
-        val dateStr = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date())
+        val dateStr = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.US).format(Date())
         val effectiveLang = if (selectedLanguage == OcrLanguage.AUTO) {
-            // Auto-detect from title if non-English words/scripts are in title, else English
             detectLanguage(documentTitle, OcrLanguage.AUTO).detectedLanguage
         } else {
             selectedLanguage
         }
 
-        val localizedBody = when (effectiveLang) {
-            OcrLanguage.ES -> """
-                EXTRACCION OCR MULTILINGÜE — ESPAÑOL (DETECTADO AUTOMATICAMENTE)
-                ================================================================
-                DOCUMENTO: $documentTitle
-                CATEGORIA: $presetCategory • PAGINAS COMPILADAS: $pageCount
-                FECHA: $dateStr
-                
-                | Concepto / Articulo | Descripcion | Cantidad | Importe (USD) | Estado |
-                | Licencias Cloud | Almacenamiento Cifrado AES-256 | 1 | $1,200.00 | Verificado |
-                | Sincronizacion | Motor Multi-Dispositivo en Tiempo Real | 1 | $650.00 | Activo |
-                | TOTAL FACTURA | Importe Total Compilado ($pageCount pág.) | 2 | $1,850.00 | Aprobado |
-                
-                Notas OCR: Documento fisico digitalizado en lote y verificado con reconocimiento optico en Español.
-            """.trimIndent()
-
-            OcrLanguage.FR -> """
-                EXTRACTION OCR MULTILINGUE — FRANÇAIS (DETECTION AUTOMATIQUE)
-                ================================================================
-                DOCUMENT: $documentTitle
-                CATEGORIE: $presetCategory • PAGES COMPILEES: $pageCount
-                DATE: $dateStr
-                
-                | Référence | Description du Service | Qté | Montant | Statut |
-                | Cloud Entreprise | Stockage Sécurisé AES-256 | 1 | $1,200.00 | Vérifié |
-                | Synchronisation | Moteur Temps Réel Room FTS4 | 1 | $650.00 | Actif |
-                | TOTAL TTC | Montant Global ($pageCount pages) | 2 | $1,850.00 | Validé |
-                
-                Notes OCR: Numérisation haute résolution via CameraX avec détection automatique de la langue française.
-            """.trimIndent()
-
-            OcrLanguage.DE -> """
-                MEHRSPRACHIGE OCR-EXTRAKTION — DEUTSCH (AUTOMATISCHE ERKENNUNG)
-                ================================================================
-                DOKUMENT: $documentTitle
-                KATEGORIE: $presetCategory • SEITENANZAHL: $pageCount
-                DATUM: $dateStr
-                
-                | Position | Leistungsbeschreibung | Menge | Betrag | Status |
-                | Cloud-Tresor | AES-256 Verschlüsselung & Archiv | 1 | $1,200.00 | Geprüft |
-                | Echtzeit-Sync | Multi-Geräte Synchronisierung | 1 | $650.00 | Aktiv |
-                | GESAMTBETRAG | Rechnungssumme ($pageCount Seiten) | 2 | $1,850.00 | Freigegeben |
-                
-                OCR-Hinweis: Mehrseitiges Dokument automatisch erfasst und als einzelnes PDF kompiliert.
-            """.trimIndent()
-
-            OcrLanguage.HI -> """
-                बहुभाषी OCR निष्कर्षण — हिन्दी (देवनागरी लिपि स्वतः पहचानी गई)
-                ================================================================
-                दस्तावेज़: $documentTitle
-                श्रेणी: $presetCategory • कुल पृष्ठ: $pageCount
-                दिनांक: $dateStr
-                
-                | क्रम | विवरण (Service Description) | मात्रा | राशि (Amount) | स्थिति |
-                | 01 | एंटरप्राइज़ क्लाउड स्टोरेज (AES-256) | 1 | $1,200.00 | सत्यापित |
-                | 02 | रीयल-टाइम सिंक इंजन (Room FTS4) | 1 | $650.00 | सक्रिय |
-                | कुल | समेकित योग ($pageCount पृष्ठ) | 2 | $1,850.00 | पूर्ण |
-                
-                नोट: CameraX मल्टी-पेज स्कैनर और बहुभाषी OCR द्वारा डिजिटल रूप में परिवर्तित।
-            """.trimIndent()
-
-            OcrLanguage.ZH -> """
-                多语言 OCR 智能识别提取 — 中文 (自动语言检测)
-                ================================================================
-                文档标题: $documentTitle
-                分类: $presetCategory • 合并页数: $pageCount 页
-                日期: $dateStr
-                
-                | 项目编号 | 服务内容描述 | 数量 | 金额 (USD) | 状态 |
-                | ITEM-01 | 企业级云端加密存储 (AES-256) | 1 | $1,200.00 | 已核验 |
-                | ITEM-02 | 跨设备实时同步与全文索引 | 1 | $650.00 | 已激活 |
-                | 合计总额 | 多页合并账单总计 ($pageCount 页) | 2 | $1,850.00 | 已批准 |
-                
-                OCR 备注: 已通过 CameraX 连续多页拍摄并自动合成为单个高清 PDF 文档。
-            """.trimIndent()
-
-            OcrLanguage.JA -> """
-                多言語 OCR テキスト抽出 — 日本語 (自動言語検出)
-                ================================================================
-                ドキュメント名: $documentTitle
-                カテゴリ: $presetCategory • ページ数: $pageCount ページ
-                日付: $dateStr
-                
-                | 項目 | 内容・仕様 | 数量 | 金額 (USD) | ステータス |
-                | 01 | クラウド暗号化ストレージ (AES-256) | 1 | $1,200.00 | 確認済 |
-                | 02 | リアルタイム同期 & Room FTS4 検索 | 1 | $650.00 | 有効 |
-                | 合計 | 請求合計金額 ($pageCount ページ統合) | 2 | $1,850.00 | 承認済 |
-                
-                備考: CameraX 連続スキャンにより単一の PDF ドキュメントに自動コンパイルされました。
-            """.trimIndent()
-
-            OcrLanguage.AR -> """
-                استخراج النص متعدد اللغات (OCR) — العربية (كشف تلقائي للغة)
-                ================================================================
-                عنوان المستند: $documentTitle
-                الفئة: $presetCategory • عدد الصفحات المدمجة: $pageCount
-                التاريخ: $dateStr
-                
-                | البند | الوصف التفصيلي | الكمية | المبلغ | الحالة |
-                | 01 | تخزين سحابي مشفر بمعيار AES-256 | 1 | $1,200.00 | موثق |
-                | 02 | مزامنة فورية ومحرك بحث شامل | 1 | $650.00 | نشط |
-                | الإجمالي | المجموع الكلي ($pageCount صفحات) | 2 | $1,850.00 | معتمد |
-            """.trimIndent()
-
-            else -> """
-                MULTI-LANGUAGE OCR EXTRACTION — ENGLISH (AUTO-DETECTED)
-                ================================================================
-                DOCUMENT: $documentTitle
-                CATEGORY: $presetCategory • COMPILED PAGES: $pageCount Page(s)
-                DATE: $dateStr
-                
-                | Line Item | Extracted OCR Description | Qty | Amount | Status |
-                | Cloud Vault | Enterprise Storage (10 TB AES-256) | 1 | $1,200.00 | Verified |
-                | Sync Engine | Real-Time Multi-Device + Room FTS4 | 1 | $650.00 | Active |
-                | Biometric Lock | Hardware Fingerprint / Face Guard | 1 | $350.00 | Enabled |
-                | TOTAL | Compiled Multi-Page Sum ($pageCount pg) | 3 | $2,200.00 | Approved |
-                
-                OCR Notes: Digitized via DocFlow Consecutive Multi-Page CameraX Pipeline with automatic language detection.
-            """.trimIndent()
-        }
+        val localizedBody = """
+            === SCANNED DOCUMENT METADATA ===
+            Title: $documentTitle
+            Category: $presetCategory
+            Compiled Pages: $pageCount Page(s)
+            Language Profile: ${effectiveLang.displayName} (${effectiveLang.nativeLabel})
+            Captured At: $dateStr
+        """.trimIndent()
 
         val detection = detectLanguage(
-            text = localizedBody,
+            text = documentTitle.ifBlank { localizedBody },
             preferredLanguage = if (selectedLanguage == OcrLanguage.AUTO) OcrLanguage.AUTO else selectedLanguage
         )
         return localizedBody to detection

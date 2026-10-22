@@ -1153,9 +1153,9 @@ fun DashboardScreen(
                                             )
                                             Text(
                                                 text = if (isAlreadySigned) {
-                                                    "3 of 3 signatures acquired • Biometric Certified"
+                                                    "Biometric Certified & Signed • ${priorityDoc.fileName}"
                                                 } else {
-                                                    "2 of 3 signatures acquired • ${priorityDoc.fileName}"
+                                                    "Awaiting Your Signature • ${priorityDoc.fileName}"
                                                 },
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = Color.White.copy(alpha = 0.72f)
@@ -1173,7 +1173,7 @@ fun DashboardScreen(
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .fillMaxWidth(if (isAlreadySigned) 1.0f else 0.66f)
+                                                .fillMaxWidth(if (isAlreadySigned) 1.0f else 0.50f)
                                                 .height(6.dp)
                                                 .clip(CircleShape)
                                                 .background(
@@ -1196,13 +1196,10 @@ fun DashboardScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy((-6).dp)
                                         ) {
-                                            val displayInitials = if (activeCollaborators.size >= 2) {
-                                                activeCollaborators.take(2).map {
-                                                    it.name.take(2).uppercase(Locale.US)
-                                                } + "You"
-                                            } else {
-                                                listOf("SL", "GC", "You")
-                                            }
+                                            val displayInitials = activeCollaborators
+                                                .map { it.name.take(2).uppercase(Locale.US) }
+                                                .distinct()
+                                                .ifEmpty { listOf("You") }
                                             displayInitials.forEachIndexed { i, token ->
                                                 val isYou = token == "You"
                                                 Box(

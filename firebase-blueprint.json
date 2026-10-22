@@ -51,6 +51,26 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "PdfAnnotation": {
+      "title": "PdfAnnotation",
+      "description": "PDF markup annotation (Draw, Highlight, Text Box, Sticky Note) synced via WorkManager to Firebase",
+      "type": "object",
+      "properties": {
+        "ymapKey": { "type": "string", "description": "Unique Y.Map annotation key" },
+        "documentId": { "type": "string", "description": "Parent document ID" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "pageIndex": { "type": "integer", "description": "Zero-based PDF page index" },
+        "toolType": { "type": "string", "description": "PEN, HIGHLIGHT, TEXT_BOX, MARKER, STICKY_NOTE" },
+        "colorHex": { "type": "string", "description": "Stroke or box hex color" },
+        "strokeWidth": { "type": "number", "description": "Stroke width" },
+        "normalizedPointsEncoded": { "type": "string", "description": "Encoded normalized coordinates" },
+        "stickyNoteText": { "type": "string", "description": "Text box or sticky note content" },
+        "authorName": { "type": "string", "description": "Author display name" },
+        "crdtClock": { "type": "integer", "description": "CRDT logical clock" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ymapKey", "documentId", "userId", "pageIndex", "toolType", "colorHex"]
     }
   },
   "firestore": {
@@ -61,6 +81,10 @@
     "/users/{userId}/documents/{documentId}": {
       "schema": { "$ref": "#/entities/Document" },
       "description": "User's synchronized documents across PDF, Word, Excel, PowerPoint, Scanned, and Pic formats"
+    },
+    "/users/{userId}/documents/{documentId}/annotations/{annotationId}": {
+      "schema": { "$ref": "#/entities/PdfAnnotation" },
+      "description": "PDF markup annotations synced via WorkManager"
     }
   }
 }

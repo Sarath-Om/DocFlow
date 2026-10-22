@@ -258,4 +258,64 @@ class DocFlowRepository(val db: FirebaseFirestore) {
             Result.failure(e)
         }
     }
+
+    suspend fun upsertPdfAnnotation(annotation: com.example.data.local.PdfAnnotationYMapEntity): Result<Unit> {
+        val uid = auth.currentUser?.uid ?: annotation.userId.ifBlank { return Result.failure(IllegalStateException("Missing userId")) }
+        val safeDocId = annotation.documentId.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").ifBlank { "doc_default" }
+        val safeKey = annotation.ymapKey.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").ifBlank { "ann_default" }
+        val path = "users/$uid/documents/$safeDocId/annotations/$safeKey"
+        val payload = mapOf(
+            "ymapKey" to safeKey,
+            "documentId" to safeDocId,
+            "userId" to uid,
+            "pageIndex" to annotation.pageIndex,
+            "toolType" to annotation.toolType,
+            "colorHex" to annotation.colorHex,
+            "strokeWidth" to annotation.strokeWidth.toDouble(),
+            "normalizedPointsEncoded" to annotation.normalizedPointsEncoded,
+            "stickyNoteText" to annotation.stickyNoteText,
+            "authorName" to annotation.authorName,
+            "crdtClock" to annotation.crdtClock,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        return try {
+            db.collection("users")
+                .document(uid)
+                .collection("documents")
+                .document(safeDocId)
+                .collection("annotations")
+                .document(safeKey)
+                .set(payload)
+                .await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deletePdfAnnotation(documentId: String, ymapKey: String): Result<Unit> {
+        val uid = auth.currentUser?.uid ?: return Result.failure(IllegalStateException("User not signed in"))
+        val safeDocId = documentId.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").ifBlank { "doc_default" }
+        val safeKey = ymapKey.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").ifBlank { "ann_default" }
+        val path = "users/$uid/documents/$safeDocId/annotations/$safeKey"
+        return try {
+            db.collection("users")
+                .document(uid)
+                .collection("documents")
+                .document(safeDocId)
+                .collection("annotations")
+                .document(safeKey)
+                .delete()
+                .await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.DELETE, path)
+            Result.failure(e)
+        }
+    }
 }

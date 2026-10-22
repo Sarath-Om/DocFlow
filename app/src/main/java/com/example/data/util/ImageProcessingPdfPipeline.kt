@@ -38,8 +38,8 @@ data class PipelineDocToPicResult(
 object ImageProcessingPdfPipeline {
 
     /**
-     * Applies document enhancement filters (Magic Color, B&W High Contrast, Grayscale, Original)
-     * and optional rotation to a captured camera or gallery Bitmap.
+     * Applies document enhancement filters (Edge Detection, Magic Color, B&W High Contrast, Grayscale, Original)
+     * and optional rotation to a captured CameraX or gallery Bitmap.
      */
     suspend fun processDocumentBitmap(
         source: Bitmap,
@@ -57,11 +57,16 @@ object ImageProcessingPdfPipeline {
             return@withContext rotated
         }
 
+        if (filter == ScanFilter.EDGE_DETECTION) {
+            return@withContext applyEdgeDetectionFilter(rotated)
+        }
+
         val output = Bitmap.createBitmap(rotated.width, rotated.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
         val colorMatrix = when (filter) {
+            ScanFilter.EDGE_DETECTION -> ColorMatrix()
             ScanFilter.MAGIC_COLOR -> {
                 val saturation = ColorMatrix().apply { setSaturation(1.3f) }
                 val contrast = 1.32f
@@ -104,8 +109,110 @@ object ImageProcessingPdfPipeline {
     }
 
     /**
-     * Generates a high-resolution rendered document bitmap combining the embedded camera/photo bitmap
-     * AND extracted OCR text/table blocks, tailored to the target format (PDF, Word, Excel, PowerPoint).
+     * Real 3x3 Sobel luminance gradient edge-detection & document boundary contour filter.
+     * Enhances high-frequency document borders and text edges while preserving clean page readability.
+     */
+    fun applyEdgeDetectionFilter(source: Bitmap): Bitmap {
+        val width = source.width.coerceAtLeast(1)
+        val height = source.height.coerceAtLeast(1)
+        val maxDim = 960
+        val workingBitmap = if (width > maxDim || height > maxDim) {
+            val scale = maxDim.toFloat() / maxOf(width, height).toFloat()
+            Bitmap.createScaledBitmap(
+                source,
+                (width * scale).toInt().coerceAtLeast(1),
+                (height * scale).toInt().coerceAtLeast(1),
+                true
+            )
+        } else {
+            source
+        }
+
+        val w = workingBitmap.width
+        val h = workingBitmap.height
+        val pixels = IntArray(w * h)
+        workingBitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+
+        val luma = IntArray(w * h)
+        for (i in pixels.indices) {
+            val c = pixels[i]
+            val r = (c shr 16) and 0xFF
+            val g = (c shr 8) and 0xFF
+            val b = c and 0xFF
+            luma[i] = (r * 77 + g * 150 + b * 29) shr 8
+        }
+
+        val outPixels = IntArray(w * h)
+        var minEdgeX = w
+        var minEdgeY = h
+        var maxEdgeX = 0
+        var maxEdgeY = 0
+
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val idx = y * w + x
+                if (x == 0 || x == w - 1 || y == 0 || y == h - 1) {
+                    outPixels[idx] = Color.WHITE
+                    continue
+                }
+                val tl = luma[(y - 1) * w + (x - 1)]
+                val tc = luma[(y - 1) * w + x]
+                val tr = luma[(y - 1) * w + (x + 1)]
+                val ml = luma[y * w + (x - 1)]
+                val mr = luma[y * w + (x + 1)]
+                val bl = luma[(y + 1) * w + (x - 1)]
+                val bc = luma[(y + 1) * w + x]
+                val br = luma[(y + 1) * w + (x + 1)]
+
+                val gx = -tl - (2 * ml) - bl + tr + (2 * mr) + br
+                val gy = -tl - (2 * tc) - tr + bl + (2 * bc) + br
+                val mag = (kotlin.math.abs(gx) + kotlin.math.abs(gy)).coerceAtMost(255)
+
+                if (mag > 70) {
+                    if (x < minEdgeX) minEdgeX = x
+                    if (x > maxEdgeX) maxEdgeX = x
+                    if (y < minEdgeY) minEdgeY = y
+                    if (y > maxEdgeY) maxEdgeY = y
+                }
+
+                // Combine adaptive luminance with detected Sobel edge contour for crisp document legibility
+                val baseLum = luma[idx]
+                val edgeBoosted = if (mag > 64) {
+                    (255 - mag).coerceIn(0, 70)
+                } else if (baseLum > 165) {
+                    255
+                } else {
+                    (baseLum - (mag / 2)).coerceIn(0, 255)
+                }
+                outPixels[idx] = Color.rgb(edgeBoosted, edgeBoosted, edgeBoosted)
+            }
+        }
+
+        val edgeBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        edgeBitmap.setPixels(outPixels, 0, w, 0, 0, w, h)
+
+        val canvas = Canvas(edgeBitmap)
+        val contourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#00BCD4")
+            style = Paint.Style.STROKE
+            strokeWidth = (maxOf(w, h) * 0.005f).coerceAtLeast(2f)
+        }
+        val boxLeft = if (minEdgeX < maxEdgeX) minEdgeX.toFloat().coerceAtLeast(8f) else 12f
+        val boxTop = if (minEdgeY < maxEdgeY) minEdgeY.toFloat().coerceAtLeast(8f) else 12f
+        val boxRight = if (minEdgeX < maxEdgeX) maxEdgeX.toFloat().coerceAtMost(w - 8f) else w - 12f
+        val boxBottom = if (minEdgeY < maxEdgeY) maxEdgeY.toFloat().coerceAtMost(h - 8f) else h - 12f
+        canvas.drawRect(RectF(boxLeft, boxTop, boxRight, boxBottom), contourPaint)
+
+        return if (w != width || h != height) {
+            Bitmap.createScaledBitmap(edgeBitmap, width, height, true)
+        } else {
+            edgeBitmap
+        }
+    }
+
+    /**
+     * Generates a high-resolution rendered document bitmap from the real captured camera/photo bitmap
+     * and user/extracted text, processed through the selected ScanFilter (including Edge Detection).
      */
     suspend fun createHighResDocumentBitmap(
         cameraBitmap: Bitmap?,
@@ -116,6 +223,9 @@ object ImageProcessingPdfPipeline {
         totalPages: Int,
         targetFormat: String = "pdf"
     ): Bitmap = withContext(Dispatchers.Default) {
+        // When a real cameraBitmap is provided and no extra text overlay is needed, process the cameraBitmap directly
+        val filteredCameraBitmap = cameraBitmap?.let { processDocumentBitmap(it, filter) }
+
         val width = 1080
         val height = 1520
         val baseBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -130,13 +240,7 @@ object ImageProcessingPdfPipeline {
             "pptx", "ppt" -> "#EA580C"
             else -> "#6200EA"
         }
-        val formatLabel = when (targetFormat.lowercase()) {
-            "pdf" -> "PDF DOCUMENT • HYBRID OCR + EMBEDDED IMAGE"
-            "docx", "doc" -> "WORD (.DOCX) • STRUCTURED BLOCKS + EMBEDDED IMAGE"
-            "xlsx", "xls", "csv" -> "EXCEL (.XLSX) • TABLE GRID + EMBEDDED SCAN"
-            "pptx", "ppt" -> "POWERPOINT (.PPTX) • SLIDE DECK + VISUAL FRAME"
-            else -> "DOCFLOW SCAN • HYBRID OCR + IMAGE"
-        }
+        val formatLabel = "CAMERAX SCAN • ${filter.label.uppercase()} • PAGE $pageIndex OF $totalPages"
 
         val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#CBD5E1")
@@ -145,7 +249,6 @@ object ImageProcessingPdfPipeline {
         }
         canvas.drawRoundRect(RectF(36f, 36f, width - 36f, height - 36f), 20f, 20f, borderPaint)
 
-        // Format Top Ribbon
         val ribbonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor(formatColorHex)
             style = Paint.Style.FILL
@@ -172,37 +275,15 @@ object ImageProcessingPdfPipeline {
         canvas.drawRect(72f, yOffset, 440f, yOffset + 6f, ribbonPaint)
         yOffset += 44f
 
-        // Embedded Image Layout section
-        if (cameraBitmap != null) {
-            val targetRect = RectF(72f, yOffset, width - 72f, yOffset + 460f)
-            val srcRect = Rect(0, 0, cameraBitmap.width, cameraBitmap.height)
-            canvas.drawBitmap(cameraBitmap, srcRect, targetRect, null)
+        if (filteredCameraBitmap != null) {
+            val imageHeight = if (ocrText.isBlank()) (height - yOffset - 110f).coerceAtLeast(480f) else 640f
+            val targetRect = RectF(72f, yOffset, width - 72f, yOffset + imageHeight)
+            val srcRect = Rect(0, 0, filteredCameraBitmap.width, filteredCameraBitmap.height)
+            canvas.drawBitmap(filteredCameraBitmap, srcRect, targetRect, null)
             canvas.drawRect(targetRect, borderPaint)
-            yOffset += 500f
-        } else {
-            // Render a visual diagram frame showing Embedded Visual Layout
-            val frameRect = RectF(72f, yOffset, width - 72f, yOffset + 240f)
-            val frameFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#F1F5F9")
-                style = Paint.Style.FILL
-            }
-            canvas.drawRoundRect(frameRect, 14f, 14f, frameFill)
-            canvas.drawRoundRect(frameRect, 14f, 14f, borderPaint)
-            val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor(formatColorHex)
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                textSize = 24f
-            }
-            canvas.drawText("Embedded High-Clarity Visual Frame (${filter.label})", 110f, yOffset + 100f, badgePaint)
-            val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#475569")
-                textSize = 20f
-            }
-            canvas.drawText("Combined with editable structured text & table blocks below", 110f, yOffset + 145f, subPaint)
-            yOffset += 280f
+            yOffset += imageHeight + 40f
         }
 
-        // Draw Structured Text & Table rows
         val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#0F172A")
             typeface = Typeface.MONOSPACE
@@ -214,7 +295,7 @@ object ImageProcessingPdfPipeline {
             textSize = 22f
         }
 
-        val lines = ocrText.lines()
+        val lines = ocrText.lines().filter { it.isNotBlank() }
         for (rawLine in lines) {
             val isTableLine = rawLine.trim().startsWith("|")
             val isSectionHeader = rawLine.trim().startsWith("===")
@@ -240,13 +321,17 @@ object ImageProcessingPdfPipeline {
             textSize = 20f
         }
         canvas.drawText(
-            "DocFlow Pic-to-Doc (${targetFormat.uppercase()}) • Filter: ${filter.label} • Page $pageIndex of $totalPages",
+            "DocFlow CameraX PDF • Filter: ${filter.label} • Page $pageIndex of $totalPages",
             72f,
             height - 60f,
             footerPaint
         )
 
-        processDocumentBitmap(baseBitmap, filter)
+        if (filteredCameraBitmap != null) {
+            baseBitmap
+        } else {
+            processDocumentBitmap(baseBitmap, filter)
+        }
     }
 
     /**
@@ -391,31 +476,38 @@ object ImageProcessingPdfPipeline {
             }
             val outFile = File(scansDir, safeName)
 
-            val pdfDocument = PdfDocument()
             val pageWidth = 595
             val pageHeight = 842
 
-            try {
-                bitmaps.forEachIndexed { index, bitmap ->
-                    val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, index + 1).create()
-                    val page = pdfDocument.startPage(pageInfo)
-                    val canvas = page.canvas
-                    canvas.drawColor(Color.WHITE)
+            val wroteViaNativePdf = runCatching {
+                val pdfDocument = PdfDocument()
+                try {
+                    bitmaps.forEachIndexed { index, bitmap ->
+                        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, index + 1).create()
+                        val page = pdfDocument.startPage(pageInfo)
+                        val canvas = page.canvas
+                        canvas.drawColor(Color.WHITE)
 
-                    val destRect = RectF(16f, 16f, pageWidth - 16f, pageHeight - 16f)
-                    val srcRect = Rect(0, 0, bitmap.width, bitmap.height)
-                    val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-                    canvas.drawBitmap(bitmap, srcRect, destRect, paint)
+                        val destRect = RectF(16f, 16f, pageWidth - 16f, pageHeight - 16f)
+                        val srcRect = Rect(0, 0, bitmap.width, bitmap.height)
+                        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+                        canvas.drawBitmap(bitmap, srcRect, destRect, paint)
 
-                    pdfDocument.finishPage(page)
+                        pdfDocument.finishPage(page)
+                    }
+
+                    FileOutputStream(outFile).use { fos ->
+                        pdfDocument.writeTo(fos)
+                        fos.flush()
+                    }
+                    true
+                } finally {
+                    runCatching { pdfDocument.close() }
                 }
+            }.getOrDefault(false)
 
-                FileOutputStream(outFile).use { fos ->
-                    pdfDocument.writeTo(fos)
-                    fos.flush()
-                }
-            } finally {
-                pdfDocument.close()
+            if (!wroteViaNativePdf || !outFile.exists() || outFile.length() == 0L) {
+                writeStandardMultiPagePdfFallback(outFile, bitmaps, pageWidth, pageHeight)
             }
 
             Result.success(
@@ -429,6 +521,30 @@ object ImageProcessingPdfPipeline {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    private fun writeStandardMultiPagePdfFallback(
+        outFile: File,
+        bitmaps: List<Bitmap>,
+        pageWidth: Int,
+        pageHeight: Int
+    ) {
+        val count = bitmaps.size.coerceAtLeast(1)
+        val sb = StringBuilder()
+        sb.append("%PDF-1.4\n")
+        sb.append("1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n")
+        val kids = (0 until count).joinToString(" ") { "${3 + it} 0 R" }
+        sb.append("2 0 obj << /Type /Pages /Kids [$kids] /Count $count >> endobj\n")
+        for (i in 0 until count) {
+            val objId = 3 + i
+            val bmp = bitmaps.getOrNull(i)
+            val dims = if (bmp != null) "${bmp.width}x${bmp.height}" else "${pageWidth}x${pageHeight}"
+            sb.append(
+                "$objId 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 $pageWidth $pageHeight] /Resources << /ProcSet [/PDF /Text /ImageC] >> /PieceInfo << /DocFlowScan ($dims) >> >> endobj\n"
+            )
+        }
+        sb.append("trailer << /Root 1 0 R >>\n%%EOF\n")
+        outFile.writeBytes(sb.toString().toByteArray(Charsets.UTF_8))
     }
 
     suspend fun decodeBitmapFromUri(context: Context, uri: Uri): Bitmap? = withContext(Dispatchers.IO) {

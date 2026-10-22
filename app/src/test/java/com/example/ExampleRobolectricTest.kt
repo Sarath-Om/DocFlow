@@ -225,6 +225,126 @@ class ExampleRobolectricTest {
     val remainingPending = dao.getAllPendingSyncDocuments()
     assertTrue(remainingPending.isEmpty())
   }
+
+  @Test
+  fun `edge detection filter processes captured bitmaps and compiles multipage pdf into local Room storage`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val page1Bmp = android.graphics.Bitmap.createBitmap(80, 100, android.graphics.Bitmap.Config.ARGB_8888)
+    val page2Bmp = android.graphics.Bitmap.createBitmap(80, 100, android.graphics.Bitmap.Config.ARGB_8888)
+
+    val edgeFiltered1 = com.example.data.util.ImageProcessingPdfPipeline.processDocumentBitmap(
+        source = page1Bmp,
+        filter = com.example.ui.screens.ScanFilter.EDGE_DETECTION,
+        rotationDegrees = 0f
+    )
+    val edgeFiltered2 = com.example.data.util.ImageProcessingPdfPipeline.processDocumentBitmap(
+        source = page2Bmp,
+        filter = com.example.ui.screens.ScanFilter.EDGE_DETECTION,
+        rotationDegrees = 0f
+    )
+    assertEquals(80, edgeFiltered1.width)
+    assertEquals(100, edgeFiltered1.height)
+
+    val pdfResult = com.example.data.util.ImageProcessingPdfPipeline.convertBitmapsToPdfFile(
+        context = context,
+        fileName = "edge_detected_multipage.pdf",
+        bitmaps = listOf(edgeFiltered1, edgeFiltered2)
+    ).getOrThrow()
+
+    assertTrue(pdfResult.pdfFile.exists())
+    assertEquals(2, pdfResult.pageCount)
+
+    val scannedRoomDoc = CachedDocumentEntity(
+        id = "scan-multipage-1",
+        userId = "scanner-user",
+        title = "Scanned Multipage Document",
+        folderId = "root",
+        category = "Work",
+        fileType = "pdf",
+        fileName = "edge_detected_multipage.pdf",
+        fileSize = pdfResult.fileSize,
+        content = "=== SECTION 1: SCANNED DOCUMENT ===\nPages: 2",
+        localFilePath = pdfResult.pdfFile.absolutePath,
+        pageCount = pdfResult.pageCount.toLong(),
+        syncState = SyncState.PENDING_CREATE.name
+    )
+    dao.upsertDocument(scannedRoomDoc)
+
+    val loaded = dao.getCachedDocumentById("scanner-user", "scan-multipage-1")
+    assertNotNull(loaded)
+    assertEquals(2L, loaded!!.pageCount)
+    assertEquals(pdfResult.pdfFile.absolutePath, loaded.localFilePath)
+  }
+
+  @Test
+  fun `pdf markup tools draw highlight and text box save locally in Room and queue for WorkManager Firebase sync`() = runBlocking {
+    val userId = "markup-user"
+    val docId = "pdf-doc-101"
+
+    val drawAnnotation = com.example.data.local.PdfAnnotationYMapEntity(
+        ymapKey = "ymap_${docId}_p0_draw",
+        documentId = docId,
+        userId = userId,
+        pageIndex = 0,
+        toolType = com.example.data.local.PdfMarkupTool.PEN.name,
+        colorHex = "#3B82F6",
+        strokeWidth = 4.5f,
+        normalizedPointsEncoded = "0.1000,0.2000;0.4000,0.5000",
+        syncState = SyncState.PENDING_CREATE.name
+    )
+    val highlightAnnotation = com.example.data.local.PdfAnnotationYMapEntity(
+        ymapKey = "ymap_${docId}_p0_highlight",
+        documentId = docId,
+        userId = userId,
+        pageIndex = 0,
+        toolType = com.example.data.local.PdfMarkupTool.HIGHLIGHT.name,
+        colorHex = "#FBBF24",
+        strokeWidth = 18f,
+        normalizedPointsEncoded = "0.1500,0.3000;0.7500,0.3000",
+        syncState = SyncState.PENDING_CREATE.name
+    )
+    val textBoxAnnotation = com.example.data.local.PdfAnnotationYMapEntity(
+        ymapKey = "ymap_${docId}_p0_textbox",
+        documentId = docId,
+        userId = userId,
+        pageIndex = 0,
+        toolType = com.example.data.local.PdfMarkupTool.TEXT_BOX.name,
+        colorHex = "#00F4FE",
+        strokeWidth = 12f,
+        normalizedPointsEncoded = "0.2500,0.4500",
+        stickyNoteText = "Verified Page 1 Annotation",
+        syncState = SyncState.PENDING_CREATE.name
+    )
+
+    dao.upsertPdfAnnotation(drawAnnotation)
+    dao.upsertPdfAnnotation(highlightAnnotation)
+    dao.upsertPdfAnnotation(textBoxAnnotation)
+
+    val docAnnotations = dao.observeDocumentAnnotations(docId).first()
+    assertEquals(3, docAnnotations.size)
+    assertTrue(docAnnotations.any { it.toolType == com.example.data.local.PdfMarkupTool.PEN.name })
+    assertTrue(docAnnotations.any { it.toolType == com.example.data.local.PdfMarkupTool.HIGHLIGHT.name })
+    assertTrue(docAnnotations.any {
+      it.toolType == com.example.data.local.PdfMarkupTool.TEXT_BOX.name &&
+          it.stickyNoteText == "Verified Page 1 Annotation"
+    })
+
+    // Verify all 3 annotations are counted in pending sync for WorkManager
+    val pendingCount = dao.observePendingSyncCount(userId).first()
+    assertEquals(3, pendingCount)
+
+    val pendingAnnotations = dao.getPendingSyncAnnotations(userId)
+    assertEquals(3, pendingAnnotations.size)
+
+    // Simulate WorkManager Firebase sync completion
+    pendingAnnotations.forEach { ann ->
+      dao.updateAnnotationSyncState(ann.ymapKey, SyncState.SYNCED.name)
+    }
+
+    val remainingAfterSync = dao.getPendingSyncAnnotations(userId)
+    assertTrue(remainingAfterSync.isEmpty())
+    assertEquals(0, dao.observePendingSyncCount(userId).first())
+  }
 }
 
 

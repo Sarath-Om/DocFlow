@@ -117,89 +117,38 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 enum class ScanFilter(val label: String) {
+    EDGE_DETECTION("Edge Detection"),
     MAGIC_COLOR("Magic Color"),
     BW_CONTRAST("B&W Sharp"),
     GRAYSCALE("Grayscale"),
     ORIGINAL("Original")
 }
 
-enum class ScanTemplatePreset(val label: String, val category: String, val defaultTitle: String, val sampleOcr: String) {
+enum class ScanTemplatePreset(val label: String, val category: String, val defaultTitle: String) {
+    DOCUMENT(
+        label = "General Document",
+        category = "Work",
+        defaultTitle = "Scanned Document"
+    ),
     INVOICE(
-        label = "Business Invoice",
+        label = "Invoice",
         category = "Invoices",
-        defaultTitle = "Scanned Vendor Invoice #4092",
-        sampleOcr = """
-            SCANNED DOCUMENT — OPTICAL CHARACTER RECOGNITION (OCR)
-            =====================================================
-            VENDOR: Apex Cloud Infrastructure Ltd.
-            INVOICE NO: INV-2026-4092
-            DATE: ${SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date())}
-            STATUS: DUE UPON RECEIPT
-            
-            LINE ITEMS:
-            1. Enterprise Cloud Document Storage (10 TB) .... $1,200.00
-            2. Real-Time Multi-Device Sync Engine ........... $  650.00
-            3. AES-256 Hardware Key Management .............. $  350.00
-            -----------------------------------------------------
-            TOTAL AMOUNT DUE:                                 $2,200.00
-            
-            Notes: Verified and digitized via DocFlow CameraX Scanner.
-        """.trimIndent()
+        defaultTitle = "Scanned Invoice"
     ),
     CONTRACT(
-        label = "Signed Contract",
+        label = "Contract",
         category = "Contracts",
-        defaultTitle = "Scanned NDA & Partner Agreement",
-        sampleOcr = """
-            SCANNED PHYSICAL CONTRACT — MULTI-PAGE OCR
-            =====================================================
-            MUTUAL NON-DISCLOSURE AGREEMENT
-            
-            This Mutual Non-Disclosure Agreement ("Agreement") is entered into by and between the undersigned parties for the purpose of preventing the unauthorized disclosure of Confidential Information.
-            
-            1. Definition of Confidential Information
-            All technical, financial, and business documents transmitted or synchronized through the DocFlow encrypted workspace.
-            
-            2. Obligations of Receiving Party
-            Receiving Party shall hold and maintain the Confidential Information in strict confidence using AES-256 encryption and zero-trust access controls.
-            
-            [SIGNATURE DETECTED: Authorized Representative — Verified]
-        """.trimIndent()
+        defaultTitle = "Scanned Contract"
     ),
     RECEIPT(
-        label = "Expense Receipt",
+        label = "Receipt",
         category = "Receipts",
-        defaultTitle = "Scanned Travel Expense Receipt",
-        sampleOcr = """
-            SCANNED EXPENSE RECEIPT — AUTO-CROPPED
-            =====================================================
-            MERCHANT: Metro Executive Conference Center
-            CATEGORY: Business Travel & Lodging
-            PAYMENT METHOD: Corporate Visa •••• 8821
-            
-            - Conference Suite Rental (2 Days) .......... $480.00
-            - High-Speed Fiber Uplink ................... $ 45.00
-            - Taxes & Fees .............................. $ 47.25
-            -----------------------------------------------------
-            TOTAL PAID:                                   $572.25
-        """.trimIndent()
+        defaultTitle = "Scanned Receipt"
     ),
-    MEDICAL(
-        label = "Medical Record",
-        category = "Medical",
-        defaultTitle = "Scanned Lab Summary Report",
-        sampleOcr = """
-            SCANNED MEDICAL RECORD — CONFIDENTIAL
-            =====================================================
-            PROVIDER: Pacific Health & Diagnostics Center
-            DOCUMENT: Annual Preventive Wellness Summary
-            
-            FINDINGS:
-            • All primary metabolic and cardiovascular markers within optimal reference range.
-            • Next routine follow-up scheduled in 12 months.
-            
-            Recommended Security: Enable AES-256 Encryption & Biometric Lock for privacy protection.
-        """.trimIndent()
+    PERSONAL(
+        label = "Personal ID / Record",
+        category = "Personal",
+        defaultTitle = "Scanned Personal Record"
     )
 }
 
@@ -251,26 +200,27 @@ fun ScannerScreen(
 
     var isCompiledReviewMode by remember { mutableStateOf(false) }
     var isProcessingPipeline by remember { mutableStateOf(false) }
-    var selectedPreset by remember { mutableStateOf(ScanTemplatePreset.INVOICE) }
-    var selectedFilter by remember { mutableStateOf(ScanFilter.MAGIC_COLOR) }
+    var captureStatusMessage by remember { mutableStateOf<String?>(null) }
+    var selectedPreset by remember { mutableStateOf(ScanTemplatePreset.DOCUMENT) }
+    var selectedFilter by remember { mutableStateOf(ScanFilter.EDGE_DETECTION) }
     var selectedLanguage by remember { mutableStateOf(OcrLanguage.AUTO) }
     var rotationDegrees by remember { mutableFloatStateOf(0f) }
 
-    // Consecutive Multi-Page CameraX Queue
-    val capturedRawBitmaps = remember { mutableStateListOf<Bitmap?>() }
+    // Consecutive Multi-Page CameraX Queue (Real Captured / Imported Bitmaps)
+    val capturedRawBitmaps = remember { mutableStateListOf<Bitmap>() }
     val processedPageBitmaps = remember { mutableStateListOf<Bitmap>() }
 
     var generatedPdfPath by remember { mutableStateOf<String?>(null) }
     var generatedPdfUri by remember { mutableStateOf<Uri?>(null) }
     var generatedPdfSize by remember { mutableStateOf(0L) }
 
-    var docTitle by remember { mutableStateOf(selectedPreset.defaultTitle) }
-    var extractedText by remember { mutableStateOf(selectedPreset.sampleOcr) }
+    var docTitle by remember { mutableStateOf("") }
+    var extractedText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(selectedPreset.category) }
     var selectedFolderId by remember {
         mutableStateOf(if (initialFolderId == "all") "root" else initialFolderId)
     }
-    var customTagsInput by remember { mutableStateOf("scanned, camerax, multi-page") }
+    var customTagsInput by remember { mutableStateOf("scanned, camerax, edge-detected, pdf") }
     var outputFormat by remember { mutableStateOf("pdf") }
     var isEncrypted by remember { mutableStateOf(false) }
     var encryptionPassword by remember { mutableStateOf("") }
@@ -284,73 +234,57 @@ fun ScannerScreen(
         )
     }
 
-    fun applyLanguageOcrAndRebuildText(pageCount: Int, lang: OcrLanguage, fmt: String) {
-        val (localizedOcr, detection) = MultiLanguageOcrEngine.extractMultiLanguageOcr(
-            presetCategory = selectedCategory,
-            selectedLanguage = lang,
-            pageCount = pageCount.coerceAtLeast(1),
-            documentTitle = docTitle.ifBlank { selectedPreset.defaultTitle }
-        )
-        val combinedBase = "Detected OCR Language: ${detection.detectedLanguage.displayName} (${detection.detectedLanguage.nativeLabel}) • Confidence: ${detection.confidencePercent}% • Script: ${detection.scriptFamily}\n\n$localizedOcr"
-        extractedText = DocToPicConverter.buildPicToDocStructuredContent(
-            targetFormat = fmt,
-            title = docTitle.ifBlank { selectedPreset.defaultTitle },
-            category = selectedCategory,
-            pageCount = pageCount.coerceAtLeast(1),
-            baseOcrText = combinedBase
-        )
-    }
-
     /**
-     * Appends one newly captured CameraX page to the consecutive multi-page queue without leaving the viewfinder.
+     * Appends one newly captured CameraX page to the consecutive multi-page queue,
+     * processing it through the selected edge-detection / enhancement filter.
      */
-    fun appendConsecutiveCapturedPage(cameraBmp: Bitmap?) {
+    fun appendConsecutiveCapturedPage(cameraBmp: Bitmap) {
         scope.launch {
             isProcessingPipeline = true
+            captureStatusMessage = null
             capturedRawBitmaps.add(cameraBmp)
-            val newPageIdx = capturedRawBitmaps.size
-            val baseSheet = ImageProcessingPdfPipeline.createHighResDocumentBitmap(
-                cameraBitmap = cameraBmp,
-                title = "${docTitle.ifBlank { selectedPreset.defaultTitle }} — Page $newPageIdx",
-                ocrText = extractedText,
+            val filteredBitmap = ImageProcessingPdfPipeline.processDocumentBitmap(
+                source = cameraBmp,
                 filter = selectedFilter,
-                pageIndex = newPageIdx,
-                totalPages = newPageIdx
+                rotationDegrees = rotationDegrees
             )
-            val finalBitmap = if (rotationDegrees % 360f != 0f) {
-                ImageProcessingPdfPipeline.processDocumentBitmap(baseSheet, ScanFilter.ORIGINAL, rotationDegrees)
-            } else {
-                baseSheet
+            processedPageBitmaps.add(filteredBitmap)
+            if (docTitle.isBlank()) {
+                val ts = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
+                docTitle = "${selectedPreset.defaultTitle} ($ts)"
             }
-            processedPageBitmaps.add(finalBitmap)
-            applyLanguageOcrAndRebuildText(processedPageBitmaps.size, selectedLanguage, outputFormat)
             isProcessingPipeline = false
         }
     }
 
     /**
-     * Compiles all consecutively captured pages (or captures 1 page if queue is empty)
-     * into a single multi-page PDF document and transitions to the review/edit screen.
+     * Compiles all consecutively captured pages through the edge-detection filter
+     * into a single multipage PDF file in local storage for Room persistence.
      */
     fun compileConsecutivePagesToSinglePdf(
         filter: ScanFilter = selectedFilter,
         rotDegrees: Float = rotationDegrees
     ) {
+        if (capturedRawBitmaps.isEmpty()) {
+            captureStatusMessage = "Capture at least one page with the camera or select photos from your device first."
+            return
+        }
         scope.launch {
             isProcessingPipeline = true
-            if (capturedRawBitmaps.isEmpty()) {
-                capturedRawBitmaps.add(null)
-            }
-            val totalPages = capturedRawBitmaps.size.coerceAtLeast(1)
+            captureStatusMessage = null
+            val totalPages = capturedRawBitmaps.size
             processedPageBitmaps.clear()
 
-            applyLanguageOcrAndRebuildText(totalPages, selectedLanguage, outputFormat)
+            val effectiveTitle = docTitle.ifBlank {
+                "${selectedPreset.defaultTitle} ($totalPages Page${if (totalPages > 1) "s" else ""})"
+            }
+            docTitle = effectiveTitle
 
             for (idx in 0 until totalPages) {
-                val rawBmp = capturedRawBitmaps.getOrNull(idx)
+                val rawBmp = capturedRawBitmaps[idx]
                 val baseSheet = ImageProcessingPdfPipeline.createHighResDocumentBitmap(
                     cameraBitmap = rawBmp,
-                    title = "${docTitle.ifBlank { selectedPreset.defaultTitle }} — Page ${idx + 1}",
+                    title = "$effectiveTitle — Page ${idx + 1}",
                     ocrText = extractedText,
                     filter = filter,
                     pageIndex = idx + 1,
@@ -364,7 +298,7 @@ fun ScannerScreen(
                 processedPageBitmaps.add(finalBitmap)
             }
 
-            val cleanName = docTitle.lowercase()
+            val cleanName = effectiveTitle.lowercase()
                 .replace(Regex("[^a-z0-9]+"), "_")
                 .trim('_')
                 .ifBlank { "compiled_multi_page_scan" } + ".pdf"
@@ -386,53 +320,47 @@ fun ScannerScreen(
     }
 
     fun triggerCameraXPageCapture(compileImmediatelyAfter: Boolean) {
+        if (!hasCameraPermission) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            captureStatusMessage = "Camera permission is required to capture a live scan, or use Batch Photos to import real images."
+            return
+        }
         isProcessingPipeline = true
-        if (hasCameraPermission) {
-            try {
-                imageCapture.takePicture(
-                    ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageCapturedCallback() {
-                        override fun onCaptureSuccess(image: ImageProxy) {
-                            val bmp = try {
-                                image.toBitmap()
-                            } catch (_: Exception) {
-                                null
-                            } finally {
-                                image.close()
-                            }
+        captureStatusMessage = null
+        try {
+            imageCapture.takePicture(
+                ContextCompat.getMainExecutor(context),
+                object : ImageCapture.OnImageCapturedCallback() {
+                    override fun onCaptureSuccess(image: ImageProxy) {
+                        val bmp = try {
+                            image.toBitmap()
+                        } catch (_: Exception) {
+                            null
+                        } finally {
+                            image.close()
+                        }
+                        if (bmp != null) {
                             if (compileImmediatelyAfter) {
                                 capturedRawBitmaps.add(bmp)
                                 compileConsecutivePagesToSinglePdf()
                             } else {
                                 appendConsecutiveCapturedPage(bmp)
                             }
-                        }
-
-                        override fun onError(exception: ImageCaptureException) {
-                            if (compileImmediatelyAfter) {
-                                capturedRawBitmaps.add(null)
-                                compileConsecutivePagesToSinglePdf()
-                            } else {
-                                appendConsecutiveCapturedPage(null)
-                            }
+                        } else {
+                            isProcessingPipeline = false
+                            captureStatusMessage = "Could not decode camera frame. Please try again or import from Batch Photos."
                         }
                     }
-                )
-            } catch (_: Exception) {
-                if (compileImmediatelyAfter) {
-                    capturedRawBitmaps.add(null)
-                    compileConsecutivePagesToSinglePdf()
-                } else {
-                    appendConsecutiveCapturedPage(null)
+
+                    override fun onError(exception: ImageCaptureException) {
+                        isProcessingPipeline = false
+                        captureStatusMessage = "Camera capture error: ${exception.localizedMessage ?: "Camera unavailable"}"
+                    }
                 }
-            }
-        } else {
-            if (compileImmediatelyAfter) {
-                capturedRawBitmaps.add(null)
-                compileConsecutivePagesToSinglePdf()
-            } else {
-                appendConsecutiveCapturedPage(null)
-            }
+            )
+        } catch (e: Exception) {
+            isProcessingPipeline = false
+            captureStatusMessage = "Camera not ready: ${e.localizedMessage ?: "Use Batch Photos if no hardware camera is attached"}"
         }
     }
 
@@ -442,12 +370,22 @@ fun ScannerScreen(
         if (uris.isNotEmpty()) {
             scope.launch {
                 isProcessingPipeline = true
+                captureStatusMessage = null
                 uris.forEach { uri ->
                     val galleryBmp = ImageProcessingPdfPipeline.decodeBitmapFromUri(context, uri)
-                    capturedRawBitmaps.add(galleryBmp)
+                    if (galleryBmp != null) {
+                        capturedRawBitmaps.add(galleryBmp)
+                    }
                 }
-                docTitle = "Compiled Multi-Page Scan (${capturedRawBitmaps.size} Pages)"
-                compileConsecutivePagesToSinglePdf()
+                if (capturedRawBitmaps.isNotEmpty()) {
+                    if (docTitle.isBlank()) {
+                        docTitle = "${selectedPreset.defaultTitle} (${capturedRawBitmaps.size} Pages)"
+                    }
+                    compileConsecutivePagesToSinglePdf()
+                } else {
+                    isProcessingPipeline = false
+                    captureStatusMessage = "Could not decode selected image(s)."
+                }
             }
         }
     }
@@ -578,6 +516,21 @@ fun ScannerScreen(
                         }
                     }
 
+                    if (!captureStatusMessage.isNullOrBlank()) {
+                        CrystalGlassCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            cornerRadius = 14.dp,
+                            tintColor = Color(0xFFF59E0B)
+                        ) {
+                            Text(
+                                text = captureStatusMessage ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+
                     // Consecutive Multi-Page Thumbnail Queue Strip
                     if (processedPageBitmaps.isNotEmpty()) {
                         CrystalGlassCard(
@@ -683,11 +636,6 @@ fun ScannerScreen(
                                 selected = selectedLanguage == lang,
                                 onClick = {
                                     selectedLanguage = lang
-                                    applyLanguageOcrAndRebuildText(
-                                        pageCount = processedPageBitmaps.size.coerceAtLeast(1),
-                                        lang = lang,
-                                        fmt = outputFormat
-                                    )
                                 },
                                 label = { Text("${lang.displayName} (${lang.nativeLabel})") },
                                 leadingIcon = if (selectedLanguage == lang) {
@@ -717,7 +665,6 @@ fun ScannerScreen(
                                     selectedPreset = preset
                                     docTitle = preset.defaultTitle
                                     selectedCategory = preset.category
-                                    extractedText = preset.sampleOcr
                                 },
                                 label = { Text(preset.label) }
                             )
@@ -995,11 +942,6 @@ fun ScannerScreen(
                                         selected = selectedLanguage == lang,
                                         onClick = {
                                             selectedLanguage = lang
-                                            applyLanguageOcrAndRebuildText(
-                                                pageCount = activePageCount,
-                                                lang = lang,
-                                                fmt = outputFormat
-                                            )
                                         },
                                         label = { Text(lang.nativeLabel) }
                                     )
@@ -1103,11 +1045,6 @@ fun ScannerScreen(
                                 selected = outputFormat == fmtKey,
                                 onClick = {
                                     outputFormat = fmtKey
-                                    applyLanguageOcrAndRebuildText(
-                                        pageCount = activePageCount,
-                                        lang = selectedLanguage,
-                                        fmt = fmtKey
-                                    )
                                 },
                                 label = { Text(fmtLabel) },
                                 modifier = Modifier.testTag("pic_to_doc_format_$fmtKey")
@@ -1327,49 +1264,18 @@ private fun ScannerOverlayCanvas(
         label = "scan_line"
     )
 
-    val sheetColor = when (filter) {
-        ScanFilter.MAGIC_COLOR -> Color(0xFFF8FAFC)
+    val frameAccent = when (filter) {
+        ScanFilter.EDGE_DETECTION -> Color(0xFF00F4FE)
+        ScanFilter.MAGIC_COLOR -> Color(0xFF38BDF8)
         ScanFilter.BW_CONTRAST -> Color(0xFFFFFFFF)
-        ScanFilter.GRAYSCALE -> Color(0xFFE2E8F0)
-        ScanFilter.ORIGINAL -> Color(0xFFFEFCE8)
+        ScanFilter.GRAYSCALE -> Color(0xFF94A3B8)
+        ScanFilter.ORIGINAL -> Color(0xFFFBBF24)
     }
 
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.76f)
-                .height(210.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(sheetColor.copy(alpha = 0.92f))
-                .border(2.dp, Color(0xFF38BDF8), RoundedCornerShape(12.dp))
-                .padding(14.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(
-                    text = preset.defaultTitle.uppercase(),
-                    color = Color(0xFF0F172A),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.5f)
-                        .height(3.dp)
-                        .background(Color(0xFF2563EB))
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = preset.sampleOcr.take(240),
-                    color = Color(0xFF334155),
-                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                    maxLines = 7
-                )
-            }
-        }
-
         Canvas(modifier = Modifier.fillMaxSize()) {
             val rectW = size.width * 0.78f
             val rectH = size.height * 0.70f
@@ -1377,7 +1283,7 @@ private fun ScannerOverlayCanvas(
             val top = (size.height - rectH) / 2f
 
             drawRoundRect(
-                color = Color(0xFF38BDF8),
+                color = frameAccent,
                 topLeft = Offset(left, top),
                 size = Size(rectW, rectH),
                 cornerRadius = CornerRadius(24f, 24f),
@@ -1386,10 +1292,26 @@ private fun ScannerOverlayCanvas(
 
             val laserY = top + rectH * scanLineProgress
             drawLine(
-                color = Color(0xFF22D3EE),
+                color = frameAccent,
                 start = Offset(left + 8f, laserY),
                 end = Offset(left + rectW - 8f, laserY),
                 strokeWidth = 5f
+            )
+        }
+
+        Surface(
+            color = Color.Black.copy(alpha = 0.58f),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(14.dp)
+        ) {
+            Text(
+                text = "${preset.label} • ${filter.label}",
+                color = frameAccent,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
             )
         }
     }
