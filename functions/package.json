@@ -1,0 +1,13 @@
+{
+  "name": "docflow-recaptcha-assessment",
+  "private": true,
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "scripts": {
+    "lint": "node --check index.js"
+  },
+  "dependencies": {
+    "@google-cloud/recaptcha-enterprise": "^7.2.1",
+    "firebase-functions": "^6.4.0"
+  }
+}

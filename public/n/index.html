@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="color-scheme" content="light dark">
+  <title>Shared note · DocFlow</title>
+  <link rel="stylesheet" href="viewer.css">
+  <script src="https://www.google.com/recaptcha/enterprise.js?render=6LdLSP0tAAAAAKmEkF_8tcs9H3DlXSobms41to3_" defer></script>
+  <script src="viewer.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="brand"><span class="mark" aria-hidden="true">D</span><span>DocFlow</span></header>
+    <section id="state" class="card" aria-live="polite">
+      <h1>Opening shared note…</h1>
+      <p class="muted">The note is decoded on this device. Its fragment is not sent to the server.</p>
+      <noscript><p class="error">JavaScript is required to read this shared note.</p></noscript>
+    </section>
+    <article id="note" class="card note" hidden>
+      <p id="note-meta" class="muted"></p>
+      <h1 id="note-title"></h1>
+      <div id="note-body" class="note-body"></div>
+      <button id="download-note" class="button secondary" type="button">Download note as text</button>
+      <p id="download-error" class="error" role="alert" hidden></p>
+    </article>
+    <section id="password-panel" class="card" hidden>
+      <h1>Password protected note</h1>
+      <p class="muted">Enter the password shared by the note's author. The password is processed on this device.</p>
+      <form id="password-form">
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <button class="button" type="submit">Unlock note</button>
+      </form>
+      <p id="password-error" class="error" role="alert" hidden></p>
+    </section>
+    <section id="error-panel" class="card" hidden>
+      <h1 id="error-title">This link is invalid</h1>
+      <p id="error-message" class="muted">The note link is incomplete or its data is malformed.</p>
+      <p class="muted">Check that you copied the entire link. If the note is password protected, ask its author to share the password separately.</p>
+    </section>
+    <footer>Shared content is carried in this link. Anyone with the link can read an unprotected note. Expiry is checked using this device's clock and may not prevent access to a previously copied link.</footer>
+  </main>
+</body>
+</html>
