@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -14,8 +15,22 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+@Immutable
+data class DocFlowPalette(
+    val isDark: Boolean,
+    val background: Color,
+    val surface: Color,
+    val surfaceSubtle: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val divider: Color,
+    val pressOverlay: Color,
+    val accentBlue: Color = DocFlowAccentBlue
+)
 
 /**
  * Single source of truth for the DocFlow Shared Design System.
@@ -26,6 +41,36 @@ import androidx.compose.ui.unit.sp
  * - No glassmorphism, no blur, no heavy shadows, no gradients (except scanner camera overlay).
  */
 object DocFlowTokens {
+
+    fun palette(isDark: Boolean): DocFlowPalette {
+        return if (isDark) {
+            DocFlowPalette(
+                isDark = true,
+                background = DocFlowDarkBackground,
+                surface = DocFlowDarkCard,
+                surfaceSubtle = Color(0xFF23262B),
+                textPrimary = DocFlowDarkTextPrimary,
+                textSecondary = DocFlowDarkTextSecondary,
+                divider = DocFlowDarkDivider,
+                pressOverlay = Color.White.copy(alpha = 0.08f)
+            )
+        } else {
+            DocFlowPalette(
+                isDark = false,
+                background = DocFlowLightBackground,
+                surface = DocFlowLightCard,
+                surfaceSubtle = Color(0xFFF6F7F9),
+                textPrimary = DocFlowLightTextPrimary,
+                textSecondary = DocFlowLightTextSecondary,
+                divider = DocFlowLightDivider,
+                pressOverlay = Color.Black.copy(alpha = 0.08f)
+            )
+        }
+    }
+
+    @Composable
+    @ReadOnlyComposable
+    fun currentPalette(): DocFlowPalette = palette(isDark)
 
     // -------------------------------------------------------------------------
     // 1. Dynamic Theme-Aware Colors
@@ -82,6 +127,19 @@ object DocFlowTokens {
     val searchMatchYellow: Color = DocFlowSearchMatchYellow
     val searchCurrentOrange: Color = DocFlowSearchCurrentOrange
 
+    // PascalCase aliases for direct token access across screens
+    @get:JvmName("getAccentBluePascal")
+    val AccentBlue: Color = accentBlue
+    val IconCircleRed: Color = iconRedPdf
+    val IconCircleBlue: Color = iconBlueSummarySafe
+    val IconCircleTeal: Color = iconTealTranslate
+    val IconCircleGreen: Color = iconGreenDownload
+    val IconCircleGray: Color = iconGrayTrash
+    val IconCircleOrangePpt: Color = iconOrangePpt
+    val IconCircleOrange: Color = iconOrangePpt
+    val IconCircleGreenExcel: Color = iconGreenDarkExcel
+    val IconCircleExcelGreen: Color = iconGreenDarkExcel
+
     // -------------------------------------------------------------------------
     // 2. Corner Radii
     // -------------------------------------------------------------------------
@@ -92,10 +150,17 @@ object DocFlowTokens {
     val thumbnailRadius: Dp = 8.dp
     val smallRadius: Dp = 12.dp
 
+    val cardCornerRadius: Dp = cardRadius
+    val sheetTopCornerRadius: Dp = sheetTopRadius
+    val thumbnailCornerRadius: Dp = thumbnailRadius
+
     val cardShape = RoundedCornerShape(cardRadius)
     val sheetTopShape = RoundedCornerShape(topStart = sheetTopRadius, topEnd = sheetTopRadius)
+    val sheetShape = sheetTopShape
     val buttonShape = RoundedCornerShape(buttonRadius)
+    val rectButtonShape = buttonShape
     val pillShape = CircleShape
+    val pillButtonShape = pillShape
     val thumbnailShape = RoundedCornerShape(thumbnailRadius)
     val smallShape = RoundedCornerShape(smallRadius)
 
@@ -111,8 +176,11 @@ object DocFlowTokens {
     val space8: Dp = 32.dp
 
     val screenSideMargin: Dp = 16.dp
+    val screenHorizontalMargin: Dp = screenSideMargin
     val cardPaddingMin: Dp = 16.dp
     val cardPaddingMax: Dp = 20.dp
+    val cardPaddingHorizontal: Dp = cardPaddingMin
+    val cardPaddingVertical: Dp = cardPaddingMin
     val minTouchTarget: Dp = 48.dp
     val dividerThickness: Dp = 1.dp
     val maxContentWidth: Dp = 720.dp
@@ -128,6 +196,12 @@ object DocFlowTokens {
     // -------------------------------------------------------------------------
     // 4. Typography (Roboto / Inter System Sans)
     // -------------------------------------------------------------------------
+    val largeTitleSize: TextUnit = 40.sp
+    val sectionLabelSize: TextUnit = 20.sp
+    val rowTitleSize: TextUnit = 18.sp
+    val bodySize: TextUnit = 16.sp
+    val captionSize: TextUnit = 14.sp
+
     val largeTitleStyle: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,

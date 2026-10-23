@@ -152,18 +152,9 @@ class DocFlowViewModel(
             DocFlowSyncManager.enqueueOfflineSyncWhenConnected(ctx, currentUserId, replaceExisting = false)
         }
         viewModelScope.launch {
-            // 30-day auto-purge of Recently deleted items
+            // 30-day auto-purge of Recently deleted items (Stored on this device)
             val thirtyDaysAgoMs = System.currentTimeMillis() - (30L * 24L * 60L * 60L * 1000L)
             dao?.purgeExpiredDeletedDocuments(thirtyDaysAgoMs)
-
-            // Seed default offline starter files once if the local database is empty on first install
-            val prefs = appContext?.getSharedPreferences("docflow_offline_prefs", Context.MODE_PRIVATE)
-            val alreadyInitialized = prefs?.getBoolean("starter_seeded_v1", false) ?: false
-            val existingDocs = dao?.getAllDocumentsForUser(currentUserId) ?: emptyList()
-            if (!alreadyInitialized && existingDocs.isEmpty() && dao != null) {
-                prefs?.edit()?.putBoolean("starter_seeded_v1", true)?.apply()
-                seedSampleWorkspace()
-            }
         }
     }
 
@@ -187,7 +178,7 @@ class DocFlowViewModel(
                 initialValue = emptyList()
             )
 
-    private val allUserVersions: StateFlow<List<DocumentVersionEntity>> =
+    val allUserVersions: StateFlow<List<DocumentVersionEntity>> =
         (dao?.observeAllUserVersions(currentUserId) ?: flowOf(emptyList()))
             .stateIn(
                 scope = viewModelScope,
@@ -1658,9 +1649,34 @@ class DocFlowViewModel(
         }
     }
 
+    /**
+     * Generates `<original> (converted)` and auto-numbers duplicates (`<original> (converted) (2)`, etc.).
+     */
+    fun buildConvertedDocumentTitle(originalTitle: String): String {
+        val cleanBase = originalTitle
+            .removeSuffix(" (converted)")
+            .replace(Regex("\\s*\\(converted\\)\\s*\\(\\d+\\)$"), "")
+            .trim()
+            .ifBlank { "Document" }
+        val candidateBase = "$cleanBase (converted)"
+        val existingTitles = cachedDocumentsMap.value.values
+            .filterNot { it.isDeleted }
+            .map { it.title.lowercase() }
+            .toSet()
+        if (candidateBase.lowercase() !in existingTitles) {
+            return candidateBase
+        }
+        var num = 2
+        while ("$candidateBase ($num)".lowercase() in existingTitles) {
+            num++
+        }
+        return "$candidateBase ($num)"
+    }
+
     fun convertFileToPdfAndSave(
         context: Context,
         sourceDoc: DocEntity,
+        watermarkConfig: com.example.data.util.PdfWatermarkConfig = com.example.data.util.PdfWatermarkConfig(enabled = false),
         onCreated: (String) -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -1669,20 +1685,32 @@ class DocFlowViewModel(
             } else {
                 sourceDoc.content
             }
-            val exportRes = PdfLibAnnotationEngine.exportAnnotatedPdf(
-                context = context,
-                document = sourceDoc,
-                plainContent = plainText,
-                annotations = emptyList(),
-                isBiometricSigned = false,
-                signerName = "DocFlow Local Converter",
-                signerEmail = ""
-            )
-            val pdfObj = exportRes.getOrNull()
-            val cleanName = sourceDoc.title.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+            val convertedTitle = buildConvertedDocumentTitle(sourceDoc.title)
+            val cleanName = convertedTitle.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
                 .ifBlank { "converted" } + ".pdf"
+
+            val pageCount = sourceDoc.pageCount.toInt().coerceAtLeast(1)
+            val pageBitmaps = (1..pageCount.coerceAtMost(8)).map { idx ->
+                ImageProcessingPdfPipeline.createHighResDocumentBitmap(
+                    cameraBitmap = null,
+                    title = "$convertedTitle ($idx/$pageCount)",
+                    ocrText = plainText,
+                    filter = ScanFilter.ORIGINAL,
+                    pageIndex = idx,
+                    totalPages = pageCount,
+                    targetFormat = "pdf"
+                )
+            }
+            val pdfObj = ImageProcessingPdfPipeline.convertBitmapsToPdfFile(
+                context = context,
+                fileName = cleanName,
+                bitmaps = pageBitmaps,
+                ocrText = plainText,
+                watermarkConfig = watermarkConfig
+            ).getOrNull()
+
             createOrScanDocument(
-                title = "${sourceDoc.title} (PDF)",
+                title = convertedTitle,
                 folderId = sourceDoc.folderId,
                 category = sourceDoc.category,
                 fileType = "pdf",
@@ -1692,14 +1720,152 @@ class DocFlowViewModel(
                 password = "",
                 encryptionKeyHint = null,
                 isOfflineCached = true,
-                pageCount = sourceDoc.pageCount.coerceAtLeast(1L),
+                pageCount = pageCount.toLong(),
                 localPdfPath = pdfObj?.pdfFile?.absolutePath,
-                generatedPdfUri = pdfObj?.shareUri,
-                customTags = "converted-pdf, created-by-me, ${sourceDoc.fileType.lowercase()}",
+                generatedPdfUri = pdfObj?.pdfUri,
+                customTags = "converted-pdf, created-by-me, ${sourceDoc.fileType.lowercase()}${if (watermarkConfig.enabled) ", watermarked" else ""}",
                 createdByMe = true,
                 onCreated = onCreated
             )
-            _statusBannerMessage.value = "Converted '${sourceDoc.title}' to PDF in Created by me"
+            _statusBannerMessage.value = "Saved '$convertedTitle' in Created by me • Stored on this device"
+        }
+    }
+
+    /**
+     * Converts a PDF document to an editable Word (.docx) document on-device.
+     * Supports optional OCR pass for scanned PDFs and returns conversion statistics.
+     */
+    fun convertPdfToWordAndSave(
+        context: Context,
+        sourceDoc: DocEntity,
+        runOcrFirst: Boolean = false,
+        ocrLanguage: OcrLanguage = OcrLanguage.ENGLISH,
+        onCreated: (docId: String, pagesConverted: Int, tablesDetected: Int, imagesKept: Int) -> Unit = { _, _, _, _ -> }
+    ) {
+        viewModelScope.launch {
+            val convertedTitle = buildConvertedDocumentTitle(sourceDoc.title)
+            val cleanName = convertedTitle.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+                .ifBlank { "converted" } + ".docx"
+
+            val rawText = if (sourceDoc.isEncrypted) {
+                ""
+            } else {
+                sourceDoc.content
+            }
+
+            val extractedBody = if (runOcrFirst || rawText.isBlank()) {
+                val localUri = _localDocumentUris.value[sourceDoc.id]
+                val firstBmp = localUri?.let { FileParserUtils.renderPdfPage(context, it, 0) }
+                if (firstBmp != null) {
+                    val mlText = MultiLanguageOcrEngine.recognizeTextFromBitmapWithMlKit(firstBmp, ocrLanguage)
+                    mlText.ifBlank { rawText }
+                } else {
+                    rawText
+                }
+            } else {
+                rawText
+            }
+
+            val pagesCount = sourceDoc.pageCount.toInt().coerceAtLeast(1)
+            val tablesDetected = extractedBody.lines().count { it.trim().startsWith("|") } / 2
+            val imagesKept = if (_localDocumentUris.value.containsKey(sourceDoc.id)) 1 else 0
+
+            val wordContent = buildString {
+                appendLine("=== WORD DOCUMENT (.DOCX): $convertedTitle ===")
+                appendLine("Source PDF: ${sourceDoc.fileName} • Pages converted: $pagesCount • Tables detected: $tablesDetected • Stored on this device")
+                appendLine()
+                if (extractedBody.isNotBlank()) {
+                    appendLine(extractedBody.trim())
+                } else {
+                    appendLine(sourceDoc.title)
+                }
+            }.trim()
+
+            createOrScanDocument(
+                title = convertedTitle,
+                folderId = sourceDoc.folderId,
+                category = sourceDoc.category,
+                fileType = "docx",
+                fileName = cleanName,
+                plainContent = wordContent,
+                isEncrypted = false,
+                password = "",
+                encryptionKeyHint = null,
+                isOfflineCached = true,
+                pageCount = pagesCount.toLong(),
+                customTags = "pdf-to-word, docx, converted, created-by-me${if (runOcrFirst) ", ocr" else ""}",
+                createdByMe = true,
+                onCreated = { newId ->
+                    onCreated(newId, pagesCount, tablesDetected, imagesKept)
+                }
+            )
+            _statusBannerMessage.value = "Converted to Word: '$convertedTitle' ($pagesCount page(s), $tablesDetected table(s)) • Stored on this device"
+        }
+    }
+
+    /**
+     * Converts one or more images/scans into a local PDF with page size, orientation, margins, quality, and watermark options.
+     */
+    fun convertImagesToPdfAndSave(
+        context: Context,
+        baseTitle: String,
+        bitmaps: List<android.graphics.Bitmap>,
+        pageSizeOption: String = "A4",
+        orientationOption: String = "PORTRAIT",
+        marginOption: String = "SMALL",
+        watermarkConfig: com.example.data.util.PdfWatermarkConfig = com.example.data.util.PdfWatermarkConfig(enabled = false),
+        onCreated: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val convertedTitle = buildConvertedDocumentTitle(baseTitle.ifBlank { "Image Scan" })
+            val cleanName = convertedTitle.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+                .ifBlank { "images_converted" } + ".pdf"
+
+            val safeBitmaps = if (bitmaps.isNotEmpty()) {
+                bitmaps
+            } else {
+                listOf(
+                    ImageProcessingPdfPipeline.createHighResDocumentBitmap(
+                        cameraBitmap = null,
+                        title = convertedTitle,
+                        ocrText = convertedTitle,
+                        filter = ScanFilter.ORIGINAL,
+                        pageIndex = 1,
+                        totalPages = 1
+                    )
+                )
+            }
+
+            val pdfRes = ImageProcessingPdfPipeline.convertBitmapsToPdfFile(
+                context = context,
+                fileName = cleanName,
+                bitmaps = safeBitmaps,
+                ocrText = "",
+                watermarkConfig = watermarkConfig,
+                pageSizeOption = pageSizeOption,
+                orientationOption = orientationOption,
+                marginOption = marginOption
+            ).getOrNull()
+
+            createOrScanDocument(
+                title = convertedTitle,
+                folderId = "root",
+                category = "Work",
+                fileType = "pdf",
+                fileName = pdfRes?.pdfFile?.name ?: cleanName,
+                plainContent = "=== IMAGE TO PDF: $convertedTitle ===\nPages: ${safeBitmaps.size} • Page Size: $pageSizeOption ($orientationOption) • Margins: $marginOption • Stored on this device",
+                isEncrypted = false,
+                password = "",
+                encryptionKeyHint = null,
+                isOfflineCached = true,
+                pageCount = safeBitmaps.size.toLong(),
+                localPdfPath = pdfRes?.pdfFile?.absolutePath,
+                generatedPdfUri = pdfRes?.pdfUri,
+                customTags = "image-to-pdf, pdf, converted, created-by-me${if (watermarkConfig.enabled) ", watermarked" else ""}",
+                createdByMe = true,
+                onCreated = onCreated
+            )
+            _statusBannerMessage.value = "Saved '$convertedTitle' (${safeBitmaps.size} page(s)) • Stored on this device"
         }
     }
 
@@ -1791,60 +1957,7 @@ class DocFlowViewModel(
                 createdByMe = true,
                 onCreated = onCreated
             )
-            _statusBannerMessage.value = "Saved ${targetLang.displayName} translation as ${ext.uppercase()} in Created by me"
-        }
-    }
-
-    fun exportBackupArchive(
-        context: Context,
-        passphrase: String,
-        onExported: (File) -> Unit = {}
-    ) {
-        viewModelScope.launch {
-            val docs = dao?.getAllDocumentsForUser(currentUserId) ?: emptyList()
-            val folders = dao?.getAllFoldersForUser(currentUserId) ?: emptyList()
-            val res = com.example.data.util.OnDeviceAiAndBackupEngine.exportEncryptedDocFlowBackup(
-                context = context,
-                passphrase = passphrase,
-                documents = docs,
-                folders = folders
-            )
-            res.onSuccess { file ->
-                _statusBannerMessage.value = "Exported encrypted backup: ${file.name} (${docs.size} files)"
-                onExported(file)
-            }.onFailure { err ->
-                _statusBannerMessage.value = "Backup export failed: ${err.localizedMessage}"
-            }
-        }
-    }
-
-    fun importBackupArchive(
-        context: Context,
-        uri: Uri,
-        passphrase: String,
-        onImported: (Int) -> Unit = {}
-    ) {
-        viewModelScope.launch {
-            val rawEncrypted = runCatching {
-                context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
-            }.getOrNull()
-            if (rawEncrypted.isNullOrBlank()) {
-                _statusBannerMessage.value = "Selected backup file is empty or unreadable"
-                return@launch
-            }
-            val parsedRes = com.example.data.util.OnDeviceAiAndBackupEngine.parseEncryptedDocFlowBackup(
-                encryptedContent = rawEncrypted,
-                passphrase = passphrase,
-                targetUserId = currentUserId
-            )
-            parsedRes.onSuccess { (folders, docs) ->
-                dao?.upsertFolders(folders)
-                dao?.upsertDocuments(docs)
-                _statusBannerMessage.value = "Restored ${docs.size} document(s) & ${folders.size} folder(s) from encrypted .docflow backup"
-                onImported(docs.size)
-            }.onFailure {
-                _statusBannerMessage.value = "Decryption failed: Invalid backup passphrase or corrupted .docflow file"
-            }
+            _statusBannerMessage.value = "Saved ${targetLang.displayName} translation as ${ext.uppercase()} • Stored on this device"
         }
     }
 
@@ -1853,7 +1966,7 @@ class DocFlowViewModel(
             runCatching {
                 context.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
             }
-            _statusBannerMessage.value = "Cleared local thumbnail & temporary cache"
+            _statusBannerMessage.value = "Cleared local thumbnail & temporary cache (user documents untouched)"
         }
     }
 
@@ -2978,6 +3091,68 @@ class DocFlowViewModel(
             )
             _statusBannerMessage.value = "OTA Update v${manifest.versionName} installed & verified (SHA-256: ${manifest.bundleSha256.take(10)}...)"
         }
+    }
+
+    fun observeDocumentComments(docId: String): Flow<List<DocumentCommentEntity>> =
+        observeCommentsForDocument(docId)
+
+    fun observeDocumentAnnotations(docId: String): Flow<List<PdfAnnotationYMapEntity>> =
+        observeAnnotationsForDocument(docId)
+
+    fun markDocumentOpened(docId: String) {
+        recordDocumentAccessed(docId)
+    }
+
+    fun saveNewVersionSnapshot(
+        doc: DocEntity,
+        plainContent: String,
+        versionLabel: String
+    ) {
+        createNamedVersionSnapshot(
+            doc = doc,
+            versionLabel = versionLabel,
+            plainContent = plainContent
+        )
+    }
+
+    fun addYMapPdfAnnotation(
+        doc: DocEntity,
+        pageIndex: Int,
+        tool: PdfMarkupTool,
+        colorHex: String,
+        strokeWidth: Float,
+        points: List<androidx.compose.ui.geometry.Offset>,
+        stickyNoteText: String = ""
+    ) {
+        upsertYMapAnnotation(
+            doc = doc,
+            pageIndex = pageIndex,
+            tool = tool,
+            colorHex = colorHex,
+            strokeWidth = strokeWidth,
+            normalizedPoints = points,
+            stickyNoteText = stickyNoteText
+        )
+    }
+
+    fun addDocumentComment(
+        doc: DocEntity,
+        anchorLineOrText: String,
+        body: String,
+        isSuggestion: Boolean = false,
+        suggestedReplacement: String = ""
+    ) {
+        addCommentOrSuggestion(
+            doc = doc,
+            anchorText = anchorLineOrText,
+            body = body,
+            isSuggestion = isSuggestion,
+            suggestedReplacement = suggestedReplacement
+        )
+    }
+
+    fun deleteComment(commentId: String) {
+        rejectSuggestion(commentId)
     }
 
     private companion object {

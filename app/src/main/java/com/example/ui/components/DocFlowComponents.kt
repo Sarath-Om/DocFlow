@@ -76,6 +76,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.ui.theme.DocFlowPalette
 import com.example.ui.theme.DocFlowTokens
 
 /**
@@ -87,11 +88,26 @@ import com.example.ui.theme.DocFlowTokens
 data class DocFlowHeaderAction(
     val icon: ImageVector,
     val contentDescription: String,
-    val testTag: String,
+    val testTag: String = "header_action_${contentDescription.lowercase().replace(' ', '_')}",
     val tint: Color? = null,
     val isActive: Boolean = false,
     val onClick: () -> Unit
 )
+
+/**
+ * Shared thin flat divider using DocFlowTokens.
+ */
+@Composable
+fun DocFlowDivider(
+    palette: DocFlowPalette? = null,
+    modifier: Modifier = Modifier
+) {
+    HorizontalDivider(
+        modifier = modifier,
+        thickness = DocFlowTokens.dividerThickness,
+        color = palette?.divider ?: DocFlowTokens.divider
+    )
+}
 
 /**
  * 1. ScreenHeader: large left-aligned title (40sp bold), optional subtitle,
@@ -102,6 +118,7 @@ fun DocFlowScreenHeader(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    palette: DocFlowPalette? = null,
     onNavigateBack: (() -> Unit)? = null,
     backTestTag: String = "header_back_button",
     actions: List<DocFlowHeaderAction> = emptyList()
@@ -110,6 +127,8 @@ fun DocFlowScreenHeader(
     val screenWidthDp = configuration.screenWidthDp
     val sideMargin = DocFlowTokens.adaptiveScreenMargin(screenWidthDp)
     val titleStyle = DocFlowTokens.adaptiveLargeTitleStyle(screenWidthDp)
+    val primaryColor = palette?.textPrimary ?: DocFlowTokens.textPrimary
+    val secondaryColor = palette?.textSecondary ?: DocFlowTokens.textSecondary
 
     Row(
         modifier = modifier
@@ -139,7 +158,7 @@ fun DocFlowScreenHeader(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = DocFlowTokens.textPrimary
+                        tint = primaryColor
                     )
                 }
             }
@@ -147,7 +166,7 @@ fun DocFlowScreenHeader(
                 Text(
                     text = title,
                     style = titleStyle,
-                    color = DocFlowTokens.textPrimary,
+                    color = primaryColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -156,7 +175,7 @@ fun DocFlowScreenHeader(
                     Text(
                         text = subtitle,
                         style = DocFlowTokens.captionStyle,
-                        color = DocFlowTokens.textSecondary,
+                        color = secondaryColor,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -184,7 +203,7 @@ fun DocFlowScreenHeader(
                             imageVector = action.icon,
                             contentDescription = action.contentDescription,
                             tint = action.tint
-                                ?: if (action.isActive) DocFlowTokens.accentBlue else DocFlowTokens.textPrimary
+                                ?: if (action.isActive) DocFlowTokens.accentBlue else primaryColor
                         )
                     }
                 }
@@ -200,12 +219,14 @@ fun DocFlowScreenHeader(
 @Composable
 fun DocFlowCard(
     modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
     padding: PaddingValues = PaddingValues(
         horizontal = DocFlowTokens.cardPaddingMin,
         vertical = DocFlowTokens.cardPaddingMin
     ),
+    contentPadding: PaddingValues? = null,
     borderColor: Color? = null,
-    containerColor: Color = DocFlowTokens.surface,
+    containerColor: Color = palette?.surface ?: DocFlowTokens.surface,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -228,7 +249,7 @@ fun DocFlowCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(padding),
+                .padding(contentPadding ?: padding),
             content = content
         )
     }
@@ -241,7 +262,7 @@ fun DocFlowCard(
 fun DocFlowIconCircle(
     icon: ImageVector,
     circleColor: Color,
-    contentDescription: String?,
+    contentDescription: String? = null,
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
     iconSize: Dp = 22.dp,
@@ -300,6 +321,7 @@ fun DocFlowListRow(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    palette: DocFlowPalette? = null,
     leading: @Composable (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
     showChevron: Boolean = false,
@@ -309,6 +331,10 @@ fun DocFlowListRow(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null
 ) {
+    val primaryColor = palette?.textPrimary ?: DocFlowTokens.textPrimary
+    val secondaryColor = palette?.textSecondary ?: DocFlowTokens.textSecondary
+    val dividerColor = palette?.divider ?: DocFlowTokens.divider
+
     val rowModifier = modifier
         .fillMaxWidth()
         .heightIn(min = 64.dp)
@@ -344,7 +370,7 @@ fun DocFlowListRow(
                 Text(
                     text = title,
                     style = DocFlowTokens.rowTitleStyle,
-                    color = DocFlowTokens.textPrimary,
+                    color = primaryColor,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -353,7 +379,7 @@ fun DocFlowListRow(
                     Text(
                         text = subtitle,
                         style = DocFlowTokens.captionStyle,
-                        color = DocFlowTokens.textSecondary,
+                        color = secondaryColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -365,7 +391,7 @@ fun DocFlowListRow(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = DocFlowTokens.textSecondary,
+                    tint = secondaryColor,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -377,7 +403,7 @@ fun DocFlowListRow(
                     end = DocFlowTokens.cardPaddingMin
                 ),
                 thickness = DocFlowTokens.dividerThickness,
-                color = DocFlowTokens.divider
+                color = dividerColor
             )
         }
     }
@@ -390,6 +416,7 @@ fun DocFlowListRow(
 fun DocFlowSectionLabel(
     text: String,
     modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
     trailing: @Composable (() -> Unit)? = null
 ) {
     Row(
@@ -405,7 +432,7 @@ fun DocFlowSectionLabel(
         Text(
             text = text,
             style = DocFlowTokens.sectionLabelStyle,
-            color = DocFlowTokens.textPrimary
+            color = palette?.textPrimary ?: DocFlowTokens.textPrimary
         )
         if (trailing != null) {
             trailing()
@@ -422,14 +449,37 @@ fun DocFlowDateGroupHeader(
     itemCount: Int,
     isCollapsed: Boolean,
     onToggleCollapse: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null
 ) {
     val countText = if (itemCount == 1) "1 item" else "$itemCount items"
+    DocFlowDateGroupHeader(
+        dateLabel = dateLabel,
+        countLabel = countText,
+        isExpanded = !isCollapsed,
+        onToggle = onToggleCollapse,
+        palette = palette,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun DocFlowDateGroupHeader(
+    dateLabel: String,
+    countLabel: String = "",
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    palette: DocFlowPalette? = null,
+    modifier: Modifier = Modifier
+) {
+    val primaryColor = palette?.textPrimary ?: DocFlowTokens.textPrimary
+    val secondaryColor = palette?.textSecondary ?: DocFlowTokens.textSecondary
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = DocFlowTokens.minTouchTarget)
-            .clickable(role = Role.Button, onClick = onToggleCollapse)
+            .clickable(role = Role.Button, onClick = onToggle)
             .padding(horizontal = DocFlowTokens.screenSideMargin, vertical = DocFlowTokens.space1),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -441,27 +491,29 @@ fun DocFlowDateGroupHeader(
             Text(
                 text = dateLabel,
                 style = DocFlowTokens.bodyMediumStyle,
-                color = DocFlowTokens.textPrimary
+                color = primaryColor
             )
-            Text(
-                text = "|",
-                style = DocFlowTokens.captionStyle,
-                color = DocFlowTokens.textSecondary
-            )
-            Text(
-                text = countText,
-                style = DocFlowTokens.captionStyle,
-                color = DocFlowTokens.textSecondary
-            )
+            if (countLabel.isNotBlank()) {
+                Text(
+                    text = "|",
+                    style = DocFlowTokens.captionStyle,
+                    color = secondaryColor
+                )
+                Text(
+                    text = countLabel,
+                    style = DocFlowTokens.captionStyle,
+                    color = secondaryColor
+                )
+            }
         }
         Box(
             modifier = Modifier.size(DocFlowTokens.minTouchTarget),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = if (isCollapsed) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
-                contentDescription = if (isCollapsed) "Expand $dateLabel" else "Collapse $dateLabel",
-                tint = DocFlowTokens.textSecondary
+                imageVector = if (!isExpanded) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
+                contentDescription = if (!isExpanded) "Expand $dateLabel" else "Collapse $dateLabel",
+                tint = secondaryColor
             )
         }
     }
@@ -477,8 +529,12 @@ fun <T> DocFlowFilterTabs(
     labelProvider: (T) -> String,
     onSelectTab: (T) -> Unit,
     modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
     testTagPrefix: String = "filter_tab"
 ) {
+    val primaryColor = palette?.textPrimary ?: DocFlowTokens.textPrimary
+    val secondaryColor = palette?.textSecondary ?: DocFlowTokens.textSecondary
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -505,7 +561,7 @@ fun <T> DocFlowFilterTabs(
                     } else {
                         DocFlowTokens.bodyStyle
                     },
-                    color = if (isSelected) DocFlowTokens.textPrimary else DocFlowTokens.textSecondary
+                    color = if (isSelected) primaryColor else secondaryColor
                 )
                 Spacer(modifier = Modifier.height(DocFlowTokens.space2))
                 Box(
@@ -520,6 +576,26 @@ fun <T> DocFlowFilterTabs(
     }
 }
 
+@Composable
+fun DocFlowFilterTabs(
+    tabs: List<String>,
+    selectedTab: String,
+    onSelectTab: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
+    testTagPrefix: String = "filter_tab"
+) {
+    DocFlowFilterTabs(
+        tabs = tabs,
+        selectedTab = selectedTab,
+        labelProvider = { it },
+        onSelectTab = onSelectTab,
+        modifier = modifier,
+        palette = palette,
+        testTagPrefix = testTagPrefix
+    )
+}
+
 /**
  * 9. BottomNav: 3 tabs (Recent, Tools, Manage), white/surface bar with a thin top divider.
  * Active tab: filled icon + dark bold label; inactive: outline icon + gray label.
@@ -530,31 +606,38 @@ enum class DocFlowNavTab(
     val outlinedIcon: ImageVector,
     val testTag: String
 ) {
-    RECENT("Recent", Icons.Filled.History, Icons.Outlined.History, "bottom_nav_recent"),
-    TOOLS("Tools", Icons.Filled.GridView, Icons.Outlined.GridView, "bottom_nav_tools"),
-    MANAGE("Manage", Icons.Filled.Folder, Icons.Outlined.Folder, "bottom_nav_manage")
+    RECENT("Recent", Icons.Filled.History, Icons.Outlined.History, "bottom_tab_recent"),
+    TOOLS("Tools", Icons.Filled.GridView, Icons.Outlined.GridView, "bottom_tab_tools"),
+    MANAGE("Manage", Icons.Filled.Folder, Icons.Outlined.Folder, "bottom_tab_manage")
 }
 
 @Composable
 fun DocFlowBottomNav(
     selectedIndex: Int,
     onSelectIndex: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null
 ) {
+    val surfaceColor = palette?.surface ?: DocFlowTokens.surface
+    val dividerColor = palette?.divider ?: DocFlowTokens.divider
+    val primaryColor = palette?.textPrimary ?: DocFlowTokens.textPrimary
+    val secondaryColor = palette?.textSecondary ?: DocFlowTokens.textSecondary
+
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = DocFlowTokens.surface,
+        color = surfaceColor,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             HorizontalDivider(
                 thickness = DocFlowTokens.dividerThickness,
-                color = DocFlowTokens.divider
+                color = dividerColor
             )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .navigationBarsPadding()
                     .height(64.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
@@ -574,7 +657,7 @@ fun DocFlowBottomNav(
                         Icon(
                             imageVector = if (isSelected) tab.filledIcon else tab.outlinedIcon,
                             contentDescription = tab.label,
-                            tint = if (isSelected) DocFlowTokens.textPrimary else DocFlowTokens.textSecondary,
+                            tint = if (isSelected) primaryColor else secondaryColor,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.height(2.dp))
@@ -583,7 +666,7 @@ fun DocFlowBottomNav(
                             style = DocFlowTokens.captionStyle.copy(
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             ),
-                            color = if (isSelected) DocFlowTokens.textPrimary else DocFlowTokens.textSecondary
+                            color = if (isSelected) primaryColor else secondaryColor
                         )
                     }
                 }
@@ -634,6 +717,7 @@ fun DocFlowFab(
 fun DocFlowBottomSheet(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
     title: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -642,7 +726,7 @@ fun DocFlowBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
         shape = DocFlowTokens.sheetTopShape,
-        containerColor = DocFlowTokens.surface,
+        containerColor = palette?.surface ?: DocFlowTokens.surface,
         tonalElevation = 0.dp,
         modifier = modifier
     ) {
@@ -661,7 +745,7 @@ fun DocFlowBottomSheet(
                 Text(
                     text = title,
                     style = DocFlowTokens.sectionLabelStyle.copy(fontWeight = FontWeight.Bold),
-                    color = DocFlowTokens.textPrimary
+                    color = palette?.textPrimary ?: DocFlowTokens.textPrimary
                 )
                 Spacer(modifier = Modifier.height(DocFlowTokens.space3))
             }
@@ -680,6 +764,7 @@ fun DocFlowDialog(
     confirmText: String,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
     dismissText: String = "Cancel",
     isDestructive: Boolean = false,
     confirmEnabled: Boolean = true,
@@ -689,13 +774,13 @@ fun DocFlowDialog(
         onDismissRequest = onDismissRequest,
         modifier = modifier,
         shape = DocFlowTokens.cardShape,
-        containerColor = DocFlowTokens.surface,
+        containerColor = palette?.surface ?: DocFlowTokens.surface,
         tonalElevation = 0.dp,
         title = {
             Text(
                 text = title,
                 style = DocFlowTokens.sectionLabelStyle.copy(fontWeight = FontWeight.Bold),
-                color = DocFlowTokens.textPrimary
+                color = palette?.textPrimary ?: DocFlowTokens.textPrimary
             )
         },
         text = {
@@ -723,10 +808,46 @@ fun DocFlowDialog(
                 onClick = onDismissRequest,
                 modifier = Modifier.heightIn(min = DocFlowTokens.minTouchTarget)
             ) {
-                Text(dismissText, color = DocFlowTokens.textSecondary, style = DocFlowTokens.bodyStyle)
+                Text(
+                    dismissText,
+                    color = palette?.textSecondary ?: DocFlowTokens.textSecondary,
+                    style = DocFlowTokens.bodyStyle
+                )
             }
         }
     )
+}
+
+@Composable
+fun DocFlowDialog(
+    title: String,
+    message: String,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
+    dismissText: String = "Cancel",
+    isDestructive: Boolean = false,
+    confirmEnabled: Boolean = true
+) {
+    DocFlowDialog(
+        title = title,
+        onDismissRequest = onDismiss,
+        confirmText = confirmText,
+        onConfirm = onConfirm,
+        modifier = modifier,
+        palette = palette,
+        dismissText = dismissText,
+        isDestructive = isDestructive,
+        confirmEnabled = confirmEnabled
+    ) {
+        Text(
+            text = message,
+            style = DocFlowTokens.bodyStyle,
+            color = palette?.textSecondary ?: DocFlowTokens.textSecondary
+        )
+    }
 }
 
 /**
@@ -735,10 +856,14 @@ fun DocFlowDialog(
 @Composable
 fun DocFlowToast(
     message: String?,
-    onDismiss: () -> Unit,
+    onDismiss: () -> Unit = {},
     modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
     isError: Boolean = false
 ) {
+    val primaryColor = palette?.textPrimary ?: DocFlowTokens.textPrimary
+    val surfaceColor = palette?.surface ?: DocFlowTokens.surface
+
     AnimatedVisibility(
         visible = !message.isNullOrBlank(),
         enter = fadeIn(DocFlowTokens.standardTween()),
@@ -750,7 +875,7 @@ fun DocFlowToast(
                 .fillMaxWidth()
                 .padding(horizontal = DocFlowTokens.screenSideMargin, vertical = DocFlowTokens.space2),
             shape = DocFlowTokens.buttonShape,
-            color = if (isError) DocFlowTokens.iconRedPdf else DocFlowTokens.textPrimary,
+            color = if (isError) DocFlowTokens.iconRedPdf else primaryColor,
             tonalElevation = 0.dp
         ) {
             Row(
@@ -774,7 +899,7 @@ fun DocFlowToast(
                     Text(
                         text = message.orEmpty(),
                         style = DocFlowTokens.captionStyle,
-                        color = if (isError) Color.White else DocFlowTokens.surface
+                        color = if (isError) Color.White else surfaceColor
                     )
                 }
                 IconButton(
@@ -784,7 +909,7 @@ fun DocFlowToast(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Dismiss notification",
-                        tint = if (isError) Color.White else DocFlowTokens.surface,
+                        tint = if (isError) Color.White else surfaceColor,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -802,6 +927,7 @@ fun DocFlowEmptyState(
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
     iconCircleColor: Color = DocFlowTokens.accentBlue,
     actionLabel: String? = null,
     onActionClick: (() -> Unit)? = null,
@@ -810,6 +936,7 @@ fun DocFlowEmptyState(
 ) {
     DocFlowCard(
         modifier = modifier.padding(horizontal = DocFlowTokens.screenSideMargin),
+        palette = palette,
         padding = PaddingValues(DocFlowTokens.space6)
     ) {
         Column(
@@ -827,13 +954,13 @@ fun DocFlowEmptyState(
             Text(
                 text = title,
                 style = DocFlowTokens.rowTitleStyle.copy(fontWeight = FontWeight.Bold),
-                color = DocFlowTokens.textPrimary,
+                color = palette?.textPrimary ?: DocFlowTokens.textPrimary,
                 textAlign = TextAlign.Center
             )
             Text(
                 text = subtitle,
                 style = DocFlowTokens.captionStyle,
-                color = DocFlowTokens.textSecondary,
+                color = palette?.textSecondary ?: DocFlowTokens.textSecondary,
                 textAlign = TextAlign.Center
             )
             if (!actionLabel.isNullOrBlank() && onActionClick != null) {
@@ -857,13 +984,13 @@ fun DocFlowEmptyState(
                         OutlinedButton(
                             onClick = onSecondaryActionClick,
                             shape = DocFlowTokens.pillShape,
-                            border = BorderStroke(1.dp, DocFlowTokens.divider),
+                            border = BorderStroke(1.dp, palette?.divider ?: DocFlowTokens.divider),
                             modifier = Modifier.heightIn(min = DocFlowTokens.minTouchTarget)
                         ) {
                             Text(
                                 text = secondaryActionLabel,
                                 style = DocFlowTokens.bodyMediumStyle,
-                                color = DocFlowTokens.textPrimary
+                                color = palette?.textPrimary ?: DocFlowTokens.textPrimary
                             )
                         }
                     }
@@ -879,10 +1006,15 @@ fun DocFlowEmptyState(
 @Composable
 fun DocFlowSkeletonLoader(
     rowCount: Int = 4,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null
 ) {
+    val dividerColor = palette?.divider ?: DocFlowTokens.divider
+    val subtleColor = palette?.surfaceSubtle ?: DocFlowTokens.surfaceSubtle
+
     DocFlowCard(
         modifier = modifier.padding(horizontal = DocFlowTokens.screenSideMargin),
+        palette = palette,
         padding = PaddingValues(DocFlowTokens.cardPaddingMin)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space4)) {
@@ -898,7 +1030,7 @@ fun DocFlowSkeletonLoader(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(DocFlowTokens.thumbnailShape)
-                            .background(DocFlowTokens.divider)
+                            .background(dividerColor)
                     )
                     Column(
                         modifier = Modifier.weight(1f),
@@ -909,14 +1041,14 @@ fun DocFlowSkeletonLoader(
                                 .fillMaxWidth(0.68f)
                                 .height(16.dp)
                                 .clip(DocFlowTokens.smallShape)
-                                .background(DocFlowTokens.divider)
+                                .background(dividerColor)
                         )
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.42f)
                                 .height(12.dp)
                                 .clip(DocFlowTokens.smallShape)
-                                .background(DocFlowTokens.surfaceSubtle)
+                                .background(subtleColor)
                         )
                     }
                 }
@@ -934,6 +1066,7 @@ fun DocFlowErrorState(
     message: String,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
     retryLabel: String = "Retry",
     secondaryLabel: String? = null,
     onSecondaryClick: (() -> Unit)? = null
@@ -942,6 +1075,7 @@ fun DocFlowErrorState(
         icon = Icons.Default.ErrorOutline,
         title = title,
         subtitle = message,
+        palette = palette,
         iconCircleColor = DocFlowTokens.iconRedPdf,
         actionLabel = retryLabel,
         onActionClick = onRetry,
@@ -961,6 +1095,7 @@ fun DocFlowPermissionState(
     primaryActionLabel: String,
     onPrimaryAction: () -> Unit,
     modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
     fallbackActionLabel: String? = null,
     onFallbackAction: (() -> Unit)? = null
 ) {
@@ -968,11 +1103,38 @@ fun DocFlowPermissionState(
         icon = Icons.Default.Lock,
         title = title,
         subtitle = message,
+        palette = palette,
         iconCircleColor = DocFlowTokens.iconBlueSummarySafe,
         actionLabel = primaryActionLabel,
         onActionClick = onPrimaryAction,
         secondaryActionLabel = fallbackActionLabel,
         onSecondaryActionClick = onFallbackAction,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun DocFlowPermissionState(
+    icon: ImageVector,
+    title: String,
+    message: String,
+    primaryButtonText: String,
+    onPrimaryClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
+    secondaryButtonText: String? = null,
+    onSecondaryClick: (() -> Unit)? = null
+) {
+    DocFlowEmptyState(
+        icon = icon,
+        title = title,
+        subtitle = message,
+        palette = palette,
+        iconCircleColor = DocFlowTokens.iconBlueSummarySafe,
+        actionLabel = primaryButtonText,
+        onActionClick = onPrimaryClick,
+        secondaryActionLabel = secondaryButtonText,
+        onSecondaryActionClick = onSecondaryClick,
         modifier = modifier
     )
 }
@@ -984,8 +1146,12 @@ fun DocFlowPermissionState(
 fun DocFlowProgressBar(
     progress: Float?,
     modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
     label: String? = null
 ) {
+    val secondaryColor = palette?.textSecondary ?: DocFlowTokens.textSecondary
+    val dividerColor = palette?.divider ?: DocFlowTokens.divider
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
@@ -999,7 +1165,7 @@ fun DocFlowProgressBar(
                 Text(
                     text = label,
                     style = DocFlowTokens.captionStyle,
-                    color = DocFlowTokens.textSecondary
+                    color = secondaryColor
                 )
                 if (progress != null) {
                     Text(
@@ -1018,7 +1184,7 @@ fun DocFlowProgressBar(
                     .height(6.dp)
                     .clip(DocFlowTokens.pillShape),
                 color = DocFlowTokens.accentBlue,
-                trackColor = DocFlowTokens.divider
+                trackColor = dividerColor
             )
         } else {
             LinearProgressIndicator(
@@ -1027,7 +1193,7 @@ fun DocFlowProgressBar(
                     .height(6.dp)
                     .clip(DocFlowTokens.pillShape),
                 color = DocFlowTokens.accentBlue,
-                trackColor = DocFlowTokens.divider
+                trackColor = dividerColor
             )
         }
     }
@@ -1078,20 +1244,25 @@ fun DocFlowSecondaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    palette: DocFlowPalette? = null,
     enabled: Boolean = true,
     isPill: Boolean = true,
     leadingIcon: ImageVector? = null,
     testTag: String? = null,
     content: (@Composable RowScope.() -> Unit)? = null
 ) {
+    val primaryColor = palette?.textPrimary ?: DocFlowTokens.textPrimary
+    val surfaceColor = palette?.surface ?: DocFlowTokens.surface
+    val dividerColor = palette?.divider ?: DocFlowTokens.divider
+
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
         shape = if (isPill) DocFlowTokens.pillShape else DocFlowTokens.buttonShape,
-        border = BorderStroke(1.dp, DocFlowTokens.divider),
+        border = BorderStroke(1.dp, dividerColor),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = DocFlowTokens.surface,
-            contentColor = DocFlowTokens.textPrimary
+            containerColor = surfaceColor,
+            contentColor = primaryColor
         ),
         modifier = modifier
             .heightIn(min = DocFlowTokens.minTouchTarget)
@@ -1104,12 +1275,12 @@ fun DocFlowSecondaryButton(
                 Icon(
                     imageVector = leadingIcon,
                     contentDescription = null,
-                    tint = DocFlowTokens.textPrimary,
+                    tint = primaryColor,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(DocFlowTokens.space2))
             }
-            Text(text = text, style = DocFlowTokens.bodyMediumStyle, color = DocFlowTokens.textPrimary)
+            Text(text = text, style = DocFlowTokens.bodyMediumStyle, color = primaryColor)
         }
     }
 }

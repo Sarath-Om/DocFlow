@@ -36,6 +36,19 @@ enum class TranslationLanguage(
     ARABIC("ar", "Arabic", "العربية", "32.8 MB")
 }
 
+data class PdfWatermarkConfig(
+    val enabled: Boolean = false,
+    val text: String = "Confidential",
+    val opacityPercent: Int = 20,
+    val positionIndex: Int = 4, // 0..8 for 3x3 grid (4 = Center), 9 = Tile across page
+    val rotationDegrees: Int = -45,
+    val fontSizeSp: Int = 36,
+    val colorHex: String = "#8A8D93",
+    val pageRangeMode: String = "ALL", // ALL, FIRST, CUSTOM
+    val customPageRange: String = "1-2",
+    val layerBehindContent: Boolean = false
+)
+
 object OnDeviceAiAndBackupEngine {
 
     private const val PREFS_NAME = "docflow_offline_prefs"
@@ -46,6 +59,13 @@ object OnDeviceAiAndBackupEngine {
     private const val KEY_APP_LOCK_ENABLED = "app_lock_enabled"
     private const val KEY_BIOMETRIC_ENABLED = "biometric_unlock_enabled"
     private const val KEY_LOCK_TIMEOUT_MINUTES = "lock_timeout_minutes"
+    private const val KEY_WATERMARK_TEXT = "watermark_text"
+    private const val KEY_WATERMARK_OPACITY = "watermark_opacity"
+    private const val KEY_WATERMARK_POSITION = "watermark_position"
+    private const val KEY_WATERMARK_ROTATION = "watermark_rotation"
+    private const val KEY_WATERMARK_SIZE = "watermark_size"
+    private const val KEY_WATERMARK_COLOR = "watermark_color"
+    private const val KEY_WATERMARK_BEHIND = "watermark_behind"
 
     const val PRIVACY_POLICY_URL = "https://doceflow.site.je/privacy/"
     const val TERMS_OF_SERVICE_URL = "https://doceflow.site.je/terms/"
@@ -568,136 +588,47 @@ object OnDeviceAiAndBackupEngine {
     }
 
     // =========================================================================
-    // Encrypted .docflow Backup Export & Import (AES-256-GCM + PBKDF2)
+    // Local Device Storage Telemetry & Watermark Persistence (Stored on this device)
     // =========================================================================
 
-    fun exportEncryptedDocFlowBackup(
-        context: Context,
-        passphrase: String,
-        documents: List<CachedDocumentEntity>,
-        folders: List<CachedFolderEntity>
-    ): Result<File> = runCatching {
-        val root = JSONObject()
-        root.put("schemaVersion", 7)
-        root.put("exportedAtMillis", System.currentTimeMillis())
-        root.put("app", "DocFlow Offline")
-
-        val foldersArray = JSONArray()
-        folders.forEach { f ->
-            foldersArray.put(
-                JSONObject().apply {
-                    put("id", f.id)
-                    put("userId", f.userId)
-                    put("name", f.name)
-                    put("color", f.color)
-                    put("icon", f.icon)
-                    put("parentFolderId", f.parentFolderId ?: "")
-                    put("updatedAtMillis", f.updatedAtMillis)
-                }
-            )
-        }
-        root.put("folders", foldersArray)
-
-        val docsArray = JSONArray()
-        documents.forEach { d ->
-            docsArray.put(
-                JSONObject().apply {
-                    put("id", d.id)
-                    put("userId", d.userId)
-                    put("title", d.title)
-                    put("folderId", d.folderId)
-                    put("category", d.category)
-                    put("fileType", d.fileType)
-                    put("fileName", d.fileName)
-                    put("fileSize", d.fileSize)
-                    put("content", d.content)
-                    put("contentPreview", d.contentPreview)
-                    put("tags", d.tags)
-                    put("isEncrypted", d.isEncrypted)
-                    put("encryptionKeyHint", d.encryptionKeyHint ?: "")
-                    put("pageCount", d.pageCount)
-                    put("updatedAtMillis", d.updatedAtMillis)
-                    put("lastAccessedAtMillis", d.lastAccessedAtMillis)
-                    put("isDeleted", d.isDeleted)
-                    put("deletedAtMillis", d.deletedAtMillis ?: 0L)
-                    put("isPrivateSafe", d.isPrivateSafe)
-                    put("createdByMe", d.createdByMe)
-                    put("lastPageViewed", d.lastPageViewed)
-                    put("sourceFolderKey", d.sourceFolderKey ?: "")
-                }
-            )
-        }
-        root.put("documents", docsArray)
-
-        val encryptedPayload = CryptoUtils.encrypt(root.toString(), passphrase.ifBlank { "docflow-backup" })
-        val backupDir = File(context.filesDir, "backups").apply { mkdirs() }
-        val backupFile = File(backupDir, "DocFlow_Backup_${System.currentTimeMillis()}.docflow")
-        backupFile.writeText(encryptedPayload, Charsets.UTF_8)
-        backupFile
+    fun getDeviceFreeSpaceBytes(context: Context): Long {
+        return runCatching {
+            context.filesDir.usableSpace.coerceAtLeast(0L)
+        }.getOrDefault(0L)
     }
 
-    fun parseEncryptedDocFlowBackup(
-        encryptedContent: String,
-        passphrase: String,
-        targetUserId: String
-    ): Result<Pair<List<CachedFolderEntity>, List<CachedDocumentEntity>>> = runCatching {
-        val decryptedJson = CryptoUtils.decrypt(encryptedContent.trim(), passphrase.ifBlank { "docflow-backup" }).getOrThrow()
-        val root = JSONObject(decryptedJson)
+    fun getDeviceTotalSpaceBytes(context: Context): Long {
+        return runCatching {
+            context.filesDir.totalSpace.coerceAtLeast(1L)
+        }.getOrDefault(1L)
+    }
 
-        val restoredFolders = mutableListOf<CachedFolderEntity>()
-        val foldersArr = root.optJSONArray("folders") ?: JSONArray()
-        for (i in 0 until foldersArr.length()) {
-            val obj = foldersArr.getJSONObject(i)
-            val parentId = obj.optString("parentFolderId", "").ifBlank { null }
-            restoredFolders.add(
-                CachedFolderEntity(
-                    id = obj.getString("id"),
-                    userId = targetUserId,
-                    name = obj.getString("name"),
-                    color = obj.optString("color", "#1F6BFF"),
-                    icon = obj.optString("icon", "folder"),
-                    parentFolderId = parentId,
-                    syncState = SyncState.LOCAL_ONLY.name,
-                    updatedAtMillis = obj.optLong("updatedAtMillis", System.currentTimeMillis())
-                )
-            )
-        }
+    fun getSavedWatermarkConfig(context: Context): PdfWatermarkConfig {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return PdfWatermarkConfig(
+            enabled = false,
+            text = prefs.getString(KEY_WATERMARK_TEXT, "Confidential") ?: "Confidential",
+            opacityPercent = prefs.getInt(KEY_WATERMARK_OPACITY, 20).coerceIn(5, 100),
+            positionIndex = prefs.getInt(KEY_WATERMARK_POSITION, 4).coerceIn(0, 9),
+            rotationDegrees = prefs.getInt(KEY_WATERMARK_ROTATION, -45).coerceIn(-90, 90),
+            fontSizeSp = prefs.getInt(KEY_WATERMARK_SIZE, 36).coerceIn(14, 72),
+            colorHex = prefs.getString(KEY_WATERMARK_COLOR, "#8A8D93") ?: "#8A8D93",
+            pageRangeMode = "ALL",
+            customPageRange = "1-2",
+            layerBehindContent = prefs.getBoolean(KEY_WATERMARK_BEHIND, false)
+        )
+    }
 
-        val restoredDocs = mutableListOf<CachedDocumentEntity>()
-        val docsArr = root.optJSONArray("documents") ?: JSONArray()
-        for (i in 0 until docsArr.length()) {
-            val obj = docsArr.getJSONObject(i)
-            val delMs = obj.optLong("deletedAtMillis", 0L).takeIf { it > 0L }
-            restoredDocs.add(
-                CachedDocumentEntity(
-                    id = obj.getString("id"),
-                    userId = targetUserId,
-                    title = obj.getString("title"),
-                    folderId = obj.optString("folderId", "root"),
-                    category = obj.optString("category", "Other"),
-                    fileType = obj.optString("fileType", "pdf"),
-                    fileName = obj.optString("fileName", "document.pdf"),
-                    fileSize = obj.optLong("fileSize", 1024L),
-                    content = obj.optString("content", ""),
-                    contentPreview = obj.optString("contentPreview", ""),
-                    tags = obj.optString("tags", ""),
-                    localFilePath = null,
-                    isEncrypted = obj.optBoolean("isEncrypted", false),
-                    encryptionKeyHint = obj.optString("encryptionKeyHint", "").ifBlank { null },
-                    isOfflineCached = true,
-                    pageCount = obj.optLong("pageCount", 1L),
-                    syncState = SyncState.LOCAL_ONLY.name,
-                    updatedAtMillis = obj.optLong("updatedAtMillis", System.currentTimeMillis()),
-                    lastAccessedAtMillis = obj.optLong("lastAccessedAtMillis", System.currentTimeMillis()),
-                    isDeleted = obj.optBoolean("isDeleted", false),
-                    deletedAtMillis = delMs,
-                    isPrivateSafe = obj.optBoolean("isPrivateSafe", false),
-                    createdByMe = obj.optBoolean("createdByMe", false),
-                    lastPageViewed = obj.optInt("lastPageViewed", 0),
-                    sourceFolderKey = obj.optString("sourceFolderKey", "").ifBlank { null }
-                )
-            )
-        }
-        Pair(restoredFolders, restoredDocs)
+    fun saveWatermarkConfig(context: Context, config: PdfWatermarkConfig) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString(KEY_WATERMARK_TEXT, config.text.take(40))
+            .putInt(KEY_WATERMARK_OPACITY, config.opacityPercent.coerceIn(5, 100))
+            .putInt(KEY_WATERMARK_POSITION, config.positionIndex.coerceIn(0, 9))
+            .putInt(KEY_WATERMARK_ROTATION, config.rotationDegrees.coerceIn(-90, 90))
+            .putInt(KEY_WATERMARK_SIZE, config.fontSizeSp.coerceIn(14, 72))
+            .putString(KEY_WATERMARK_COLOR, config.colorHex)
+            .putBoolean(KEY_WATERMARK_BEHIND, config.layerBehindContent)
+            .apply()
     }
 }

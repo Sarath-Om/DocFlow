@@ -1,16 +1,8 @@
 package com.example.ui.screens
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Environment
-import android.os.StatFs
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,55 +12,44 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Gavel
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Password
-import androidx.compose.material.icons.filled.PieChart
-import androidx.compose.material.icons.filled.PrivacyTip
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.SettingsBrightness
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -79,814 +60,696 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.data.model.StorageDashboardSummary
-import com.example.data.util.BiometricSecurityHelper
+import androidx.compose.ui.unit.sp
+import com.example.data.local.CachedDocumentEntity
 import com.example.data.util.OnDeviceAiAndBackupEngine
 import com.example.data.util.TranslationLanguage
 import com.example.ui.components.DocFlowBottomSheet
 import com.example.ui.components.DocFlowCard
 import com.example.ui.components.DocFlowDialog
-import com.example.ui.components.DocFlowHeaderAction
+import com.example.ui.components.DocFlowDivider
+import com.example.ui.components.DocFlowEmptyState
 import com.example.ui.components.DocFlowIconCircle
 import com.example.ui.components.DocFlowListRow
 import com.example.ui.components.DocFlowPrimaryButton
 import com.example.ui.components.DocFlowProgressBar
-import com.example.ui.components.DocFlowScreenHeader
 import com.example.ui.components.DocFlowSecondaryButton
 import com.example.ui.components.DocFlowSectionLabel
 import com.example.ui.components.DocFlowToast
+import com.example.ui.theme.DocFlowPalette
 import com.example.ui.theme.DocFlowTokens
+import com.example.ui.viewmodel.DocFlowViewModel
 import com.example.ui.viewmodel.ThemeMode
 
-/**
- * Dedicated Settings Screen built exclusively with the DocFlow Shared Component Library
- * (`DocFlowScreenHeader`, `DocFlowSectionLabel`, `DocFlowCard`, `DocFlowListRow`,
- * `DocFlowIconCircle`, `DocFlowProgressBar`, `DocFlowBottomSheet`, `DocFlowDialog`, `DocFlowToast`).
- *
- * Includes grouped sections with `DocFlowListRow`s for:
- * 1. 'General' (Theme with Light Mode / Dark Mode / System Default, Language)
- * 2. 'Storage' (Storage usage stats, Clear Cache, Encrypted .docflow Backup & Restore)
- * 3. 'Security' (Biometric Toggle, PIN settings)
- * 4. 'About' (App Version, Privacy Policy link https://doceflow.site.je/privacy/, Terms of Service link https://doceflow.site.je/terms/)
- */
+private data class StorageCategorySlice(
+    val key: String,
+    val label: String,
+    val bytes: Long,
+    val color: Color,
+    val files: List<CachedDocumentEntity>
+)
+
 @Composable
 fun SettingsScreen(
-    themeMode: ThemeMode,
-    biometricVaultEnabled: Boolean,
-    appEntryBiometricGateEnabled: Boolean,
-    storageSummary: StorageDashboardSummary,
-    totalDocumentsCount: Int,
-    deletedDocumentsCount: Int,
-    privateSafeCount: Int,
+    viewModel: DocFlowViewModel,
+    palette: DocFlowPalette,
     onBack: () -> Unit,
-    onSelectThemeMode: (ThemeMode) -> Unit,
-    onToggleBiometricVault: () -> Unit,
-    onToggleAppEntryBiometricGate: () -> Unit,
-    onOpenStorageDashboard: () -> Unit,
-    onClearCacheAndCompact: () -> Unit,
-    onExportBackup: (String) -> Unit,
-    onImportBackupUri: (Uri, String) -> Unit,
-    modifier: Modifier = Modifier
+    onOpenStorageDashboard: () -> Unit
 ) {
-    BackHandler { onBack() }
-
     val context = LocalContext.current
-    val configuration = LocalConfiguration.current
-    val screenWidthDp = configuration.screenWidthDp
-    val horizontalMargin = DocFlowTokens.adaptiveScreenMargin(screenWidthDp)
+    val themeMode by viewModel.themeMode.collectAsState()
+    val cachedMap by viewModel.cachedDocumentsMap.collectAsState()
+    val deletedDocs by viewModel.deletedDocuments.collectAsState()
+    val privateSafeDocs by viewModel.privateSafeDocuments.collectAsState()
 
-    var toastMessage by remember { mutableStateOf<String?>(null) }
-    var isToastError by remember { mutableStateOf(false) }
-
-    // Sheet & Dialog states
-    var showThemeSheet by remember { mutableStateOf(false) }
-    var showLanguageSheet by remember { mutableStateOf(false) }
-    var showPinSettingsSheet by remember { mutableStateOf(false) }
-    var showBackupSheet by remember { mutableStateOf(false) }
-    var showAboutDialog by remember { mutableStateOf(false) }
-    var activeLegalLinkPreview by remember { mutableStateOf<LegalDocumentSpec?>(null) }
-
-    // Language & OCR state
     var primaryLanguage by remember {
         mutableStateOf(OnDeviceAiAndBackupEngine.getPrimaryLanguage(context))
     }
     var downloadedLangs by remember {
         mutableStateOf(OnDeviceAiAndBackupEngine.getDownloadedLanguagePacks(context))
     }
-
-    // Security & PIN state
-    var hasConfiguredPin by remember {
+    var hasPin by remember {
         mutableStateOf(OnDeviceAiAndBackupEngine.hasPrivateSafePin(context))
+    }
+    var biometricEnabled by remember {
+        mutableStateOf(OnDeviceAiAndBackupEngine.isBiometricUnlockEnabled(context))
+    }
+    var appLockEnabled by remember {
+        mutableStateOf(OnDeviceAiAndBackupEngine.isAppLockEnabled(context))
     }
     var lockTimeoutMinutes by remember {
         mutableIntStateOf(OnDeviceAiAndBackupEngine.getLockTimeoutMinutes(context))
     }
-    val biometricStatus = remember(context) {
-        BiometricSecurityHelper.getBiometricStatus(context)
-    }
-
-    // Storage & Cache metrics
     var cacheBytes by remember {
-        mutableLongStateOf(
-            OnDeviceAiAndBackupEngine.calculateCacheAndTempBytes(context) +
-                (storageSummary.versionSnapshotsCount * 4096L)
-        )
+        mutableLongStateOf(OnDeviceAiAndBackupEngine.calculateCacheAndTempBytes(context))
     }
-    val deviceFreeBytes = remember {
-        runCatching {
-            val stat = StatFs(Environment.getDataDirectory().path)
-            stat.availableBlocksLong * stat.blockSizeLong
-        }.getOrDefault(12L * 1024L * 1024L * 1024L)
-    }
-    val totalAppBytes = storageSummary.totalBytesUsed + cacheBytes
 
-    // Backup state
-    var backupPassphrase by remember { mutableStateOf("") }
-    val restoreBackupLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            onImportBackupUri(uri, backupPassphrase.ifBlank { "docflow-backup" })
-            toastMessage = "Restoring encrypted .docflow backup..."
-            isToastError = false
-            showBackupSheet = false
+    // Interactive Modals & Bottom Sheets
+    var showThemeSheet by remember { mutableStateOf(false) }
+    var showLanguageSheet by remember { mutableStateOf(false) }
+    var showPinDialog by remember { mutableStateOf(false) }
+    var showClearCacheConfirm by remember { mutableStateOf(false) }
+    var showLockTimeoutSheet by remember { mutableStateOf(false) }
+    var showLicensesSheet by remember { mutableStateOf(false) }
+    var showPrivacyOfflineFallbackSheet by remember { mutableStateOf(false) }
+    var showTermsOfflineFallbackSheet by remember { mutableStateOf(false) }
+    var selectedCategoryForDrilldown by remember { mutableStateOf<StorageCategorySlice?>(null) }
+    var toastMessage by remember { mutableStateOf<String?>(null) }
+
+    var pinStep by remember { mutableStateOf("ENTER_CURRENT") } // ENTER_CURRENT, SET_NEW, CONFIRM_NEW
+    var currentPinInput by remember { mutableStateOf("") }
+    var newPinInput by remember { mutableStateOf("") }
+    var confirmPinInput by remember { mutableStateOf("") }
+    var pinErrorText by remember { mutableStateOf<String?>(null) }
+
+    // On-device storage breakdown calculation (Strictly local — Stored on this device)
+    val allDocs = cachedMap.values.toList()
+    val activeNormalDocs = allDocs.filter { !it.isDeleted && !it.isPrivateSafe }
+
+    val pdfDocs = activeNormalDocs.filter {
+        it.fileType.equals("pdf", true) || it.fileType.equals("ofd", true)
+    }
+    val wordDocs = activeNormalDocs.filter {
+        val ft = it.fileType.lowercase()
+        ft in setOf("docx", "doc", "xlsx", "xls", "csv", "pptx", "ppt", "txt", "md", "note")
+    }
+    val imageScanDocs = activeNormalDocs.filter {
+        val ft = it.fileType.lowercase()
+        ft in setOf("pic", "scanned", "png", "jpg", "jpeg", "webp", "heic")
+    }
+
+    val pdfBytes = pdfDocs.sumOf { it.fileSize.coerceAtLeast(1024L) }
+    val wordBytes = wordDocs.sumOf { it.fileSize.coerceAtLeast(1024L) }
+    val imageBytes = imageScanDocs.sumOf { it.fileSize.coerceAtLeast(1024L) }
+    val safeBytes = privateSafeDocs.sumOf { it.fileSize.coerceAtLeast(1024L) }
+    val deletedBytes = deletedDocs.sumOf { it.fileSize.coerceAtLeast(1024L) }
+    val totalUsedByDocFlow = pdfBytes + wordBytes + imageBytes + safeBytes + deletedBytes + cacheBytes
+    val deviceFreeBytes = remember(totalUsedByDocFlow) {
+        OnDeviceAiAndBackupEngine.getDeviceFreeSpaceBytes(context)
+    }
+
+    val storageCategories = listOf(
+        StorageCategorySlice(
+            key = "pdf",
+            label = "PDF documents",
+            bytes = pdfBytes,
+            color = DocFlowTokens.IconCircleRed,
+            files = pdfDocs.sortedByDescending { it.fileSize }
+        ),
+        StorageCategorySlice(
+            key = "word",
+            label = "Word & Office documents",
+            bytes = wordBytes,
+            color = DocFlowTokens.AccentBlue,
+            files = wordDocs.sortedByDescending { it.fileSize }
+        ),
+        StorageCategorySlice(
+            key = "images",
+            label = "Images / Scans",
+            bytes = imageBytes,
+            color = DocFlowTokens.IconCircleTeal,
+            files = imageScanDocs.sortedByDescending { it.fileSize }
+        ),
+        StorageCategorySlice(
+            key = "safe",
+            label = "Private Safe",
+            bytes = safeBytes,
+            color = DocFlowTokens.IconCircleBlue,
+            files = privateSafeDocs.sortedByDescending { it.fileSize }
+        ),
+        StorageCategorySlice(
+            key = "deleted",
+            label = "Recently deleted",
+            bytes = deletedBytes,
+            color = DocFlowTokens.IconCircleGray,
+            files = deletedDocs.sortedByDescending { it.fileSize }
+        )
+    )
+
+    fun openExternalUrl(url: String, onFallback: () -> Unit) {
+        runCatching {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        }.onFailure {
+            onFallback()
         }
     }
 
-    val themeSubtitle = when (themeMode) {
-        ThemeMode.LIGHT -> "Light Mode (#F0F1F3 background, white cards)"
-        ThemeMode.DARK -> "Dark Mode (#0F1113 background, dark cards)"
-        ThemeMode.SYSTEM -> "System Default (Follows device setting)"
-    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(palette.background)
+            .testTag("settings_screen_root")
+    ) {
+        // Top Header with Back Button + 40sp Bold Title
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = DocFlowTokens.space2,
+                    end = DocFlowTokens.screenHorizontalMargin,
+                    top = DocFlowTokens.space3,
+                    bottom = DocFlowTokens.space2
+                ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(DocFlowTokens.minTouchTarget)
+                    .clip(CircleShape)
+                    .clickable(onClick = onBack)
+                    .testTag("settings_back_button"),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = palette.textPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(DocFlowTokens.space1))
+            Column {
+                Text(
+                    text = "Settings",
+                    style = DocFlowTokens.largeTitleStyle,
+                    color = palette.textPrimary
+                )
+                Text(
+                    text = "Stored on this device • Offline workspace",
+                    style = DocFlowTokens.captionStyle,
+                    color = palette.textSecondary
+                )
+            }
+        }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = DocFlowTokens.background,
-        contentWindowInsets = WindowInsets.safeDrawing
-    ) { innerPadding ->
-        Box(
+        if (toastMessage != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = DocFlowTokens.space1)
+            ) {
+                DocFlowToast(message = toastMessage!!)
+            }
+        }
+
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(DocFlowTokens.background)
-                .padding(innerPadding),
-            contentAlignment = Alignment.TopCenter
+                .testTag("settings_lazy_column"),
+            contentPadding = PaddingValues(bottom = 48.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .widthIn(max = DocFlowTokens.maxContentWidth)
-                    .testTag("settings_screen_list"),
-                contentPadding = PaddingValues(bottom = DocFlowTokens.space8),
-                verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
-            ) {
-                // Top Shared ScreenHeader with Back Button and Quick Light/Dark Toggle
-                item {
-                    DocFlowScreenHeader(
-                        title = "Settings",
-                        subtitle = "100% Offline • Your files stay on your phone",
-                        onNavigateBack = onBack,
-                        backTestTag = "settings_back_button",
-                        actions = listOf(
-                            DocFlowHeaderAction(
-                                icon = if (themeMode == ThemeMode.DARK) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                contentDescription = if (themeMode == ThemeMode.DARK) "Switch to Light Mode" else "Switch to Dark Mode",
-                                testTag = "settings_header_light_mode_button",
-                                isActive = themeMode == ThemeMode.LIGHT,
-                                onClick = {
-                                    val next = if (themeMode == ThemeMode.LIGHT) ThemeMode.DARK else ThemeMode.LIGHT
-                                    onSelectThemeMode(next)
-                                    toastMessage = if (next == ThemeMode.LIGHT) {
-                                        "Switched to Light Mode"
-                                    } else {
-                                        "Switched to Dark Mode"
-                                    }
-                                    isToastError = false
-                                }
-                            )
-                        )
-                    )
-                }
-
-                // Toast Feedback Banner
-                if (!toastMessage.isNullOrBlank()) {
-                    item {
-                        DocFlowToast(
-                            message = toastMessage,
-                            isError = isToastError,
-                            onDismiss = { toastMessage = null }
-                        )
-                    }
-                }
-
-                // =============================================================
-                // SECTION 1: GENERAL (Theme, Language)
-                // =============================================================
-                item {
-                    DocFlowSectionLabel(text = "General")
-                }
-
-                item {
-                    DocFlowCard(
-                        modifier = Modifier.padding(horizontal = horizontalMargin),
-                        padding = PaddingValues(vertical = DocFlowTokens.space1)
-                    ) {
-                        // Row 1: Theme
-                        DocFlowListRow(
-                            title = "Theme",
-                            subtitle = themeSubtitle,
-                            leading = {
-                                DocFlowIconCircle(
-                                    icon = when (themeMode) {
-                                        ThemeMode.LIGHT -> Icons.Default.LightMode
-                                        ThemeMode.DARK -> Icons.Default.DarkMode
-                                        ThemeMode.SYSTEM -> Icons.Default.Palette
-                                    },
-                                    circleColor = DocFlowTokens.accentBlue,
-                                    contentDescription = "Theme"
-                                )
-                            },
-                            showChevron = true,
-                            showBottomDivider = false,
-                            testTag = "settings_row_theme",
-                            onClick = { showThemeSheet = true }
-                        )
-
-                        // Inline Quick Theme Segmented Bar (Light Mode / Dark Mode / System)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    start = DocFlowTokens.cardPaddingMin,
-                                    end = DocFlowTokens.cardPaddingMin,
-                                    bottom = DocFlowTokens.space3
-                                ),
-                            horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
-                        ) {
-                            ThemeSegmentPill(
-                                label = "Light Mode",
-                                icon = Icons.Default.LightMode,
-                                selected = themeMode == ThemeMode.LIGHT,
-                                testTag = "settings_theme_chip_light",
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    onSelectThemeMode(ThemeMode.LIGHT)
-                                    toastMessage = "Light Mode active"
-                                    isToastError = false
-                                }
-                            )
-                            ThemeSegmentPill(
-                                label = "Dark Mode",
-                                icon = Icons.Default.DarkMode,
-                                selected = themeMode == ThemeMode.DARK,
-                                testTag = "settings_theme_chip_dark",
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    onSelectThemeMode(ThemeMode.DARK)
-                                    toastMessage = "Dark Mode active"
-                                    isToastError = false
-                                }
-                            )
-                            ThemeSegmentPill(
-                                label = "System",
-                                icon = Icons.Default.SettingsBrightness,
-                                selected = themeMode == ThemeMode.SYSTEM,
-                                testTag = "settings_theme_chip_system",
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    onSelectThemeMode(ThemeMode.SYSTEM)
-                                    toastMessage = "Following System theme"
-                                    isToastError = false
-                                }
-                            )
-                        }
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin),
-                            thickness = DocFlowTokens.dividerThickness,
-                            color = DocFlowTokens.divider
-                        )
-
-                        // Row 2: Language
-                        DocFlowListRow(
-                            title = "Language",
-                            subtitle = "${primaryLanguage.displayName} (${primaryLanguage.nativeName}) • ${downloadedLangs.size} offline OCR/translation pack(s)",
-                            leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Default.Language,
-                                    circleColor = DocFlowTokens.iconTealTranslate,
-                                    contentDescription = "Language"
-                                )
-                            },
-                            showChevron = true,
-                            showBottomDivider = false,
-                            testTag = "settings_row_language",
-                            onClick = { showLanguageSheet = true }
-                        )
-                    }
-                }
-
-                // =============================================================
-                // SECTION 2: STORAGE (Clear Cache, Storage usage stats)
-                // =============================================================
-                item {
-                    DocFlowSectionLabel(text = "Storage")
-                }
-
-                item {
-                    DocFlowCard(
-                        modifier = Modifier.padding(horizontal = horizontalMargin),
-                        padding = PaddingValues(vertical = DocFlowTokens.space1)
-                    ) {
-                        // Row 1: Storage usage stats
-                        DocFlowListRow(
-                            title = "Storage usage stats",
-                            subtitle = "${formatStorageBytes(totalAppBytes)} used ($totalDocumentsCount files) • ${formatStorageBytes(deviceFreeBytes)} free on device",
-                            leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Default.PieChart,
-                                    circleColor = DocFlowTokens.accentBlue,
-                                    contentDescription = "Storage usage stats"
-                                )
-                            },
-                            showChevron = true,
-                            showBottomDivider = false,
-                            testTag = "settings_row_storage_stats",
-                            onClick = onOpenStorageDashboard
-                        )
-
-                        // Visual Storage Breakdown Progress Bar inside Storage Card
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    start = DocFlowTokens.cardPaddingMin,
-                                    end = DocFlowTokens.cardPaddingMin,
-                                    bottom = DocFlowTokens.space3
-                                ),
-                            verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
-                        ) {
-                            val storageRatio = remember(totalAppBytes, deviceFreeBytes) {
-                                val denom = (totalAppBytes + deviceFreeBytes).coerceAtLeast(1L).toFloat()
-                                (totalAppBytes.toFloat() / denom).coerceIn(0.04f, 1f)
-                            }
-                            DocFlowProgressBar(
-                                progress = storageRatio,
-                                label = "Documents: ${formatStorageBytes(storageSummary.totalBytesUsed)} • Cache: ${formatStorageBytes(cacheBytes)} • Safe: $privateSafeCount • Trash: $deletedDocumentsCount"
-                            )
-                        }
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin),
-                            thickness = DocFlowTokens.dividerThickness,
-                            color = DocFlowTokens.divider
-                        )
-
-                        // Row 2: Clear Cache
-                        DocFlowListRow(
-                            title = "Clear Cache",
-                            subtitle = if (cacheBytes > 0L) {
-                                "${formatStorageBytes(cacheBytes)} in thumbnails, temp PDFs & old snapshots"
-                            } else {
-                                "0 B • Cache and temporary files are clean"
-                            },
-                            leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Default.CleaningServices,
-                                    circleColor = DocFlowTokens.iconOrangePpt,
-                                    contentDescription = "Clear Cache"
-                                )
-                            },
-                            trailing = {
-                                Surface(
-                                    shape = DocFlowTokens.pillShape,
-                                    color = DocFlowTokens.surfaceSubtle,
-                                    border = BorderStroke(1.dp, DocFlowTokens.divider)
-                                ) {
-                                    Text(
-                                        text = if (cacheBytes > 0L) "Clean" else "0 B",
-                                        style = DocFlowTokens.microBadgeStyle,
-                                        color = if (cacheBytes > 0L) DocFlowTokens.accentBlue else DocFlowTokens.textSecondary,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                    )
-                                }
-                            },
-                            showBottomDivider = true,
-                            testTag = "settings_row_clear_cache",
-                            onClick = {
-                                val freed = OnDeviceAiAndBackupEngine.clearCacheAndTempFiles(context) + cacheBytes
-                                onClearCacheAndCompact()
-                                cacheBytes = 0L
-                                toastMessage = "Cache cleared • Freed ${formatStorageBytes(freed.coerceAtLeast(1024L))}"
-                                isToastError = false
-                            }
-                        )
-
-                        // Row 3: Encrypted .docflow Local Backup & Restore
-                        DocFlowListRow(
-                            title = "Encrypted .docflow Backup",
-                            subtitle = "Export or restore AES-256-GCM local archive",
-                            leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Default.Backup,
-                                    circleColor = DocFlowTokens.iconGreenDownload,
-                                    contentDescription = "Encrypted Backup"
-                                )
-                            },
-                            showChevron = true,
-                            showBottomDivider = false,
-                            testTag = "settings_row_backup",
-                            onClick = { showBackupSheet = true }
-                        )
-                    }
-                }
-
-                // =============================================================
-                // SECTION 3: SECURITY (Biometric Toggle, PIN settings)
-                // =============================================================
-                item {
-                    DocFlowSectionLabel(text = "Security")
-                }
-
-                item {
-                    DocFlowCard(
-                        modifier = Modifier.padding(horizontal = horizontalMargin),
-                        padding = PaddingValues(vertical = DocFlowTokens.space1)
-                    ) {
-                        // Row 1: Biometric Toggle
-                        DocFlowListRow(
-                            title = "Biometric Toggle",
-                            subtitle = "${biometricStatus.statusLabel} • Unlock Private Safe & encrypted files",
-                            leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Default.Fingerprint,
-                                    circleColor = DocFlowTokens.iconBlueSummarySafe,
-                                    contentDescription = "Biometric Toggle"
-                                )
-                            },
-                            trailing = {
-                                Switch(
-                                    checked = biometricVaultEnabled,
-                                    onCheckedChange = {
-                                        onToggleBiometricVault()
-                                        OnDeviceAiAndBackupEngine.setBiometricUnlockEnabled(
-                                            context,
-                                            !biometricVaultEnabled
-                                        )
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = DocFlowTokens.accentBlue,
-                                        uncheckedThumbColor = DocFlowTokens.textSecondary,
-                                        uncheckedTrackColor = DocFlowTokens.surfaceSubtle
-                                    ),
-                                    modifier = Modifier.testTag("settings_switch_biometric")
-                                )
-                            },
-                            showBottomDivider = true,
-                            testTag = "settings_row_biometric",
-                            onClick = {
-                                onToggleBiometricVault()
-                                OnDeviceAiAndBackupEngine.setBiometricUnlockEnabled(
-                                    context,
-                                    !biometricVaultEnabled
-                                )
-                            }
-                        )
-
-                        // Row 2: PIN settings
-                        DocFlowListRow(
-                            title = "PIN settings",
-                            subtitle = if (hasConfiguredPin) {
-                                "Custom PIN active • Auto-lock after ${lockTimeoutMinutes}m"
-                            } else {
-                                "Default PIN (1234) • Auto-lock after ${lockTimeoutMinutes}m • Tap to update"
-                            },
-                            leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Default.Password,
-                                    circleColor = DocFlowTokens.accentBlue,
-                                    contentDescription = "PIN settings"
-                                )
-                            },
-                            showChevron = true,
-                            showBottomDivider = true,
-                            testTag = "settings_row_pin",
-                            onClick = { showPinSettingsSheet = true }
-                        )
-
-                        // Row 3: App Launch Biometric Lock
-                        DocFlowListRow(
-                            title = "Require Lock on App Launch",
-                            subtitle = if (appEntryBiometricGateEnabled) {
-                                "Enabled • Prompt for biometric/credential when opening DocFlow"
-                            } else {
-                                "Off • Only prompt when opening Private Safe"
-                            },
-                            leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Default.Lock,
-                                    circleColor = DocFlowTokens.iconGreenDarkExcel,
-                                    contentDescription = "App Launch Lock"
-                                )
-                            },
-                            trailing = {
-                                Switch(
-                                    checked = appEntryBiometricGateEnabled,
-                                    onCheckedChange = { onToggleAppEntryBiometricGate() },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = DocFlowTokens.accentBlue,
-                                        uncheckedThumbColor = DocFlowTokens.textSecondary,
-                                        uncheckedTrackColor = DocFlowTokens.surfaceSubtle
-                                    ),
-                                    modifier = Modifier.testTag("settings_switch_app_lock")
-                                )
-                            },
-                            showBottomDivider = false,
-                            testTag = "settings_row_app_lock",
-                            onClick = onToggleAppEntryBiometricGate
-                        )
-                    }
-                }
-
-                // =============================================================
-                // SECTION 4: ABOUT (App Version, Privacy Policy, Terms of Service)
-                // =============================================================
-                item {
-                    DocFlowSectionLabel(text = "About")
-                }
-
-                item {
-                    DocFlowCard(
-                        modifier = Modifier.padding(horizontal = horizontalMargin),
-                        padding = PaddingValues(vertical = DocFlowTokens.space1)
-                    ) {
-                        // Row 1: App Version
-                        DocFlowListRow(
-                            title = "App Version",
-                            subtitle = "Version ${OnDeviceAiAndBackupEngine.APP_VERSION_NAME} (Build ${OnDeviceAiAndBackupEngine.APP_VERSION_BUILD}) • Android 8.0+ • Offline",
-                            leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Default.Info,
-                                    circleColor = DocFlowTokens.accentBlue,
-                                    contentDescription = "App Version"
-                                )
-                            },
-                            trailing = {
-                                Surface(
-                                    shape = DocFlowTokens.pillShape,
-                                    color = DocFlowTokens.accentBlue.copy(alpha = 0.12f)
-                                ) {
-                                    Text(
-                                        text = "v${OnDeviceAiAndBackupEngine.APP_VERSION_NAME}",
-                                        style = DocFlowTokens.microBadgeStyle,
-                                        color = DocFlowTokens.accentBlue,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                    )
-                                }
-                            },
-                            showBottomDivider = true,
-                            testTag = "settings_row_app_version",
-                            onClick = { showAboutDialog = true }
-                        )
-
-                        // Row 2: Privacy Policy link (https://doceflow.site.je/privacy/)
-                        DocFlowListRow(
-                            title = "Privacy Policy",
-                            subtitle = OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL,
-                            leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Default.PrivacyTip,
-                                    circleColor = DocFlowTokens.iconGreenDownload,
-                                    contentDescription = "Privacy Policy"
-                                )
-                            },
-                            trailing = {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                    contentDescription = "Open Privacy Policy",
-                                    tint = DocFlowTokens.accentBlue,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            },
-                            showBottomDivider = true,
-                            testTag = "settings_row_privacy_policy",
-                            onClick = {
-                                val spec = LegalDocumentSpec(
-                                    title = "Privacy Policy",
-                                    url = OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL,
-                                    summaryPoints = listOf(
-                                        "100% On-Device Processing: DocFlow opens, scans, edits, summarizes, and translates your documents locally on your Android device.",
-                                        "Zero Cloud Uploads: We do not operate servers, user accounts, or cloud databases. Your files never leave your phone unless you explicitly share them.",
-                                        "No Analytics or Tracking: DocFlow contains no analytics SDKs, no advertising identifiers, no cookies, and no telemetry.",
-                                        "Hardware-Backed Security: Private Safe files are encrypted locally using AES-256-GCM with keys derived via PBKDF2 and protected by Android Keystore."
-                                    )
-                                )
-                                val opened = openExternalUrlSafely(context, spec.url)
-                                if (!opened) {
-                                    activeLegalLinkPreview = spec
-                                } else {
-                                    activeLegalLinkPreview = spec
-                                }
-                            }
-                        )
-
-                        // Row 3: Terms of Service link (https://doceflow.site.je/terms/)
-                        DocFlowListRow(
-                            title = "Terms of Service",
-                            subtitle = OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL,
-                            leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Default.Gavel,
-                                    circleColor = DocFlowTokens.iconTealTranslate,
-                                    contentDescription = "Terms of Service"
-                                )
-                            },
-                            trailing = {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                    contentDescription = "Open Terms of Service",
-                                    tint = DocFlowTokens.accentBlue,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            },
-                            showBottomDivider = false,
-                            testTag = "settings_row_terms_of_service",
-                            onClick = {
-                                val spec = LegalDocumentSpec(
-                                    title = "Terms of Service",
-                                    url = OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL,
-                                    summaryPoints = listOf(
-                                        "Local Responsibility: Because DocFlow stores all documents locally on your device without any cloud servers, you are responsible for maintaining backups of important files.",
-                                        "Private Safe PIN & Passphrases: Encrypted files cannot be recovered by us if you forget your PIN or backup passphrase, as no keys are ever sent to a server.",
-                                        "Permitted Use: DocFlow is provided free of charge for personal and professional document viewing, scanning, OCR, and conversion.",
-                                        "Data Deletion: Uninstalling DocFlow or clearing app storage permanently removes all app-private documents, databases, and keys from your device."
-                                    )
-                                )
-                                val opened = openExternalUrlSafely(context, spec.url)
-                                if (!opened) {
-                                    activeLegalLinkPreview = spec
-                                } else {
-                                    activeLegalLinkPreview = spec
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    // =========================================================================
-    // 1. THEME SELECTION BOTTOM SHEET
-    // =========================================================================
-    if (showThemeSheet) {
-        DocFlowBottomSheet(
-            title = "Select Theme",
-            onDismissRequest = { showThemeSheet = false }
-        ) {
-            Text(
-                text = "Choose how DocFlow looks across all screens, cards, and viewers.",
-                style = DocFlowTokens.captionStyle,
-                color = DocFlowTokens.textSecondary
-            )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-
-            val themeOptions = listOf(
-                Triple(
-                    ThemeMode.LIGHT,
-                    "Light Mode",
-                    "Flat light gray background (#F0F1F3) with crisp white (#FFFFFF) cards"
-                ),
-                Triple(
-                    ThemeMode.DARK,
-                    "Dark Mode",
-                    "OLED-friendly dark background (#0F1113) with charcoal (#1B1D20) cards"
-                ),
-                Triple(
-                    ThemeMode.SYSTEM,
-                    "System Default",
-                    "Automatically switches between Light and Dark mode with your Android device"
-                )
-            )
-
-            DocFlowCard(
-                containerColor = DocFlowTokens.surfaceSubtle,
-                padding = PaddingValues(vertical = DocFlowTokens.space1)
-            ) {
-                themeOptions.forEachIndexed { idx, (mode, label, desc) ->
-                    val isSelected = themeMode == mode
+            // =================================================================
+            // SECTION 1: GENERAL (Theme with Light Mode default, Language)
+            // =================================================================
+            item {
+                DocFlowSectionLabel(text = "General", palette = palette)
+                DocFlowCard(palette = palette, contentPadding = PaddingValues(vertical = DocFlowTokens.space1)) {
+                    // Row 1: Theme (Light / Dark / System)
                     DocFlowListRow(
-                        title = label,
-                        subtitle = desc,
+                        title = "Theme",
+                        subtitle = when (themeMode) {
+                            ThemeMode.LIGHT -> "Light Mode (Active • #F0F1F3 surface)"
+                            ThemeMode.DARK -> "Dark Mode (Active • #0F1113 surface)"
+                            ThemeMode.SYSTEM -> "Follow System Theme"
+                        },
+                        palette = palette,
+                        onClick = { showThemeSheet = true },
+                        modifier = Modifier.testTag("settings_row_theme"),
                         leading = {
                             DocFlowIconCircle(
-                                icon = when (mode) {
-                                    ThemeMode.LIGHT -> Icons.Default.LightMode
-                                    ThemeMode.DARK -> Icons.Default.DarkMode
-                                    ThemeMode.SYSTEM -> Icons.Default.SettingsBrightness
-                                },
-                                circleColor = if (isSelected) DocFlowTokens.accentBlue else DocFlowTokens.iconGrayTrash,
-                                contentDescription = label
-                            )
-                        },
-                        trailing = {
-                            if (isSelected) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = "Selected",
-                                    tint = DocFlowTokens.accentBlue
-                                )
-                            }
-                        },
-                        selected = isSelected,
-                        showBottomDivider = idx < themeOptions.lastIndex,
-                        testTag = "theme_sheet_option_${mode.name.lowercase()}",
-                        onClick = {
-                            onSelectThemeMode(mode)
-                            toastMessage = "$label applied"
-                            isToastError = false
-                            showThemeSheet = false
-                        }
-                    )
-                }
-            }
-        }
-    }
-
-    // =========================================================================
-    // 2. LANGUAGE & OFFLINE OCR PACKS BOTTOM SHEET
-    // =========================================================================
-    if (showLanguageSheet) {
-        DocFlowBottomSheet(
-            title = "Language & Offline OCR Packs",
-            onDismissRequest = { showLanguageSheet = false }
-        ) {
-            Text(
-                text = "Select your default OCR & translation language. Downloaded packs run 100% offline on your device.",
-                style = DocFlowTokens.captionStyle,
-                color = DocFlowTokens.textSecondary
-            )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-
-            DocFlowCard(
-                containerColor = DocFlowTokens.surfaceSubtle,
-                padding = PaddingValues(vertical = DocFlowTokens.space1)
-            ) {
-                TranslationLanguage.entries.forEachIndexed { index, lang ->
-                    val isPrimary = primaryLanguage == lang
-                    val isInstalled = lang.code in downloadedLangs
-                    DocFlowListRow(
-                        title = "${lang.displayName} (${lang.nativeName})",
-                        subtitle = "${lang.packSizeMb} • ${if (isPrimary) "Primary language" else if (isInstalled) "Installed offline" else "Tap Download for offline use"}",
-                        leading = {
-                            DocFlowIconCircle(
-                                icon = Icons.Default.Language,
-                                circleColor = if (isPrimary) DocFlowTokens.accentBlue else DocFlowTokens.iconTealTranslate,
-                                contentDescription = lang.displayName
+                                icon = if (themeMode == ThemeMode.DARK) Icons.Filled.DarkMode else Icons.Filled.LightMode,
+                                circleColor = DocFlowTokens.AccentBlue
                             )
                         },
                         trailing = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
+                                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space1)
                             ) {
-                                if (!isInstalled) {
-                                    DocFlowSecondaryButton(
-                                        text = "Download",
-                                        leadingIcon = Icons.Default.Download,
-                                        onClick = {
-                                            OnDeviceAiAndBackupEngine.markLanguagePackDownloaded(context, lang.code)
-                                            downloadedLangs = OnDeviceAiAndBackupEngine.getDownloadedLanguagePacks(context)
-                                            toastMessage = "Downloaded ${lang.displayName} offline pack"
-                                            isToastError = false
-                                        }
-                                    )
-                                } else {
-                                    if (isPrimary) {
-                                        Surface(
-                                            shape = DocFlowTokens.pillShape,
-                                            color = DocFlowTokens.accentBlue.copy(alpha = 0.14f)
-                                        ) {
-                                            Text(
-                                                text = "Active",
-                                                style = DocFlowTokens.microBadgeStyle,
-                                                color = DocFlowTokens.accentBlue,
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                            )
-                                        }
-                                    } else if (lang.code != "en") {
-                                        TextButton(
-                                            onClick = {
-                                                OnDeviceAiAndBackupEngine.removeLanguagePack(context, lang.code)
-                                                downloadedLangs = OnDeviceAiAndBackupEngine.getDownloadedLanguagePacks(context)
-                                            }
-                                        ) {
-                                            Text("Remove", color = DocFlowTokens.iconRedPdf, style = DocFlowTokens.captionBoldStyle)
-                                        }
+                                ThemeQuickChip(
+                                    label = "Light",
+                                    selected = themeMode == ThemeMode.LIGHT,
+                                    palette = palette,
+                                    testTag = "theme_chip_light",
+                                    onClick = {
+                                        viewModel.setThemeMode(ThemeMode.LIGHT)
+                                        toastMessage = "Switched to Light Mode"
                                     }
+                                )
+                                ThemeQuickChip(
+                                    label = "Dark",
+                                    selected = themeMode == ThemeMode.DARK,
+                                    palette = palette,
+                                    testTag = "theme_chip_dark",
+                                    onClick = {
+                                        viewModel.setThemeMode(ThemeMode.DARK)
+                                        toastMessage = "Switched to Dark Mode"
+                                    }
+                                )
+                                ThemeQuickChip(
+                                    label = "System",
+                                    selected = themeMode == ThemeMode.SYSTEM,
+                                    palette = palette,
+                                    testTag = "theme_chip_system",
+                                    onClick = {
+                                        viewModel.setThemeMode(ThemeMode.SYSTEM)
+                                        toastMessage = "Following System Theme"
+                                    }
+                                )
+                            }
+                        }
+                    )
+
+                    DocFlowDivider(
+                        palette = palette,
+                        modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin)
+                    )
+
+                    // Row 2: Language (App UI, OCR & Offline Translation Language Packs)
+                    DocFlowListRow(
+                        title = "Language",
+                        subtitle = "${primaryLanguage.displayName} (${primaryLanguage.nativeName}) • ${downloadedLangs.size} offline pack(s) on this device",
+                        palette = palette,
+                        onClick = { showLanguageSheet = true },
+                        showChevron = true,
+                        modifier = Modifier.testTag("settings_row_language"),
+                        leading = {
+                            DocFlowIconCircle(
+                                icon = Icons.Filled.Language,
+                                circleColor = DocFlowTokens.IconCircleTeal
+                            )
+                        }
+                    )
+                }
+            }
+
+            // =================================================================
+            // SECTION 2: STORAGE ("On this device" breakdown, largest files, Clear cache)
+            // =================================================================
+            item {
+                Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+                DocFlowSectionLabel(text = "Storage • On this device", palette = palette)
+                DocFlowCard(palette = palette, contentPadding = PaddingValues(vertical = DocFlowTokens.space2)) {
+                    // Top Summary & Multi-segment Breakdown Bar ("On this device")
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = DocFlowTokens.cardPaddingMin, vertical = DocFlowTokens.space1)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "On this device",
+                                    style = DocFlowTokens.rowTitleStyle,
+                                    color = palette.textPrimary
+                                )
+                                Text(
+                                    text = "Stored on this device • Free space: ${formatStorageBytes(deviceFreeBytes)}",
+                                    style = DocFlowTokens.captionStyle,
+                                    color = palette.textSecondary
+                                )
+                            }
+                            Text(
+                                text = formatStorageBytes(totalUsedByDocFlow),
+                                style = DocFlowTokens.rowTitleStyle,
+                                fontWeight = FontWeight.Bold,
+                                color = DocFlowTokens.AccentBlue
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+
+                        // Breakdown Horizontal Bar
+                        val barTotal = totalUsedByDocFlow.coerceAtLeast(1L).toFloat()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(10.dp)
+                                .clip(DocFlowTokens.pillButtonShape)
+                                .background(palette.divider)
+                                .testTag("settings_storage_breakdown_bar")
+                        ) {
+                            storageCategories.forEach { cat ->
+                                val weightVal = (cat.bytes.toFloat() / barTotal).coerceAtLeast(if (cat.bytes > 0L) 0.04f else 0f)
+                                if (weightVal > 0f) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(weightVal)
+                                            .height(10.dp)
+                                            .background(cat.color)
+                                    )
                                 }
                             }
+                            val cacheWeight = (cacheBytes.toFloat() / barTotal).coerceAtLeast(if (cacheBytes > 0L) 0.04f else 0f)
+                            if (cacheWeight > 0f) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(cacheWeight)
+                                        .height(10.dp)
+                                        .background(DocFlowTokens.IconCircleGreen)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+                    DocFlowDivider(
+                        palette = palette,
+                        modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin)
+                    )
+
+                    // Full Storage Dashboard row
+                    DocFlowListRow(
+                        title = "Storage usage stats (On this device)",
+                        subtitle = "${formatStorageBytes(totalUsedByDocFlow)} used across ${allDocs.size} local document(s) • Stored on this device",
+                        palette = palette,
+                        onClick = onOpenStorageDashboard,
+                        showChevron = true,
+                        modifier = Modifier.testTag("settings_row_storage_stats"),
+                        leading = {
+                            DocFlowIconCircle(
+                                icon = Icons.Filled.Storage,
+                                circleColor = DocFlowTokens.AccentBlue
+                            )
+                        }
+                    )
+
+                    // Category rows: tap any row to inspect largest files in that category with a delete option
+                    storageCategories.forEach { slice ->
+                        DocFlowDivider(
+                            palette = palette,
+                            modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin)
+                        )
+                        DocFlowListRow(
+                            title = slice.label,
+                            subtitle = "${formatStorageBytes(slice.bytes)} • ${slice.files.size} file(s) • Tap to view largest files",
+                            palette = palette,
+                            onClick = { selectedCategoryForDrilldown = slice },
+                            showChevron = true,
+                            modifier = Modifier.testTag("settings_storage_cat_${slice.key}"),
+                            leading = {
+                                DocFlowIconCircle(
+                                    icon = when (slice.key) {
+                                        "pdf" -> Icons.Filled.PictureAsPdf
+                                        "word" -> Icons.Filled.Description
+                                        "images" -> Icons.Filled.Image
+                                        "safe" -> Icons.Filled.Lock
+                                        else -> Icons.Filled.DeleteOutline
+                                    },
+                                    circleColor = slice.color
+                                )
+                            }
+                        )
+                    }
+
+                    DocFlowDivider(
+                        palette = palette,
+                        modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin)
+                    )
+
+                    // Clear Cache (never deletes user documents)
+                    DocFlowListRow(
+                        title = "Clear cache",
+                        subtitle = "${formatStorageBytes(cacheBytes)} temporary thumbnails • Never deletes user documents",
+                        palette = palette,
+                        onClick = { showClearCacheConfirm = true },
+                        modifier = Modifier.testTag("settings_row_clear_cache"),
+                        leading = {
+                            DocFlowIconCircle(
+                                icon = Icons.Filled.CleaningServices,
+                                circleColor = DocFlowTokens.IconCircleGreen
+                            )
                         },
-                        selected = isPrimary,
-                        showBottomDivider = index < TranslationLanguage.entries.lastIndex,
-                        testTag = "language_option_${lang.code}",
+                        trailing = {
+                            Text(
+                                text = "Clear",
+                                style = DocFlowTokens.captionStyle,
+                                fontWeight = FontWeight.SemiBold,
+                                color = DocFlowTokens.AccentBlue
+                            )
+                        }
+                    )
+                }
+            }
+
+            // =================================================================
+            // SECTION 3: DEVICE MANAGEMENT (Scoped Accounting to Device)
+            // =================================================================
+            item {
+                Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+                DocFlowSectionLabel(text = "Device", palette = palette)
+                DocFlowCard(palette = palette, contentPadding = PaddingValues(vertical = DocFlowTokens.space1)) {
+                    DocFlowListRow(
+                        title = "Device Storage & File Accounting",
+                        subtitle = "${allDocs.size} total file(s) • ${formatStorageBytes(deviceFreeBytes)} free on this device • Stored on this device",
+                        palette = palette,
+                        onClick = onOpenStorageDashboard,
+                        showChevron = true,
+                        modifier = Modifier.testTag("settings_row_device_accounting"),
+                        leading = {
+                            DocFlowIconCircle(
+                                icon = Icons.Filled.Devices,
+                                circleColor = DocFlowTokens.IconCircleBlue
+                            )
+                        }
+                    )
+                }
+            }
+
+            // =================================================================
+            // SECTION 4: SECURITY (Biometric Toggle, PIN Settings, App Lock)
+            // =================================================================
+            item {
+                Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+                DocFlowSectionLabel(text = "Security", palette = palette)
+                DocFlowCard(palette = palette, contentPadding = PaddingValues(vertical = DocFlowTokens.space1)) {
+                    // Row 1: Biometric Toggle
+                    DocFlowListRow(
+                        title = "Biometric Toggle",
+                        subtitle = if (biometricEnabled) {
+                            "Enabled • Fingerprint / Face unlock for Private Safe"
+                        } else {
+                            "Disabled • Require PIN only"
+                        },
+                        palette = palette,
                         onClick = {
-                            OnDeviceAiAndBackupEngine.setPrimaryLanguage(context, lang)
-                            primaryLanguage = lang
-                            downloadedLangs = OnDeviceAiAndBackupEngine.getDownloadedLanguagePacks(context)
-                            toastMessage = "Primary language set to ${lang.displayName}"
-                            isToastError = false
+                            val next = !biometricEnabled
+                            biometricEnabled = next
+                            OnDeviceAiAndBackupEngine.setBiometricUnlockEnabled(context, next)
+                            viewModel.toggleBiometricVault()
+                            toastMessage = if (next) "Biometric unlock enabled" else "Biometric unlock disabled"
+                        },
+                        modifier = Modifier.testTag("settings_row_biometric"),
+                        leading = {
+                            DocFlowIconCircle(
+                                icon = Icons.Filled.Fingerprint,
+                                circleColor = DocFlowTokens.IconCircleTeal
+                            )
+                        },
+                        trailing = {
+                            Switch(
+                                checked = biometricEnabled,
+                                onCheckedChange = { next ->
+                                    biometricEnabled = next
+                                    OnDeviceAiAndBackupEngine.setBiometricUnlockEnabled(context, next)
+                                    viewModel.toggleBiometricVault()
+                                    toastMessage = if (next) "Biometric unlock enabled" else "Biometric unlock disabled"
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = DocFlowTokens.AccentBlue
+                                ),
+                                modifier = Modifier.testTag("settings_switch_biometric")
+                            )
+                        }
+                    )
+
+                    DocFlowDivider(
+                        palette = palette,
+                        modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin)
+                    )
+
+                    // Row 2: PIN Settings
+                    DocFlowListRow(
+                        title = "PIN settings",
+                        subtitle = if (hasPin) {
+                            "Custom AES-256 Private Safe PIN configured • Tap to change or reset"
+                        } else {
+                            "Default PIN (1234) active • Tap to set custom 4–8 digit PIN"
+                        },
+                        palette = palette,
+                        onClick = {
+                            currentPinInput = ""
+                            newPinInput = ""
+                            confirmPinInput = ""
+                            pinErrorText = null
+                            pinStep = if (hasPin) "ENTER_CURRENT" else "SET_NEW"
+                            showPinDialog = true
+                        },
+                        showChevron = true,
+                        modifier = Modifier.testTag("settings_row_pin"),
+                        leading = {
+                            DocFlowIconCircle(
+                                icon = Icons.Filled.Password,
+                                circleColor = DocFlowTokens.AccentBlue
+                            )
+                        }
+                    )
+
+                    DocFlowDivider(
+                        palette = palette,
+                        modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin)
+                    )
+
+                    // Row 3: App Lock on Launch & Timeout
+                    DocFlowListRow(
+                        title = "Auto-lock Private Safe",
+                        subtitle = if (appLockEnabled) {
+                            "Require unlock after $lockTimeoutMinutes min in background"
+                        } else {
+                            "Lock immediately when leaving Private Safe"
+                        },
+                        palette = palette,
+                        onClick = { showLockTimeoutSheet = true },
+                        showChevron = true,
+                        modifier = Modifier.testTag("settings_row_auto_lock"),
+                        leading = {
+                            DocFlowIconCircle(
+                                icon = Icons.Filled.Timer,
+                                circleColor = DocFlowTokens.IconCircleGray
+                            )
+                        }
+                    )
+                }
+            }
+
+            // =================================================================
+            // SECTION 5: ABOUT (App Version, Privacy Policy, Terms of Service)
+            // =================================================================
+            item {
+                Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+                DocFlowSectionLabel(text = "About", palette = palette)
+                DocFlowCard(palette = palette, contentPadding = PaddingValues(vertical = DocFlowTokens.space1)) {
+                    // Row 1: App Version
+                    DocFlowListRow(
+                        title = "App Version",
+                        subtitle = "DocFlow v${OnDeviceAiAndBackupEngine.APP_VERSION_NAME} (Build ${OnDeviceAiAndBackupEngine.APP_VERSION_BUILD}) • Stored on this device",
+                        palette = palette,
+                        onClick = { showLicensesSheet = true },
+                        modifier = Modifier.testTag("settings_row_version"),
+                        leading = {
+                            DocFlowIconCircle(
+                                icon = Icons.Filled.Info,
+                                circleColor = DocFlowTokens.AccentBlue
+                            )
+                        },
+                        trailing = {
+                            Text(
+                                text = "v${OnDeviceAiAndBackupEngine.APP_VERSION_NAME}",
+                                style = DocFlowTokens.captionStyle,
+                                fontWeight = FontWeight.SemiBold,
+                                color = palette.textSecondary
+                            )
+                        }
+                    )
+
+                    DocFlowDivider(
+                        palette = palette,
+                        modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin)
+                    )
+
+                    // Row 2: Privacy Policy Link (https://doceflow.site.je/privacy/)
+                    DocFlowListRow(
+                        title = "Privacy Policy",
+                        subtitle = OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL,
+                        palette = palette,
+                        onClick = {
+                            openExternalUrl(
+                                url = OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL,
+                                onFallback = { showPrivacyOfflineFallbackSheet = true }
+                            )
+                        },
+                        modifier = Modifier.testTag("settings_row_privacy_policy"),
+                        leading = {
+                            DocFlowIconCircle(
+                                icon = Icons.Filled.Policy,
+                                circleColor = DocFlowTokens.IconCircleGreen
+                            )
+                        },
+                        trailing = {
+                            Icon(
+                                imageVector = Icons.Filled.OpenInNew,
+                                contentDescription = "Open Privacy Policy",
+                                tint = palette.textSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    )
+
+                    DocFlowDivider(
+                        palette = palette,
+                        modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin)
+                    )
+
+                    // Row 3: Terms of Service Link (https://doceflow.site.je/terms/)
+                    DocFlowListRow(
+                        title = "Terms of Service",
+                        subtitle = OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL,
+                        palette = palette,
+                        onClick = {
+                            openExternalUrl(
+                                url = OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL,
+                                onFallback = { showTermsOfflineFallbackSheet = true }
+                            )
+                        },
+                        modifier = Modifier.testTag("settings_row_terms_of_service"),
+                        leading = {
+                            DocFlowIconCircle(
+                                icon = Icons.Filled.Gavel,
+                                circleColor = DocFlowTokens.IconCircleTeal
+                            )
+                        },
+                        trailing = {
+                            Icon(
+                                imageVector = Icons.Filled.OpenInNew,
+                                contentDescription = "Open Terms of Service",
+                                tint = palette.textSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     )
                 }
@@ -895,404 +758,578 @@ fun SettingsScreen(
     }
 
     // =========================================================================
-    // 3. PIN SETTINGS & AUTO-LOCK TIMEOUT BOTTOM SHEET
+    // SHEET: CATEGORY LARGEST FILES DRILL-DOWN WITH DELETE OPTION
     // =========================================================================
-    if (showPinSettingsSheet) {
-        var newPin by remember { mutableStateOf("") }
-        var confirmPin by remember { mutableStateOf("") }
-        var pinError by remember { mutableStateOf<String?>(null) }
-
+    selectedCategoryForDrilldown?.let { slice ->
         DocFlowBottomSheet(
-            title = "Private Safe PIN & Lock Settings",
-            onDismissRequest = { showPinSettingsSheet = false }
+            onDismissRequest = { selectedCategoryForDrilldown = null },
+            palette = palette
         ) {
             Text(
-                text = "Protect your Private Safe documents with a 4–8 digit PIN and hardware-backed AES-256-GCM encryption.",
+                text = "${slice.label} • On this device",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space1))
+            Text(
+                text = "${formatStorageBytes(slice.bytes)} across ${slice.files.size} file(s) • Largest files first",
                 style = DocFlowTokens.captionStyle,
-                color = DocFlowTokens.textSecondary
+                color = palette.textSecondary
             )
             Spacer(modifier = Modifier.height(DocFlowTokens.space3))
 
-            Text(
-                text = "Auto-lock Timeout",
-                style = DocFlowTokens.bodyMediumStyle,
-                color = DocFlowTokens.textPrimary
-            )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
-            ) {
-                listOf(1, 5, 15, 30).forEach { mins ->
-                    FilterChip(
-                        selected = lockTimeoutMinutes == mins,
-                        onClick = {
-                            lockTimeoutMinutes = mins
-                            OnDeviceAiAndBackupEngine.setLockTimeoutMinutes(context, mins)
+            if (slice.files.isEmpty()) {
+                DocFlowEmptyState(
+                    icon = Icons.Filled.Storage,
+                    title = "No files in ${slice.label}",
+                    subtitle = "Files stored on this device in this category will appear here.",
+                    palette = palette
+                )
+            } else {
+                slice.files.take(8).forEach { doc ->
+                    DocFlowListRow(
+                        title = doc.title,
+                        subtitle = "${doc.fileType.uppercase()} • ${formatStorageBytes(doc.fileSize)} • Stored on this device",
+                        palette = palette,
+                        onClick = {},
+                        leading = {
+                            DocFlowIconCircle(
+                                icon = Icons.Filled.Description,
+                                circleColor = slice.color
+                            )
                         },
-                        label = { Text("${mins}m") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = DocFlowTokens.accentBlue.copy(alpha = 0.16f),
-                            selectedLabelColor = DocFlowTokens.accentBlue
-                        )
+                        trailing = {
+                            Box(
+                                modifier = Modifier
+                                    .size(DocFlowTokens.minTouchTarget)
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        if (doc.isDeleted) {
+                                            viewModel.permanentlyDeleteDocument(doc.id)
+                                        } else {
+                                            viewModel.softDeleteDocument(doc.id)
+                                        }
+                                        toastMessage = "Deleted '${doc.title}'"
+                                        selectedCategoryForDrilldown = null
+                                    }
+                                    .testTag("settings_delete_cat_file_${doc.id}"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.DeleteOutline,
+                                    contentDescription = "Delete ${doc.title}",
+                                    tint = DocFlowTokens.IconCircleRed,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
                     )
+                    DocFlowDivider(palette = palette)
                 }
             }
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+            DocFlowSecondaryButton(
+                text = "Close",
+                onClick = { selectedCategoryForDrilldown = null },
+                palette = palette,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
 
-            Spacer(modifier = Modifier.height(DocFlowTokens.space4))
+    // =========================================================================
+    // SHEET 1: THEME SELECTOR (Light / Dark / System)
+    // =========================================================================
+    if (showThemeSheet) {
+        DocFlowBottomSheet(
+            onDismissRequest = { showThemeSheet = false },
+            palette = palette
+        ) {
+            Text(
+                text = "Choose Theme",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space1))
+            Text(
+                text = "Select Light Mode (#F0F1F3 flat canvas), Dark Mode (#0F1113), or follow your device setting.",
+                style = DocFlowTokens.captionStyle,
+                color = palette.textSecondary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
 
+            val options = listOf(
+                Triple(ThemeMode.LIGHT, "Light Mode", "Flat #F0F1F3 light gray background with #FFFFFF cards"),
+                Triple(ThemeMode.DARK, "Dark Mode", "Flat #0F1113 dark background with #1B1D20 surfaces"),
+                Triple(ThemeMode.SYSTEM, "System Default", "Automatically match Android system appearance")
+            )
+            options.forEach { (mode, label, desc) ->
+                DocFlowListRow(
+                    title = label,
+                    subtitle = desc,
+                    palette = palette,
+                    onClick = {
+                        viewModel.setThemeMode(mode)
+                        showThemeSheet = false
+                        toastMessage = "Theme set to $label"
+                    },
+                    modifier = Modifier.testTag("theme_sheet_option_${mode.name.lowercase()}"),
+                    leading = {
+                        DocFlowIconCircle(
+                            icon = if (mode == ThemeMode.DARK) Icons.Filled.DarkMode else Icons.Filled.LightMode,
+                            circleColor = if (themeMode == mode) DocFlowTokens.AccentBlue else DocFlowTokens.IconCircleGray
+                        )
+                    },
+                    trailing = {
+                        if (themeMode == mode) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = "Selected",
+                                tint = DocFlowTokens.AccentBlue
+                            )
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    // =========================================================================
+    // SHEET 2: LANGUAGE & OFFLINE PACK MANAGER
+    // =========================================================================
+    if (showLanguageSheet) {
+        DocFlowBottomSheet(
+            onDismissRequest = { showLanguageSheet = false },
+            palette = palette
+        ) {
+            Text(
+                text = "Language & Offline Packs",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space1))
+            Text(
+                text = "Select your primary OCR & translation language. Downloaded packs are stored on this device.",
+                style = DocFlowTokens.captionStyle,
+                color = palette.textSecondary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+
+            TranslationLanguage.entries.forEach { lang ->
+                val isInstalled = downloadedLangs.contains(lang.code)
+                val isPrimary = primaryLanguage == lang
+                DocFlowListRow(
+                    title = "${lang.displayName} (${lang.nativeName})",
+                    subtitle = if (isInstalled) {
+                        "Installed on this device • ${lang.packSizeMb}"
+                    } else {
+                        "Offline pack • ${lang.packSizeMb} (Tap to download & activate)"
+                    },
+                    palette = palette,
+                    onClick = {
+                        OnDeviceAiAndBackupEngine.setPrimaryLanguage(context, lang)
+                        primaryLanguage = lang
+                        downloadedLangs = OnDeviceAiAndBackupEngine.getDownloadedLanguagePacks(context)
+                        toastMessage = "Primary language set to ${lang.displayName}"
+                    },
+                    modifier = Modifier.testTag("lang_option_${lang.code}"),
+                    leading = {
+                        DocFlowIconCircle(
+                            icon = if (isInstalled) Icons.Filled.Language else Icons.Filled.Download,
+                            circleColor = if (isPrimary) DocFlowTokens.AccentBlue else DocFlowTokens.IconCircleTeal
+                        )
+                    },
+                    trailing = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
+                        ) {
+                            if (isInstalled && lang.code != "en") {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            OnDeviceAiAndBackupEngine.removeLanguagePack(context, lang.code)
+                                            downloadedLangs = OnDeviceAiAndBackupEngine.getDownloadedLanguagePacks(context)
+                                            toastMessage = "Removed ${lang.displayName} offline pack"
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.DeleteOutline,
+                                        contentDescription = "Remove pack",
+                                        tint = palette.textSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            if (isPrimary) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = "Active language",
+                                    tint = DocFlowTokens.AccentBlue
+                                )
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    // =========================================================================
+    // DIALOG 3: CLEAR CACHE CONFIRMATION
+    // =========================================================================
+    if (showClearCacheConfirm) {
+        DocFlowDialog(
+            title = "Clear local cache?",
+            message = "This frees ${formatStorageBytes(cacheBytes)} of rendered page thumbnails and temporary files. Your documents, folders, and Private Safe files stored on this device will not be touched.",
+            confirmText = "Clear Cache",
+            dismissText = "Cancel",
+            palette = palette,
+            onConfirm = {
+                val freed = OnDeviceAiAndBackupEngine.clearCacheAndTempFiles(context)
+                viewModel.clearThumbnailAndTempCache(context)
+                cacheBytes = OnDeviceAiAndBackupEngine.calculateCacheAndTempBytes(context)
+                showClearCacheConfirm = false
+                toastMessage = "Cleared ${formatStorageBytes(freed)} of local cache"
+            },
+            onDismiss = { showClearCacheConfirm = false }
+        )
+    }
+
+    // =========================================================================
+    // SHEET 4: PIN SETTINGS (Set / Change / Reset Private Safe PIN)
+    // =========================================================================
+    if (showPinDialog) {
+        DocFlowBottomSheet(
+            onDismissRequest = { showPinDialog = false },
+            palette = palette
+        ) {
+            Text(
+                text = when (pinStep) {
+                    "ENTER_CURRENT" -> "Verify Current PIN"
+                    "SET_NEW" -> "Set New Private Safe PIN"
+                    else -> "Confirm New PIN"
+                },
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space1))
+            Text(
+                text = "Used for AES-256-GCM PBKDF2 key derivation in Private Safe (Stored on this device).",
+                style = DocFlowTokens.captionStyle,
+                color = palette.textSecondary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+
+            val activeValue = when (pinStep) {
+                "ENTER_CURRENT" -> currentPinInput
+                "SET_NEW" -> newPinInput
+                else -> confirmPinInput
+            }
             OutlinedTextField(
-                value = newPin,
-                onValueChange = {
-                    if (it.length <= 8 && it.all { ch -> ch.isDigit() }) {
-                        newPin = it
-                        pinError = null
+                value = activeValue,
+                onValueChange = { value ->
+                    val digitsOnly = value.filter { it.isDigit() }.take(8)
+                    pinErrorText = null
+                    when (pinStep) {
+                        "ENTER_CURRENT" -> currentPinInput = digitsOnly
+                        "SET_NEW" -> newPinInput = digitsOnly
+                        else -> confirmPinInput = digitsOnly
                     }
                 },
-                label = { Text("New 4–8 Digit PIN") },
+                label = {
+                    Text(
+                        when (pinStep) {
+                            "ENTER_CURRENT" -> "Current PIN"
+                            "SET_NEW" -> "New 4–8 digit PIN"
+                            else -> "Re-enter new PIN"
+                        }
+                    )
+                },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("settings_pin_new_input")
+                    .testTag("settings_pin_input")
             )
 
-            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
-
-            OutlinedTextField(
-                value = confirmPin,
-                onValueChange = {
-                    if (it.length <= 8 && it.all { ch -> ch.isDigit() }) {
-                        confirmPin = it
-                        pinError = null
-                    }
-                },
-                label = { Text("Confirm New PIN") },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("settings_pin_confirm_input")
-            )
-
-            if (!pinError.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+            if (pinErrorText != null) {
+                Spacer(modifier = Modifier.height(DocFlowTokens.space1))
                 Text(
-                    text = pinError.orEmpty(),
-                    style = DocFlowTokens.captionStyle,
-                    color = DocFlowTokens.iconRedPdf
+                    text = pinErrorText!!,
+                    color = DocFlowTokens.IconCircleRed,
+                    style = DocFlowTokens.captionStyle
                 )
             }
 
             Spacer(modifier = Modifier.height(DocFlowTokens.space4))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
             ) {
-                if (hasConfiguredPin) {
+                if (hasPin && pinStep == "ENTER_CURRENT") {
                     DocFlowSecondaryButton(
                         text = "Reset to Default",
-                        modifier = Modifier.weight(1f),
                         onClick = {
-                            OnDeviceAiAndBackupEngine.clearPrivateSafePin(context)
-                            hasConfiguredPin = false
-                            toastMessage = "Private Safe PIN reset to default (1234)"
-                            isToastError = false
-                            showPinSettingsSheet = false
-                        }
+                            if (OnDeviceAiAndBackupEngine.verifyPrivateSafePin(context, currentPinInput)) {
+                                OnDeviceAiAndBackupEngine.clearPrivateSafePin(context)
+                                hasPin = false
+                                showPinDialog = false
+                                toastMessage = "Private Safe PIN reset to default (1234)"
+                            } else {
+                                pinErrorText = "Enter your current PIN first to reset"
+                            }
+                        },
+                        palette = palette,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    DocFlowSecondaryButton(
+                        text = "Cancel",
+                        onClick = { showPinDialog = false },
+                        palette = palette,
+                        modifier = Modifier.weight(1f)
                     )
                 }
+
                 DocFlowPrimaryButton(
-                    text = "Save PIN",
-                    modifier = Modifier.weight(1f),
-                    testTag = "settings_save_pin_button",
+                    text = when (pinStep) {
+                        "ENTER_CURRENT" -> "Next"
+                        "SET_NEW" -> "Continue"
+                        else -> "Save PIN"
+                    },
                     onClick = {
-                        when {
-                            newPin.length < 4 -> {
-                                pinError = "PIN must be at least 4 digits."
+                        when (pinStep) {
+                            "ENTER_CURRENT" -> {
+                                if (OnDeviceAiAndBackupEngine.verifyPrivateSafePin(context, currentPinInput)) {
+                                    pinStep = "SET_NEW"
+                                } else {
+                                    pinErrorText = "Incorrect current PIN"
+                                }
                             }
-                            newPin != confirmPin -> {
-                                pinError = "PIN entries do not match."
+                            "SET_NEW" -> {
+                                if (newPinInput.length < 4) {
+                                    pinErrorText = "PIN must be at least 4 digits"
+                                } else {
+                                    pinStep = "CONFIRM_NEW"
+                                }
                             }
                             else -> {
-                                OnDeviceAiAndBackupEngine.setPrivateSafePin(context, newPin)
-                                hasConfiguredPin = true
-                                toastMessage = "Private Safe PIN updated"
-                                isToastError = false
-                                showPinSettingsSheet = false
+                                if (confirmPinInput != newPinInput) {
+                                    pinErrorText = "PINs do not match"
+                                } else {
+                                    OnDeviceAiAndBackupEngine.setPrivateSafePin(context, newPinInput)
+                                    hasPin = true
+                                    showPinDialog = false
+                                    toastMessage = "Private Safe PIN updated"
+                                }
                             }
                         }
-                    }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("settings_pin_confirm_button")
                 )
             }
         }
     }
 
     // =========================================================================
-    // 4. ENCRYPTED .DOCFLOW BACKUP & RESTORE BOTTOM SHEET
+    // SHEET 5: AUTO-LOCK TIMEOUT SELECTOR
     // =========================================================================
-    if (showBackupSheet) {
+    if (showLockTimeoutSheet) {
         DocFlowBottomSheet(
-            title = "Encrypted .docflow Backup & Restore",
-            onDismissRequest = { showBackupSheet = false }
+            onDismissRequest = { showLockTimeoutSheet = false },
+            palette = palette
         ) {
             Text(
-                text = "Export or restore all documents, folders, tags, and Private Safe items in a single AES-256-GCM encrypted .docflow file.",
-                style = DocFlowTokens.captionStyle,
-                color = DocFlowTokens.textSecondary
+                text = "Auto-lock Timeout",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
             )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-
-            OutlinedTextField(
-                value = backupPassphrase,
-                onValueChange = { backupPassphrase = it },
-                label = { Text("Backup Passphrase") },
-                visualTransformation = PasswordVisualTransformation(),
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("settings_backup_passphrase_input")
+            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+            val timeouts = listOf(
+                0 to "Immediately when leaving Private Safe",
+                1 to "After 1 minute in background",
+                5 to "After 5 minutes in background",
+                15 to "After 15 minutes in background"
             )
-
-            Spacer(modifier = Modifier.height(DocFlowTokens.space4))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
-            ) {
-                DocFlowPrimaryButton(
-                    text = "Export .docflow",
-                    leadingIcon = Icons.Default.Backup,
-                    modifier = Modifier.weight(1f),
-                    testTag = "settings_export_backup_button",
+            timeouts.forEach { (mins, desc) ->
+                val isSelected = (mins == 0 && !appLockEnabled) || (mins > 0 && appLockEnabled && lockTimeoutMinutes == mins)
+                DocFlowListRow(
+                    title = desc,
+                    palette = palette,
                     onClick = {
-                        onExportBackup(backupPassphrase.ifBlank { "docflow-backup" })
-                        toastMessage = "Exported encrypted .docflow backup archive"
-                        isToastError = false
-                        showBackupSheet = false
-                    }
-                )
-                DocFlowSecondaryButton(
-                    text = "Restore",
-                    leadingIcon = Icons.Default.Restore,
-                    modifier = Modifier.weight(1f),
-                    testTag = "settings_restore_backup_button",
-                    onClick = {
-                        restoreBackupLauncher.launch(arrayOf("*/*"))
-                    }
-                )
-            }
-        }
-    }
-
-    // =========================================================================
-    // 5. ABOUT DOCFLOW DIALOG
-    // =========================================================================
-    if (showAboutDialog) {
-        DocFlowDialog(
-            title = "About DocFlow",
-            onDismissRequest = { showAboutDialog = false },
-            confirmText = "Done",
-            onConfirm = { showAboutDialog = false },
-            dismissText = "Privacy Policy"
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
-                ) {
-                    DocFlowIconCircle(
-                        icon = Icons.Default.Description,
-                        circleColor = DocFlowTokens.accentBlue,
-                        contentDescription = null,
-                        solidFill = true
-                    )
-                    Column {
-                        Text(
-                            text = "DocFlow v${OnDeviceAiAndBackupEngine.APP_VERSION_NAME}",
-                            style = DocFlowTokens.rowTitleStyle.copy(fontWeight = FontWeight.Bold),
-                            color = DocFlowTokens.textPrimary
-                        )
-                        Text(
-                            text = "Build ${OnDeviceAiAndBackupEngine.APP_VERSION_BUILD} • Android 8.0+ • Free",
-                            style = DocFlowTokens.captionStyle,
-                            color = DocFlowTokens.textSecondary
-                        )
-                    }
-                }
-                Text(
-                    text = "Open, scan, convert, summarize, translate, and organize your documents privately and offline.",
-                    style = DocFlowTokens.bodyStyle,
-                    color = DocFlowTokens.textPrimary
-                )
-                DocFlowCard(
-                    containerColor = DocFlowTokens.surfaceSubtle,
-                    padding = PaddingValues(DocFlowTokens.space3)
-                ) {
-                    Text(
-                        text = "• No servers or cloud uploads\n• No account required\n• Zero trackers or analytics\n• Hardware-backed AES-256-GCM Private Safe",
-                        style = DocFlowTokens.captionStyle,
-                        color = DocFlowTokens.textSecondary
-                    )
-                }
-            }
-        }
-    }
-
-    // =========================================================================
-    // 6. PRIVACY POLICY & TERMS OF SERVICE SHEET (With External Browser Launch + Copy Link)
-    // =========================================================================
-    activeLegalLinkPreview?.let { legalSpec ->
-        DocFlowBottomSheet(
-            title = legalSpec.title,
-            onDismissRequest = { activeLegalLinkPreview = null }
-        ) {
-            DocFlowCard(
-                containerColor = DocFlowTokens.surfaceSubtle,
-                padding = PaddingValues(DocFlowTokens.space3)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Official Web URL",
-                            style = DocFlowTokens.captionBoldStyle,
-                            color = DocFlowTokens.textSecondary
-                        )
-                        Text(
-                            text = legalSpec.url,
-                            style = DocFlowTokens.bodyMediumStyle.copy(fontFamily = FontFamily.Monospace),
-                            color = DocFlowTokens.accentBlue,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    DocFlowSecondaryButton(
-                        text = "Copy",
-                        leadingIcon = Icons.Default.ContentCopy,
-                        onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                            clipboard?.setPrimaryClip(ClipData.newPlainText(legalSpec.title, legalSpec.url))
-                            toastMessage = "Copied ${legalSpec.url}"
-                            isToastError = false
+                        if (mins == 0) {
+                            appLockEnabled = false
+                            OnDeviceAiAndBackupEngine.setAppLockEnabled(context, false)
+                        } else {
+                            appLockEnabled = true
+                            lockTimeoutMinutes = mins
+                            OnDeviceAiAndBackupEngine.setAppLockEnabled(context, true)
+                            OnDeviceAiAndBackupEngine.setLockTimeoutMinutes(context, mins)
                         }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-
-            legalSpec.summaryPoints.forEach { point ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = DocFlowTokens.space1),
-                    horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = null,
-                        tint = DocFlowTokens.accentBlue,
-                        modifier = Modifier
-                            .padding(top = 2.dp)
-                            .size(18.dp)
-                    )
-                    Text(
-                        text = point,
-                        style = DocFlowTokens.bodyStyle,
-                        color = DocFlowTokens.textPrimary
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(DocFlowTokens.space4))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
-            ) {
-                DocFlowSecondaryButton(
-                    text = "Close",
-                    modifier = Modifier.weight(1f),
-                    onClick = { activeLegalLinkPreview = null }
-                )
-                DocFlowPrimaryButton(
-                    text = "Open in Browser",
-                    leadingIcon = Icons.AutoMirrored.Filled.OpenInNew,
-                    modifier = Modifier.weight(1f),
-                    testTag = "legal_sheet_open_browser_button",
-                    onClick = {
-                        openExternalUrlSafely(context, legalSpec.url)
-                        activeLegalLinkPreview = null
+                        showLockTimeoutSheet = false
+                        toastMessage = "Auto-lock updated: $desc"
+                    },
+                    trailing = {
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = "Selected",
+                                tint = DocFlowTokens.AccentBlue
+                            )
+                        }
                     }
                 )
             }
+        }
+    }
+
+    // =========================================================================
+    // SHEET 6: PRIVACY POLICY & TERMS OF SERVICE OFFLINE READERS
+    // =========================================================================
+    if (showPrivacyOfflineFallbackSheet) {
+        DocFlowBottomSheet(
+            onDismissRequest = { showPrivacyOfflineFallbackSheet = false },
+            palette = palette
+        ) {
+            Text(
+                text = "Privacy Policy",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space1))
+            Text(
+                text = OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL,
+                color = DocFlowTokens.AccentBlue,
+                style = DocFlowTokens.captionStyle,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+            Text(
+                text = "DocFlow processes and stores all documents, scans, OCR text, summaries, translations, and AES-256-GCM Private Safe vaults strictly on your device. No personal files or analytics are uploaded to external servers.",
+                style = DocFlowTokens.bodyStyle,
+                color = palette.textPrimary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space4))
+            DocFlowPrimaryButton(
+                text = "Close",
+                onClick = { showPrivacyOfflineFallbackSheet = false },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    if (showTermsOfflineFallbackSheet) {
+        DocFlowBottomSheet(
+            onDismissRequest = { showTermsOfflineFallbackSheet = false },
+            palette = palette
+        ) {
+            Text(
+                text = "Terms of Service",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space1))
+            Text(
+                text = OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL,
+                color = DocFlowTokens.AccentBlue,
+                style = DocFlowTokens.captionStyle,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+            Text(
+                text = "By using DocFlow, you retain 100% ownership and custody of your local documents stored on this device. Remember your Private Safe PIN, as AES-256-GCM encryption keys are derived locally on your device.",
+                style = DocFlowTokens.bodyStyle,
+                color = palette.textPrimary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space4))
+            DocFlowPrimaryButton(
+                text = "Close",
+                onClick = { showTermsOfflineFallbackSheet = false },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    if (showLicensesSheet) {
+        DocFlowBottomSheet(
+            onDismissRequest = { showLicensesSheet = false },
+            palette = palette
+        ) {
+            Text(
+                text = "DocFlow v${OnDeviceAiAndBackupEngine.APP_VERSION_NAME} (Offline Architecture)",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+            Text(
+                text = "• Room SQLite + FTS4 Full-Text Index (Stored on this device)\n• Android PdfRenderer & PdfDocument Engine\n• Google ML Kit On-Device Text Recognition (English + Devanagari Hindi)\n• Hardware DSP NoiseSuppressor + Offline SpeechRecognizer\n• WebCrypto / javax.crypto AES-256-GCM + PBKDF2-HMAC-SHA256",
+                style = DocFlowTokens.bodyStyle,
+                color = palette.textSecondary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space4))
+            DocFlowPrimaryButton(
+                text = "Done",
+                onClick = { showLicensesSheet = false },
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
 
-private data class LegalDocumentSpec(
-    val title: String,
-    val url: String,
-    val summaryPoints: List<String>
-)
-
 @Composable
-private fun ThemeSegmentPill(
+private fun ThemeQuickChip(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
+    palette: DocFlowPalette,
     testTag: String,
-    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val bgColor = if (selected) DocFlowTokens.accentBlue else DocFlowTokens.surfaceSubtle
-    val contentColor = if (selected) Color.White else DocFlowTokens.textPrimary
-    val borderColor = if (selected) DocFlowTokens.accentBlue else DocFlowTokens.divider
-
-    Row(
-        modifier = modifier
-            .heightIn(min = 42.dp)
-            .clip(DocFlowTokens.pillShape)
-            .background(bgColor)
-            .border(1.dp, borderColor, DocFlowTokens.pillShape)
-            .clickable(role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
+    Box(
+        modifier = Modifier
+            .clip(DocFlowTokens.pillButtonShape)
+            .background(if (selected) DocFlowTokens.AccentBlue else palette.background)
+            .border(
+                width = 1.dp,
+                color = if (selected) DocFlowTokens.AccentBlue else palette.divider,
+                shape = DocFlowTokens.pillButtonShape
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
             .testTag(testTag),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+        contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = if (selected) Icons.Default.Check else icon,
-            contentDescription = null,
-            tint = contentColor,
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = label,
-            style = DocFlowTokens.captionBoldStyle,
-            color = contentColor,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) Color.White else palette.textPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
     }
 }
 
-private fun openExternalUrlSafely(context: Context, url: String): Boolean {
-    return runCatching {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
-        true
-    }.getOrDefault(false)
+private fun formatStorageBytes(bytes: Long): String {
+    if (bytes <= 0L) return "0 KB"
+    val kb = bytes / 1024.0
+    if (kb < 1024.0) return String.format("%.1f KB", kb)
+    val mb = kb / 1024.0
+    if (mb < 1024.0) return String.format("%.2f MB", mb)
+    val gb = mb / 1024.0
+    return String.format("%.2f GB", gb)
 }

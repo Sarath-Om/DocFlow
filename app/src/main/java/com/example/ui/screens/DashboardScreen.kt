@@ -1,7 +1,6 @@
 package com.example.ui.screens
 
 import android.net.Uri
-import android.text.format.DateUtils
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -17,67 +16,55 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Checklist
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.DriveFileMove
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.NoteAdd
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Sort
-import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.filled.Slideshow
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,639 +73,280 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.CachedDocumentEntity
-import com.example.data.local.SyncLogEntity
-import com.example.data.model.ActiveCollaborator
 import com.example.data.model.DocEntity
 import com.example.data.model.FolderEntity
-import com.example.data.sync.BackgroundSyncWorkerState
-import com.example.data.util.OtaInstallPhase
-import com.example.ui.theme.BadgeDocBlue
-import com.example.ui.theme.BadgeOfdPurple
-import com.example.ui.theme.BadgePdfRed
-import com.example.ui.theme.BadgePptOrange
-import com.example.ui.theme.BadgeTxtSlate
-import com.example.ui.theme.BadgeXlsGreen
-import com.example.ui.theme.DocFlowAccentBlue
-import com.example.ui.viewmodel.SortOption
-import com.example.ui.viewmodel.ThemeMode
+import com.example.ui.components.AiMicDictationBottomSheet
+import com.example.ui.components.DocFlowCard
+import com.example.ui.components.DocFlowDateGroupHeader
+import com.example.ui.components.DocFlowDivider
+import com.example.ui.components.DocFlowEmptyState
+import com.example.ui.components.DocFlowFab
+import com.example.ui.components.DocFlowFilterTabs
+import com.example.ui.components.DocFlowHeaderAction
+import com.example.ui.components.DocFlowIconCircle
+import com.example.ui.components.DocFlowListRow
+import com.example.ui.components.DocFlowPrimaryButton
+import com.example.ui.components.DocFlowScreenHeader
+import com.example.ui.components.DocFlowSecondaryButton
+import com.example.ui.theme.DocFlowPalette
+import com.example.ui.theme.DocFlowTokens
+import com.example.ui.viewmodel.DocFlowViewModel
 import com.example.ui.viewmodel.UiState
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-private data class FormatTabSpec(
-    val label: String,
-    val filterKey: String
-)
-
-private val FORMAT_FILTER_TABS = listOf(
-    FormatTabSpec("All", "All"),
-    FormatTabSpec("DOC", "docx"),
-    FormatTabSpec("XLS", "xlsx"),
-    FormatTabSpec("PPT", "pptx"),
-    FormatTabSpec("PDF", "pdf"),
-    FormatTabSpec("OFD", "ofd"),
-    FormatTabSpec("TXT", "txt")
-)
-
-private val AUTO_CATEGORIES = listOf(
-    "All", "Invoice", "Receipt", "Contract", "ID", "Medical", "Education", "Work", "Personal", "Notes", "Other"
-)
+private val RECENT_FILTER_TABS = listOf("All", "PDF", "Word", "Excel", "PPT", "OFD", "Other")
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(
-    documentsState: UiState<List<DocEntity>>,
-    filteredDocuments: List<DocEntity>,
-    foldersState: UiState<List<FolderEntity>>,
-    cachedDocumentsMap: Map<String, CachedDocumentEntity>,
-    syncLogs: List<SyncLogEntity>,
-    pendingSyncCount: Int,
-    searchQuery: String,
-    selectedFolderId: String,
-    selectedCategory: String,
-    selectedFileType: String,
-    offlineOnlyFilter: Boolean,
-    sortOption: SortOption,
-    isOfflineMode: Boolean,
-    themeMode: ThemeMode,
-    statusBannerMessage: String?,
-    onSearchQueryChange: (String) -> Unit,
-    onSelectFolder: (String) -> Unit,
-    onSelectCategory: (String) -> Unit,
-    onSelectFileType: (String) -> Unit,
-    onToggleOfflineOnlyFilter: () -> Unit,
-    onSortOptionChange: (SortOption) -> Unit,
-    onToggleOfflineNetworkMode: () -> Unit,
-    onToggleThemeMode: () -> Unit,
-    onDismissStatusBanner: () -> Unit,
-    onCreateFolder: (String, String, String) -> Unit,
-    onDeleteFolder: (String) -> Unit,
+    viewModel: DocFlowViewModel,
+    palette: DocFlowPalette,
+    onOpenDocument: (String) -> Unit,
     onOpenScanner: () -> Unit,
-    onOpenDocument: (DocEntity) -> Unit,
-    onToggleDocumentOffline: (DocEntity) -> Unit,
-    onCreateDocument: (
-        title: String,
-        folderId: String,
-        category: String,
-        fileType: String,
-        fileName: String,
-        content: String,
-        isEncrypted: Boolean,
-        password: String,
-        keyHint: String?,
-        customTags: String
-    ) -> Unit,
-    onImportFileUri: (Uri) -> Unit,
-    onSeedSampleWorkspace: () -> Unit = {},
-    onShareDocument: (DocEntity) -> Unit = {},
-    onClearSyncHistory: () -> Unit = {},
-    onSignOut: () -> Unit = {},
-    selectedTagFilters: Set<String> = emptySet(),
-    biometricVaultEnabled: Boolean = true,
-    onToggleTagFilter: (String) -> Unit = {},
-    onClearTagFilters: () -> Unit = {},
-    onToggleBiometricVault: () -> Unit = {},
-    onOpenBatchProcessor: () -> Unit = {},
-    onAddCustomTagToDoc: (DocEntity, String) -> Unit = { _, _ -> },
-    onUpdateCategoryAndTags: (DocEntity, String, String) -> Unit = { _, _, _ -> },
-    recentCachedDocuments: List<CachedDocumentEntity> = emptyList(),
-    onOpenStorageDashboard: () -> Unit = {},
-    activeCollaborators: List<ActiveCollaborator> = emptyList(),
-    otaVersionName: String = "3.0.0-offline",
-    otaInstallPhase: OtaInstallPhase = OtaInstallPhase.UP_TO_DATE,
-    onOpenOtaAndSettings: () -> Unit = {},
-    backgroundSyncWorkerState: BackgroundSyncWorkerState = BackgroundSyncWorkerState(),
-    onTriggerWorkManagerSync: () -> Unit = {},
-    onBatchSoftDelete: (Set<String>) -> Unit = {},
-    onBatchMoveToFolder: (Set<String>, String) -> Unit = { _, _ -> },
-    onBatchTagDocuments: (Set<String>, String) -> Unit = { _, _ -> },
-    onMoveToPrivateSafe: (String, String) -> Unit = { _, _ -> }
+    onOpenBatchProcessor: () -> Unit,
+    onOpenStorageDashboard: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit
 ) {
-    var showSearchBar by remember { mutableStateOf(searchQuery.isNotBlank()) }
+    val context = LocalContext.current
+    val documents by viewModel.filteredDocuments.collectAsState()
+    val cachedMap by viewModel.cachedDocumentsMap.collectAsState()
+    val foldersState by viewModel.foldersState.collectAsState()
+
+    var activeTypeTab by remember { mutableStateOf("All") }
     var isMultiSelectMode by remember { mutableStateOf(false) }
-    val selectedDocIds = remember { mutableStateListOf<String>() }
-    val collapsedDateGroups = remember { mutableStateMapOf<String, Boolean>() }
+    var selectedDocIds by remember { mutableStateOf(setOf<String>()) }
 
-    var showFabCreateSheet by remember { mutableStateOf(false) }
-    var showNewDocDialog by remember { mutableStateOf(false) }
-    var newDocDefaultFormat by remember { mutableStateOf("docx") }
-    var showSortMenuDialog by remember { mutableStateOf(false) }
-    var showBatchMoveDialog by remember { mutableStateOf(false) }
+    // Collapsible date group state (default expanded)
+    val collapsedGroups = remember { mutableStateMapOf<String, Boolean>() }
+
+    // FAB Action Sheet & Create Dialogs
+    var showFabSheet by remember { mutableStateOf(false) }
+    var showCreateDocDialog by remember { mutableStateOf(false) }
+    var createFormat by remember { mutableStateOf("docx") }
+    var newDocTitle by remember { mutableStateOf("") }
+    var newDocBody by remember { mutableStateOf("") }
+    var showAiMicForCreate by remember { mutableStateOf(false) }
+    var showStandaloneAiMicSheet by remember { mutableStateOf(false) }
+
+    var showMoveFolderDialog by remember { mutableStateOf(false) }
     var showBatchTagDialog by remember { mutableStateOf(false) }
-    var docForQuickPreviewModal by remember { mutableStateOf<DocEntity?>(null) }
-    var docForPrivateSafePrompt by remember { mutableStateOf<DocEntity?>(null) }
-    var docForCategorizeModal by remember { mutableStateOf<DocEntity?>(null) }
+    var batchTagInput by remember { mutableStateOf("") }
+    var docForRename by remember { mutableStateOf<DocEntity?>(null) }
+    var renameText by remember { mutableStateOf("") }
 
-    val openDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            uris.forEach { uri -> onImportFileUri(uri) }
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.importDocumentFromUri(
+                context = context,
+                uri = uri,
+                folderId = "root",
+                category = "Work",
+                isEncrypted = false,
+                password = "",
+                encryptionKeyHint = null,
+                onImported = { docId -> onOpenDocument(docId) }
+            )
         }
     }
 
-    val folders = (foldersState as? UiState.Success)?.data ?: emptyList()
+    val folders = (foldersState as? UiState.Success<List<FolderEntity>>)?.data ?: emptyList()
 
-    // Group documents by date string e.g. "17 Oct"
-    val dateFormatter = remember { SimpleDateFormat("dd MMM", Locale.getDefault()) }
-    val groupedByDate = remember(filteredDocuments) {
-        filteredDocuments.groupBy { doc ->
-            val ts = doc.updatedAt?.toDate()?.time ?: System.currentTimeMillis()
-            dateFormatter.format(Date(ts))
-        }
-    }
-
-    val allAvailableTags = remember(cachedDocumentsMap, selectedTagFilters) {
-        (cachedDocumentsMap.values.flatMap { it.parsedTags() } + selectedTagFilters)
-            .distinct()
-            .take(12)
-    }
-
-    val configuration = LocalConfiguration.current
-    val screenWidthDp = configuration.screenWidthDp
-    val headerFontSize = when {
-        screenWidthDp < 350 -> 30.sp
-        screenWidthDp < 390 -> 34.sp
-        else -> 38.sp
-    }
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        floatingActionButton = {
-            if (!isMultiSelectMode) {
-                FloatingActionButton(
-                    onClick = { showFabCreateSheet = true },
-                    containerColor = DocFlowAccentBlue,
-                    contentColor = Color.White,
-                    shape = CircleShape,
-                    modifier = Modifier
-                        .size(60.dp)
-                        .testTag("recent_fab_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "New document, scan, or import",
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
+    // Filter documents by selected horizontal tab ("All", "PDF", "Word", "Excel", "PPT", "OFD", "Other")
+    val tabFilteredDocs = remember(documents, activeTypeTab) {
+        documents.filter { doc ->
+            val ft = doc.fileType.lowercase()
+            when (activeTypeTab) {
+                "All" -> true
+                "PDF" -> ft == "pdf" || ft == "scanned"
+                "Word" -> ft == "docx" || ft == "doc"
+                "Excel" -> ft == "xlsx" || ft == "xls" || ft == "csv"
+                "PPT" -> ft == "pptx" || ft == "ppt"
+                "OFD" -> ft == "ofd"
+                "Other" -> ft !in setOf("pdf", "scanned", "docx", "doc", "xlsx", "xls", "csv", "pptx", "ppt", "ofd")
+                else -> true
             }
         }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(innerPadding),
-            contentAlignment = Alignment.TopCenter
-        ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .widthIn(max = 720.dp)
-        ) {
-            // Top Flat Header: Title "Recent" + Subtitle "N in total" + Checklist, Search, Settings icons
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Recent",
-                        fontSize = headerFontSize,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        letterSpacing = (-0.8).sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "${filteredDocuments.size} in total",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+    }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    IconButton(
-                        onClick = { showSearchBar = !showSearchBar },
-                        modifier = Modifier.testTag("recent_search_toggle_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search documents",
-                            tint = if (showSearchBar || searchQuery.isNotBlank()) {
-                                DocFlowAccentBlue
-                            } else {
-                                MaterialTheme.colorScheme.onBackground
-                            }
-                        )
-                    }
+    // Group documents by date (Today, Yesterday, Earlier this week, or "DD MMM")
+    val groupedDocs = remember(tabFilteredDocs, cachedMap) {
+        val sorted = tabFilteredDocs.sortedByDescending { doc ->
+            val cached = cachedMap[doc.id]
+            cached?.lastAccessedAtMillis ?: cached?.updatedAtMillis ?: ((doc.updatedAt?.seconds ?: 0L) * 1000L)
+        }
+        sorted.groupBy { doc ->
+            val cached = cachedMap[doc.id]
+            val ts = cached?.lastAccessedAtMillis ?: cached?.updatedAtMillis ?: ((doc.updatedAt?.seconds ?: 0L) * 1000L)
+            formatDateGroupHeader(ts)
+        }
+    }
 
-                    IconButton(
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(palette.background)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Top Header ("Recent" ~40sp bold, right icons: Search, Multi-select checklist, Settings)
+            DocFlowScreenHeader(
+                title = if (isMultiSelectMode) "${selectedDocIds.size} Selected" else "Recent",
+                subtitle = "Stored on this device",
+                palette = palette,
+                actions = listOf(
+                    DocFlowHeaderAction(
+                        icon = Icons.Filled.Search,
+                        contentDescription = "Search documents",
+                        testTag = "top_search_button",
+                        onClick = onOpenSearch
+                    ),
+                    DocFlowHeaderAction(
+                        icon = if (isMultiSelectMode) Icons.Filled.Close else Icons.Filled.Checklist,
+                        contentDescription = if (isMultiSelectMode) "Exit selection" else "Multi-select checklist",
+                        testTag = "top_multiselect_button",
                         onClick = {
                             isMultiSelectMode = !isMultiSelectMode
-                            if (!isMultiSelectMode) selectedDocIds.clear()
-                        },
-                        modifier = Modifier.testTag("recent_multiselect_toggle_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Checklist,
-                            contentDescription = "Multi-select documents",
-                            tint = if (isMultiSelectMode) {
-                                DocFlowAccentBlue
-                            } else {
-                                MaterialTheme.colorScheme.onBackground
-                            }
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { showSortMenuDialog = true },
-                        modifier = Modifier.testTag("recent_sort_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Sort,
-                            contentDescription = "Sort documents",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-
-                    IconButton(
-                        onClick = onOpenOtaAndSettings,
-                        modifier = Modifier.testTag("recent_settings_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                }
-            }
-
-            // Status Banner (if any action completed)
-            AnimatedVisibility(visible = !statusBannerMessage.isNullOrBlank()) {
-                if (!statusBannerMessage.isNullOrBlank()) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = DocFlowAccentBlue.copy(alpha = 0.12f)
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = statusBannerMessage,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier.weight(1f)
-                            )
-                            IconButton(
-                                onClick = onDismissStatusBanner,
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Dismiss notification",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
+                            if (!isMultiSelectMode) selectedDocIds = emptySet()
                         }
-                    }
-                }
-            }
-
-            // Expandable Search + Category & Tag Filter Bar (FTS4 full-text search across OCR & content)
-            AnimatedVisibility(visible = showSearchBar || searchQuery.isNotBlank() || selectedCategory != "All" || selectedTagFilters.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("search_input"),
-                        placeholder = {
-                            Text("Search filename, OCR text, or #tags...")
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = null)
-                        },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { onSearchQueryChange("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear search")
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(16.dp)
+                    ),
+                    DocFlowHeaderAction(
+                        icon = Icons.Filled.Settings,
+                        contentDescription = "Settings",
+                        testTag = "top_settings_button",
+                        onClick = onOpenSettings
                     )
+                )
+            )
 
-                    // Category chips
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        AUTO_CATEGORIES.forEach { cat ->
-                            val isSelected = selectedCategory.equals(cat, ignoreCase = true)
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { onSelectCategory(cat) },
-                                label = { Text(cat, fontSize = 12.sp) }
-                            )
-                        }
-                    }
-
-                    // Tag chips if available
-                    if (allAvailableTags.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            allAvailableTags.forEach { tag ->
-                                val active = selectedTagFilters.any { it.equals(tag, ignoreCase = true) }
-                                FilterChip(
-                                    selected = active,
-                                    onClick = { onToggleTagFilter(tag) },
-                                    label = { Text("#$tag", fontSize = 12.sp) }
-                                )
-                            }
-                            if (selectedTagFilters.isNotEmpty()) {
-                                TextButton(onClick = onClearTagFilters) {
-                                    Text("Clear tags", fontSize = 12.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Horizontal Format Filter Tabs: All, DOC, XLS, PPT, PDF, OFD, TXT with red underline on active
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(22.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FORMAT_FILTER_TABS.forEach { tab ->
-                    val isSelected = selectedFileType.equals(tab.filterKey, ignoreCase = true)
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .clickable { onSelectFileType(tab.filterKey) }
-                            .padding(vertical = 4.dp)
-                            .testTag("format_tab_${tab.label.lowercase()}")
-                    ) {
-                        Text(
-                            text = tab.label,
-                            fontSize = 16.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) {
-                                MaterialTheme.colorScheme.onBackground
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Box(
-                            modifier = Modifier
-                                .width(26.dp)
-                                .height(3.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(if (isSelected) BadgePdfRed else Color.Transparent)
-                        )
-                    }
-                }
-            }
+            // Horizontal Filter Tabs with Blue Underline
+            DocFlowFilterTabs(
+                tabs = RECENT_FILTER_TABS,
+                selectedTab = activeTypeTab,
+                onSelectTab = { activeTypeTab = it },
+                palette = palette
+            )
 
             // Multi-select Batch Action Bar
             AnimatedVisibility(visible = isMultiSelectMode) {
-                Card(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                        .background(palette.surface)
+                        .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = DocFlowTokens.space2),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "${selectedDocIds.size} selected",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(
-                                    onClick = {
-                                        if (selectedDocIds.size == filteredDocuments.size) {
-                                            selectedDocIds.clear()
-                                        } else {
-                                            selectedDocIds.clear()
-                                            selectedDocIds.addAll(filteredDocuments.map { it.id })
-                                        }
-                                    }
-                                ) {
-                                    Text(if (selectedDocIds.size == filteredDocuments.size) "Deselect all" else "Select all")
-                                }
-                                TextButton(
-                                    onClick = {
-                                        isMultiSelectMode = false
-                                        selectedDocIds.clear()
-                                    }
-                                ) {
-                                    Text("Done")
-                                }
+                    TextButton(
+                        onClick = {
+                            selectedDocIds = if (selectedDocIds.size == tabFilteredDocs.size) {
+                                emptySet()
+                            } else {
+                                tabFilteredDocs.map { it.id }.toSet()
                             }
                         }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Text(
+                            text = if (selectedDocIds.size == tabFilteredDocs.size) "Deselect all" else "Select all",
+                            color = DocFlowTokens.AccentBlue,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space1)) {
+                        IconButton(
+                            onClick = {
+                                val firstId = selectedDocIds.firstOrNull()
+                                val doc = tabFilteredDocs.find { it.id == firstId }
+                                if (doc != null) viewModel.shareAnyDocument(context, doc)
+                            },
+                            enabled = selectedDocIds.isNotEmpty()
                         ) {
-                            TextButton(
-                                enabled = selectedDocIds.isNotEmpty(),
-                                onClick = {
-                                    val firstDoc = filteredDocuments.firstOrNull { it.id in selectedDocIds }
-                                    if (firstDoc != null) onShareDocument(firstDoc)
+                            Icon(Icons.Filled.Share, contentDescription = "Share selected", tint = palette.textPrimary)
+                        }
+                        IconButton(
+                            onClick = { showMoveFolderDialog = true },
+                            enabled = selectedDocIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Filled.DriveFileMove, contentDescription = "Move to folder", tint = palette.textPrimary)
+                        }
+                        IconButton(
+                            onClick = { showBatchTagDialog = true },
+                            enabled = selectedDocIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Filled.Label, contentDescription = "Tag selected", tint = palette.textPrimary)
+                        }
+                        IconButton(
+                            onClick = {
+                                selectedDocIds.forEach { id ->
+                                    viewModel.moveToPrivateSafe(id, "1234")
                                 }
-                            ) {
-                                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Share", fontSize = 13.sp)
-                            }
-                            TextButton(
-                                enabled = selectedDocIds.isNotEmpty(),
-                                onClick = { showBatchMoveDialog = true }
-                            ) {
-                                Icon(Icons.Default.DriveFileMove, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Move", fontSize = 13.sp)
-                            }
-                            TextButton(
-                                enabled = selectedDocIds.isNotEmpty(),
-                                onClick = { showBatchTagDialog = true }
-                            ) {
-                                Icon(Icons.Default.Tag, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Tag", fontSize = 13.sp)
-                            }
-                            TextButton(
-                                enabled = selectedDocIds.isNotEmpty(),
-                                onClick = {
-                                    onBatchSoftDelete(selectedDocIds.toSet())
-                                    selectedDocIds.clear()
-                                    isMultiSelectMode = false
-                                }
-                            ) {
-                                Icon(
-                                    Icons.Default.DeleteOutline,
-                                    contentDescription = null,
-                                    tint = BadgePdfRed,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Delete", color = BadgePdfRed, fontSize = 13.sp)
-                            }
+                                selectedDocIds = emptySet()
+                                isMultiSelectMode = false
+                            },
+                            enabled = selectedDocIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Filled.Lock, contentDescription = "Move to Private Safe", tint = palette.textPrimary)
+                        }
+                        IconButton(
+                            onClick = {
+                                viewModel.softDeleteDocuments(selectedDocIds)
+                                selectedDocIds = emptySet()
+                                isMultiSelectMode = false
+                            },
+                            enabled = selectedDocIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete selected", tint = DocFlowTokens.IconCircleRed)
                         }
                     }
                 }
             }
 
-            // Document List or Empty State
-            if (filteredDocuments.isEmpty()) {
+            // Document List Grouped by Date inside White 24dp Flat Cards
+            if (tabFilteredDocs.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
+                        .padding(bottom = 80.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(28.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        DocFlowEmptyState(
+                            icon = Icons.Filled.History,
+                            title = "No recent files in $activeTypeTab",
+                            subtitle = "Create a Word, PPT, Excel, Note or PDF document, scan with AI Auto Capture, or use AI Mic voice-to-text. All files are stored on this device.",
+                            palette = palette
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2),
+                            modifier = Modifier.padding(horizontal = DocFlowTokens.screenHorizontalMargin)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .clip(CircleShape)
-                                    .background(DocFlowAccentBlue.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.FolderOpen,
-                                    contentDescription = null,
-                                    tint = DocFlowAccentBlue,
-                                    modifier = Modifier.size(36.dp)
-                                )
-                            }
-                            Text(
-                                text = "No documents found",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
+                            DocFlowPrimaryButton(
+                                text = "Create Doc / PPT / XLS",
+                                onClick = {
+                                    createFormat = "docx"
+                                    newDocTitle = ""
+                                    newDocBody = ""
+                                    showCreateDocDialog = true
+                                },
+                                modifier = Modifier.testTag("empty_state_create_doc_button")
                             )
-                            Text(
-                                text = "Open a PDF, Word, Excel, PowerPoint, or text file from your phone, or scan a paper document offline.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            DocFlowSecondaryButton(
+                                text = "AI Mic Dictate",
+                                onClick = { showStandaloneAiMicSheet = true },
+                                palette = palette,
+                                modifier = Modifier.testTag("empty_state_ai_mic_button")
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Button(
-                                    onClick = {
-                                        openDocumentLauncher.launch(
-                                            arrayOf(
-                                                "application/pdf",
-                                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                                "application/msword",
-                                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                                                "text/plain",
-                                                "*/*"
-                                            )
-                                        )
-                                    },
-                                    shape = RoundedCornerShape(14.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = DocFlowAccentBlue,
-                                        contentColor = Color.White
-                                    ),
-                                    modifier = Modifier.testTag("empty_state_open_file_button")
-                                ) {
-                                    Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Open a file", fontWeight = FontWeight.SemiBold)
-                                }
-
-                                OutlinedButton(
-                                    onClick = onOpenScanner,
-                                    shape = RoundedCornerShape(14.dp),
-                                    modifier = Modifier.testTag("empty_state_scan_button")
-                                ) {
-                                    Icon(Icons.Default.DocumentScanner, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Scan", fontWeight = FontWeight.SemiBold)
-                                }
-                            }
                         }
                     }
                 }
@@ -727,94 +355,66 @@ fun DashboardScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("recent_documents_list"),
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 6.dp,
-                        bottom = 96.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    contentPadding = PaddingValues(top = DocFlowTokens.space2, bottom = 104.dp)
                 ) {
-                    items(
-                        items = groupedByDate.entries.toList(),
-                        key = { it.key }
-                    ) { (dateLabel, docsInGroup) ->
-                        val isCollapsed = collapsedDateGroups[dateLabel] == true
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Date Group Header: "17 Oct | 2 items" + Collapse/Expand chevron
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        collapsedDateGroups[dateLabel] = !isCollapsed
-                                    }
-                                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "$dateLabel  |  ${docsInGroup.size} ${if (docsInGroup.size == 1) "item" else "items"}",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Icon(
-                                    imageVector = if (isCollapsed) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
-                                    contentDescription = if (isCollapsed) "Expand date group" else "Collapse date group",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                    groupedDocs.forEach { (dateLabel, docsInGroup) ->
+                        val isCollapsed = collapsedGroups[dateLabel] == true
+                        item(key = "header_$dateLabel") {
+                            DocFlowDateGroupHeader(
+                                dateLabel = dateLabel,
+                                isExpanded = !isCollapsed,
+                                onToggle = { collapsedGroups[dateLabel] = !isCollapsed },
+                                palette = palette
+                            )
+                        }
 
-                            if (!isCollapsed) {
-                                // White Card with 24.dp corner radius containing the rows for this date
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(24.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    ),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                        if (!isCollapsed) {
+                            item(key = "card_$dateLabel") {
+                                DocFlowCard(
+                                    palette = palette,
+                                    modifier = Modifier.padding(vertical = DocFlowTokens.space1),
+                                    contentPadding = PaddingValues(vertical = DocFlowTokens.space1)
                                 ) {
-                                    Column(modifier = Modifier.fillMaxWidth()) {
-                                        docsInGroup.forEachIndexed { index, doc ->
-                                            val isSelected = doc.id in selectedDocIds
-                                            val cached = cachedDocumentsMap[doc.id]
-                                            val tags = cached?.parsedTags() ?: emptyList()
-
-                                            RecentDocumentFlatRow(
-                                                doc = doc,
-                                                tags = tags,
-                                                isMultiSelectMode = isMultiSelectMode,
-                                                isSelected = isSelected,
-                                                onClick = {
-                                                    if (isMultiSelectMode) {
-                                                        if (isSelected) {
-                                                            selectedDocIds.remove(doc.id)
-                                                        } else {
-                                                            selectedDocIds.add(doc.id)
-                                                        }
+                                    docsInGroup.forEachIndexed { index, doc ->
+                                        val cached = cachedMap[doc.id]
+                                        val isSelected = selectedDocIds.contains(doc.id)
+                                        RecentDocumentFlatRow(
+                                            doc = doc,
+                                            cached = cached,
+                                            palette = palette,
+                                            isMultiSelectMode = isMultiSelectMode,
+                                            isSelected = isSelected,
+                                            onClick = {
+                                                if (isMultiSelectMode) {
+                                                    selectedDocIds = if (isSelected) {
+                                                        selectedDocIds - doc.id
                                                     } else {
-                                                        onOpenDocument(doc)
+                                                        selectedDocIds + doc.id
                                                     }
-                                                },
-                                                onLongClick = {
-                                                    docForQuickPreviewModal = doc
-                                                },
-                                                onMoreClick = {
-                                                    docForQuickPreviewModal = doc
+                                                } else {
+                                                    onOpenDocument(doc.id)
                                                 }
-                                            )
-
-                                            if (index < docsInGroup.lastIndex) {
-                                                HorizontalDivider(
-                                                    modifier = Modifier.padding(start = 74.dp, end = 16.dp),
-                                                    thickness = 0.7.dp,
-                                                    color = MaterialTheme.colorScheme.outlineVariant
+                                            },
+                                            onLongClick = {
+                                                isMultiSelectMode = true
+                                                selectedDocIds = selectedDocIds + doc.id
+                                            },
+                                            onShare = { viewModel.shareAnyDocument(context, doc) },
+                                            onRename = {
+                                                docForRename = doc
+                                                renameText = doc.title
+                                            },
+                                            onMoveToSafe = { viewModel.moveToPrivateSafe(doc.id, "1234") },
+                                            onDelete = { viewModel.softDeleteDocument(doc.id) }
+                                        )
+                                        if (index < docsInGroup.lastIndex) {
+                                            DocFlowDivider(
+                                                palette = palette,
+                                                modifier = Modifier.padding(
+                                                    start = 72.dp,
+                                                    end = DocFlowTokens.cardPaddingMin
                                                 )
-                                            }
+                                            )
                                         }
                                     }
                                 }
@@ -824,503 +424,410 @@ fun DashboardScreen(
                 }
             }
         }
-        }
+
+        // Bottom-Right Blue Circle FAB (+)
+        DocFlowFab(
+            onClick = { showFabSheet = true },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 20.dp)
+                .testTag("recent_fab_button")
+        )
     }
 
-    // FAB Bottom Sheet: New document (Word/Text), Scan document, Import file
-    if (showFabCreateSheet) {
+    // FAB Action Sheet: Scan, Open file, Create DOC/PPT/XLS/TXT/PDF, AI Mic with Noise Clean
+    if (showFabSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showFabCreateSheet = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            onDismissRequest = { showFabSheet = false },
+            containerColor = palette.surface,
+            shape = DocFlowTokens.sheetShape
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(horizontal = DocFlowTokens.cardPaddingMax, vertical = DocFlowTokens.space2)
             ) {
                 Text(
-                    text = "Create or Open",
-                    style = MaterialTheme.typography.titleLarge,
+                    text = "Add or Create Document",
+                    style = DocFlowTokens.sectionLabelStyle,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = palette.textPrimary
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-
-                FabSheetOptionRow(
-                    icon = Icons.Default.NoteAdd,
-                    iconBgColor = BadgeDocBlue,
-                    title = "New document (Word)",
-                    subtitle = "Create a formatted .docx or text note offline",
-                    testTag = "fab_sheet_new_doc",
-                    onClick = {
-                        showFabCreateSheet = false
-                        newDocDefaultFormat = "docx"
-                        showNewDocDialog = true
-                    }
+                Text(
+                    text = "Stored on this device • Opens in full Word / Office UI",
+                    style = DocFlowTokens.captionStyle,
+                    color = palette.textSecondary
                 )
+                Spacer(modifier = Modifier.height(DocFlowTokens.space3))
 
-                FabSheetOptionRow(
-                    icon = Icons.Default.DocumentScanner,
-                    iconBgColor = BadgePdfRed,
-                    title = "Scan document",
-                    subtitle = "Auto edge detect, perspective crop & offline OCR",
-                    testTag = "fab_sheet_scan_doc",
+                FabSheetRow(
+                    icon = Icons.Filled.CameraAlt,
+                    iconBg = DocFlowTokens.AccentBlue,
+                    title = "Scan document (AI Auto Capture)",
+                    subtitle = "CameraX batch scanner with auto-edge lock & multi-page preview drawer",
+                    palette = palette,
                     onClick = {
-                        showFabCreateSheet = false
+                        showFabSheet = false
                         onOpenScanner()
                     }
                 )
-
-                FabSheetOptionRow(
-                    icon = Icons.Default.FileOpen,
-                    iconBgColor = BadgeXlsGreen,
-                    title = "Import file",
-                    subtitle = "Open PDF, Word, Excel, PPT, or TXT from device",
-                    testTag = "fab_sheet_import_file",
+                FabSheetRow(
+                    icon = Icons.Filled.Mic,
+                    iconBg = DocFlowTokens.IconCircleTeal,
+                    title = "AI Mic • Sound to Text (Noise Clean)",
+                    subtitle = "Convert voice to clean text with hardware DSP noise suppression",
+                    palette = palette,
                     onClick = {
-                        showFabCreateSheet = false
-                        openDocumentLauncher.launch(
-                            arrayOf(
-                                "application/pdf",
-                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                "application/msword",
-                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                                "text/plain",
-                                "*/*"
-                            )
-                        )
+                        showFabSheet = false
+                        showStandaloneAiMicSheet = true
                     }
                 )
-
-                Spacer(modifier = Modifier.height(18.dp))
+                FabSheetRow(
+                    icon = Icons.Filled.FolderOpen,
+                    iconBg = DocFlowTokens.IconCircleGreen,
+                    title = "Open file from device",
+                    subtitle = "Import PDF, Word (.docx), Excel (.xlsx), PPT (.pptx), TXT or image",
+                    palette = palette,
+                    onClick = {
+                        showFabSheet = false
+                        filePickerLauncher.launch(arrayOf("*/*"))
+                    }
+                )
+                FabSheetRow(
+                    icon = Icons.Filled.Description,
+                    iconBg = DocFlowTokens.AccentBlue,
+                    title = "Create Word Document (.docx)",
+                    subtitle = "Open in full MS Word-style ribbon editor (Home, Insert, Layout, Review, View)",
+                    palette = palette,
+                    onClick = {
+                        showFabSheet = false
+                        createFormat = "docx"
+                        newDocTitle = ""
+                        newDocBody = ""
+                        showCreateDocDialog = true
+                    }
+                )
+                FabSheetRow(
+                    icon = Icons.Filled.Slideshow,
+                    iconBg = DocFlowTokens.IconCircleOrange,
+                    title = "Create Presentation (.pptx)",
+                    subtitle = "Author slide decks with speaker notes & export to PDF",
+                    palette = palette,
+                    onClick = {
+                        showFabSheet = false
+                        createFormat = "pptx"
+                        newDocTitle = ""
+                        newDocBody = ""
+                        showCreateDocDialog = true
+                    }
+                )
+                FabSheetRow(
+                    icon = Icons.Filled.TableChart,
+                    iconBg = DocFlowTokens.IconCircleExcelGreen,
+                    title = "Create Spreadsheet (.xlsx)",
+                    subtitle = "Build structured tables & financial sheets stored on this device",
+                    palette = palette,
+                    onClick = {
+                        showFabSheet = false
+                        createFormat = "xlsx"
+                        newDocTitle = ""
+                        newDocBody = ""
+                        showCreateDocDialog = true
+                    }
+                )
+                FabSheetRow(
+                    icon = Icons.Filled.PictureAsPdf,
+                    iconBg = DocFlowTokens.IconCircleRed,
+                    title = "Create Note / PDF (.txt / .pdf)",
+                    subtitle = "Author a clean note or instant PDF document on this device",
+                    palette = palette,
+                    onClick = {
+                        showFabSheet = false
+                        createFormat = "txt"
+                        newDocTitle = ""
+                        newDocBody = ""
+                        showCreateDocDialog = true
+                    }
+                )
+                Spacer(modifier = Modifier.height(DocFlowTokens.space5))
             }
         }
     }
 
-    // Quick-Preview & Metadata Modal (Long-press or More button)
-    val previewDoc = docForQuickPreviewModal
-    if (previewDoc != null) {
-        val cached = cachedDocumentsMap[previewDoc.id]
-        val tags = cached?.parsedTags() ?: emptyList()
-        val updatedTimeMs = previewDoc.updatedAt?.toDate()?.time ?: System.currentTimeMillis()
-        val formattedDate = remember(updatedTimeMs) {
-            SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(updatedTimeMs))
-        }
-
+    // Create Document Dialog (Supports Word .docx, PPT .pptx, Excel .xlsx, Note .txt, PDF .pdf + AI Mic Noise Clean)
+    if (showCreateDocDialog) {
+        val formatOptions = listOf(
+            "docx" to "Word (.docx)",
+            "pptx" to "PPT (.pptx)",
+            "xlsx" to "Excel (.xlsx)",
+            "txt" to "Note (.txt)",
+            "pdf" to "PDF (.pdf)"
+        )
         AlertDialog(
-            onDismissRequest = { docForQuickPreviewModal = null },
+            onDismissRequest = { showCreateDocDialog = false },
             title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    FlatFileFormatBadge(fileType = previewDoc.fileType, sizeDp = 40)
-                    Column {
-                        Text(
-                            text = previewDoc.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = previewDoc.fileName,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                Text(
+                    text = "Create Document (Open in Word UI)",
+                    style = DocFlowTokens.sectionLabelStyle,
+                    fontWeight = FontWeight.Bold
+                )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Card(
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.background
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "Format: ${previewDoc.fileType.uppercase()}  •  Pages: ${previewDoc.pageCount.coerceAtLeast(1L)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Size: ${formatDocumentBytes(previewDoc.fileSize)}  •  Category: ${previewDoc.category}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Text(
-                                text = "Last modified: $formattedDate",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (tags.isNotEmpty()) {
-                                Text(
-                                    text = "Tags: ${tags.joinToString(", ") { "#$it" }}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = DocFlowAccentBlue
-                                )
-                            }
-                        }
-                    }
-
+                Column(verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)) {
                     Text(
-                        text = "Extracted Content / OCR Preview",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
+                        text = "Select format • Stored on this device",
+                        style = DocFlowTokens.captionStyle,
+                        color = palette.textSecondary
                     )
-                    Text(
-                        text = if (previewDoc.isEncrypted) {
-                            "AES-256-GCM Encrypted Document"
-                        } else {
-                            previewDoc.content.take(280).ifBlank { "No text preview available." }
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 6,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    HorizontalDivider()
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        TextButton(
-                            onClick = {
-                                docForQuickPreviewModal = null
-                                docForCategorizeModal = previewDoc
-                            }
-                        ) {
-                            Icon(Icons.Default.Tag, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Tags & Category")
-                        }
-
-                        TextButton(
-                            onClick = {
-                                docForQuickPreviewModal = null
-                                docForPrivateSafePrompt = previewDoc
-                            }
-                        ) {
-                            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Private Safe")
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        TextButton(
-                            onClick = {
-                                docForQuickPreviewModal = null
-                                onShareDocument(previewDoc)
-                            }
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Share")
-                        }
-
-                        TextButton(
-                            onClick = {
-                                val id = previewDoc.id
-                                docForQuickPreviewModal = null
-                                onBatchSoftDelete(setOf(id))
-                            }
-                        ) {
-                            Icon(
-                                Icons.Default.DeleteOutline,
-                                contentDescription = null,
-                                tint = BadgePdfRed,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Delete", color = BadgePdfRed)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val doc = previewDoc
-                        docForQuickPreviewModal = null
-                        onOpenDocument(doc)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DocFlowAccentBlue)
-                ) {
-                    Text("Open Document", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { docForQuickPreviewModal = null }) {
-                    Text("Close")
-                }
-            }
-        )
-    }
-
-    // Move to Private Safe Dialog
-    val safeDoc = docForPrivateSafePrompt
-    if (safeDoc != null) {
-        var pinInput by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { docForPrivateSafePrompt = null },
-            title = { Text("Move to Private Safe", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "'${safeDoc.title}' will be encrypted with AES-256-GCM and hidden from Recent and Search.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    OutlinedTextField(
-                        value = pinInput,
-                        onValueChange = { pinInput = it },
-                        label = { Text("Private Safe PIN (default 1234)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onMoveToPrivateSafe(safeDoc.id, pinInput.ifBlank { "1234" })
-                        docForPrivateSafePrompt = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DocFlowAccentBlue)
-                ) {
-                    Text("Encrypt & Move", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { docForPrivateSafePrompt = null }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    // Categorize & Tag Modal
-    val catDoc = docForCategorizeModal
-    if (catDoc != null) {
-        val currentTags = cachedDocumentsMap[catDoc.id]?.parsedTags()?.joinToString(", ") ?: ""
-        var selectedCat by remember(catDoc) { mutableStateOf(catDoc.category.ifBlank { "Other" }) }
-        var tagsInput by remember(catDoc) { mutableStateOf(currentTags) }
-
-        AlertDialog(
-            onDismissRequest = { docForCategorizeModal = null },
-            title = { Text("Category & Tags", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Category", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
                     ) {
-                        AUTO_CATEGORIES.filter { it != "All" }.forEach { cat ->
+                        formatOptions.forEach { (ext, label) ->
                             FilterChip(
-                                selected = selectedCat.equals(cat, ignoreCase = true),
-                                onClick = { selectedCat = cat },
-                                label = { Text(cat, fontSize = 12.sp) }
+                                selected = createFormat == ext,
+                                onClick = { createFormat = ext },
+                                label = { Text(label, fontSize = 12.sp) },
+                                modifier = Modifier.testTag("create_format_chip_$ext")
                             )
                         }
                     }
                     OutlinedTextField(
-                        value = tagsInput,
-                        onValueChange = { tagsInput = it },
-                        label = { Text("Tags (comma-separated)") },
+                        value = newDocTitle,
+                        onValueChange = { newDocTitle = it },
+                        label = { Text("Document title") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("create_doc_title_input")
                     )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onUpdateCategoryAndTags(catDoc, selectedCat, tagsInput)
-                        docForCategorizeModal = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DocFlowAccentBlue)
-                ) {
-                    Text("Save", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { docForCategorizeModal = null }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    // New Document (Word / Text) Dialog
-    if (showNewDocDialog) {
-        var title by remember { mutableStateOf("") }
-        var content by remember { mutableStateOf("") }
-        var fileType by remember { mutableStateOf(newDocDefaultFormat) }
-        var tags by remember { mutableStateOf("created-by-me") }
-
-        AlertDialog(
-            onDismissRequest = { showNewDocDialog = false },
-            title = { Text("New Document", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        label = { Text("Document Title") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("docx" to "Word (.docx)", "txt" to "Text (.txt)", "pdf" to "PDF (.pdf)").forEach { (ext, label) ->
-                            FilterChip(
-                                selected = fileType == ext,
-                                onClick = { fileType = ext },
-                                label = { Text(label, fontSize = 12.sp) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Initial Content (Optional)",
+                            style = DocFlowTokens.captionStyle,
+                            color = palette.textSecondary
+                        )
+                        Row(
+                            modifier = Modifier
+                                .clip(DocFlowTokens.pillButtonShape)
+                                .background(DocFlowTokens.IconCircleTeal.copy(alpha = 0.14f))
+                                .clickable { showAiMicForCreate = true }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .testTag("create_doc_ai_mic_button"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.GraphicEq,
+                                contentDescription = "AI Mic Noise Clean",
+                                tint = DocFlowTokens.IconCircleTeal,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "AI Mic (Noise Clean)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = DocFlowTokens.IconCircleTeal
                             )
                         }
                     }
-
                     OutlinedTextField(
-                        value = content,
-                        onValueChange = { content = it },
-                        label = { Text("Document Content") },
+                        value = newDocBody,
+                        onValueChange = { newDocBody = it },
+                        label = { Text("Type or use AI Mic voice-to-text...") },
                         minLines = 4,
                         maxLines = 8,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = tags,
-                        onValueChange = { tags = it },
-                        label = { Text("Tags (comma-separated)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("create_doc_body_input")
                     )
                 }
             },
             confirmButton = {
-                Button(
+                TextButton(
                     onClick = {
-                        val finalTitle = title.trim().ifBlank { "Untitled Document" }
-                        val cleanName = finalTitle.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_') + ".$fileType"
-                        onCreateDocument(
-                            finalTitle,
-                            if (selectedFolderId == "all") "root" else selectedFolderId,
-                            "Work",
-                            fileType,
-                            cleanName,
-                            content.ifBlank { finalTitle },
-                            false,
-                            "",
-                            null,
-                            tags
+                        val title = newDocTitle.trim().ifBlank {
+                            when (createFormat) {
+                                "pptx" -> "Untitled Presentation"
+                                "xlsx" -> "Untitled Spreadsheet"
+                                "txt" -> "Untitled Note"
+                                "pdf" -> "Untitled PDF"
+                                else -> "Untitled Word Document"
+                            }
+                        }
+                        val ext = createFormat.lowercase()
+                        val cleanName = title.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+                            .ifBlank { "document" } + ".$ext"
+                        val bodyContent = newDocBody.ifBlank {
+                            when (ext) {
+                                "pptx" -> "=== SLIDE 1: $title ===\n• Key presentation point\n• Stored on this device"
+                                "xlsx" -> "=== SHEET 1: $title ===\n| Item | Value | Notes |\n| Row 1 | 100 | Active |"
+                                else -> title
+                            }
+                        }
+                        viewModel.createOrScanDocument(
+                            title = title,
+                            folderId = "root",
+                            category = "Work",
+                            fileType = ext,
+                            fileName = cleanName,
+                            plainContent = bodyContent,
+                            isEncrypted = false,
+                            password = "",
+                            encryptionKeyHint = null,
+                            isOfflineCached = true,
+                            pageCount = 1L,
+                            customTags = "created-by-me, $ext",
+                            createdByMe = true,
+                            onCreated = { createdId ->
+                                showCreateDocDialog = false
+                                onOpenDocument(createdId)
+                            }
                         )
-                        showNewDocDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = DocFlowAccentBlue)
+                    modifier = Modifier.testTag("create_doc_confirm_button")
                 ) {
-                    Text("Create", color = Color.White)
+                    Text("Create & Open in Word UI", fontWeight = FontWeight.Bold, color = DocFlowTokens.AccentBlue)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showNewDocDialog = false }) {
+                TextButton(onClick = { showCreateDocDialog = false }) {
                     Text("Cancel")
                 }
             }
         )
     }
 
-    // Sort Option Dialog
-    if (showSortMenuDialog) {
+    if (showAiMicForCreate) {
+        AiMicDictationBottomSheet(
+            palette = palette,
+            initialText = newDocBody,
+            confirmButtonLabel = "Use Clean Text",
+            onDismiss = { showAiMicForCreate = false },
+            onConfirmCleanText = { cleaned ->
+                newDocBody = cleaned
+                if (newDocTitle.isBlank()) {
+                    newDocTitle = cleaned.lines().firstOrNull()?.take(36)?.trim() ?: "Voice Dictation Note"
+                }
+                showAiMicForCreate = false
+            }
+        )
+    }
+
+    if (showStandaloneAiMicSheet) {
+        AiMicDictationBottomSheet(
+            palette = palette,
+            initialText = "",
+            confirmButtonLabel = "Create Word Doc from Voice",
+            onDismiss = { showStandaloneAiMicSheet = false },
+            onConfirmCleanText = { cleaned ->
+                val title = cleaned.lines().firstOrNull()?.take(36)?.trim()?.ifBlank { "AI Mic Voice Document" }
+                    ?: "AI Mic Voice Document"
+                val cleanName = title.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+                    .ifBlank { "voice_doc" } + ".docx"
+                viewModel.createOrScanDocument(
+                    title = title,
+                    folderId = "root",
+                    category = "Work",
+                    fileType = "docx",
+                    fileName = cleanName,
+                    plainContent = cleaned,
+                    isEncrypted = false,
+                    password = "",
+                    encryptionKeyHint = null,
+                    isOfflineCached = true,
+                    pageCount = 1L,
+                    customTags = "ai-mic, noise-clean, voice-to-text, created-by-me, docx",
+                    createdByMe = true,
+                    onCreated = { docId ->
+                        showStandaloneAiMicSheet = false
+                        onOpenDocument(docId)
+                    }
+                )
+            }
+        )
+    }
+
+    // Rename Dialog
+    docForRename?.let { targetDoc ->
         AlertDialog(
-            onDismissRequest = { showSortMenuDialog = false },
-            title = { Text("Sort Documents", fontWeight = FontWeight.Bold) },
+            onDismissRequest = { docForRename = null },
+            title = { Text("Rename document") },
             text = {
-                Column {
-                    SortOption.entries.forEach { option ->
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    label = { Text("New name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val updatedTitle = renameText.trim().ifBlank { targetDoc.title }
+                        viewModel.updateDocumentContent(
+                            doc = targetDoc,
+                            newTitle = updatedTitle,
+                            newFolderId = targetDoc.folderId,
+                            newCategory = targetDoc.category,
+                            plainContent = targetDoc.content,
+                            isEncrypted = targetDoc.isEncrypted,
+                            password = null,
+                            encryptionKeyHint = targetDoc.encryptionKeyHint,
+                            isOfflineCached = true
+                        )
+                        docForRename = null
+                    }
+                ) {
+                    Text("Save", fontWeight = FontWeight.Bold, color = DocFlowTokens.AccentBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { docForRename = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Move to Folder Dialog
+    if (showMoveFolderDialog) {
+        AlertDialog(
+            onDismissRequest = { showMoveFolderDialog = false },
+            title = { Text("Move ${selectedDocIds.size} item(s) to folder") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)) {
+                    folders.forEach { folder ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clip(DocFlowTokens.buttonShape)
                                 .clickable {
-                                    onSortOptionChange(option)
-                                    showSortMenuDialog = false
+                                    viewModel.moveDocumentsToFolder(selectedDocIds, folder.id)
+                                    showMoveFolderDialog = false
+                                    isMultiSelectMode = false
+                                    selectedDocIds = emptySet()
                                 }
-                                .padding(vertical = 12.dp, horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(DocFlowTokens.space3),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
                         ) {
-                            Text(
-                                text = option.label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (sortOption == option) FontWeight.Bold else FontWeight.Normal
-                            )
-                            if (sortOption == option) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = DocFlowAccentBlue)
-                            }
+                            Icon(Icons.Filled.FolderOpen, contentDescription = null, tint = DocFlowTokens.AccentBlue)
+                            Text(folder.name, style = DocFlowTokens.rowTitleStyle, color = palette.textPrimary)
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showSortMenuDialog = false }) {
+                TextButton(onClick = { showMoveFolderDialog = false }) {
                     Text("Close")
-                }
-            }
-        )
-    }
-
-    // Batch Move to Folder Dialog
-    if (showBatchMoveDialog) {
-        AlertDialog(
-            onDismissRequest = { showBatchMoveDialog = false },
-            title = { Text("Move ${selectedDocIds.size} item(s) to Folder", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (folders.isEmpty()) {
-                        Text("No custom folders yet. Create folders in the Manage tab.")
-                    } else {
-                        folders.forEach { folder ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        onBatchMoveToFolder(selectedDocIds.toSet(), folder.id)
-                                        selectedDocIds.clear()
-                                        isMultiSelectMode = false
-                                        showBatchMoveDialog = false
-                                    }
-                                    .padding(vertical = 10.dp, horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.FolderOpen, contentDescription = null, tint = DocFlowAccentBlue)
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(folder.name, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showBatchMoveDialog = false }) {
-                    Text("Cancel")
                 }
             }
         )
@@ -1328,30 +835,29 @@ fun DashboardScreen(
 
     // Batch Tag Dialog
     if (showBatchTagDialog) {
-        var batchTagText by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showBatchTagDialog = false },
-            title = { Text("Tag ${selectedDocIds.size} item(s)", fontWeight = FontWeight.Bold) },
+            title = { Text("Tag ${selectedDocIds.size} selected item(s)") },
             text = {
                 OutlinedTextField(
-                    value = batchTagText,
-                    onValueChange = { batchTagText = it },
-                    label = { Text("Tags (e.g. tax, urgent, 2026)") },
+                    value = batchTagInput,
+                    onValueChange = { batchTagInput = it },
+                    label = { Text("Tags (comma separated, e.g. urgent, tax)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
             },
             confirmButton = {
-                Button(
+                TextButton(
                     onClick = {
-                        onBatchTagDocuments(selectedDocIds.toSet(), batchTagText)
-                        selectedDocIds.clear()
-                        isMultiSelectMode = false
+                        viewModel.batchTagDocuments(selectedDocIds, batchTagInput)
+                        batchTagInput = ""
                         showBatchTagDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DocFlowAccentBlue)
+                        isMultiSelectMode = false
+                        selectedDocIds = emptySet()
+                    }
                 ) {
-                    Text("Apply Tags", color = Color.White)
+                    Text("Apply", fontWeight = FontWeight.Bold, color = DocFlowTokens.AccentBlue)
                 }
             },
             dismissButton = {
@@ -1367,21 +873,53 @@ fun DashboardScreen(
 @Composable
 private fun RecentDocumentFlatRow(
     doc: DocEntity,
-    tags: List<String>,
+    cached: CachedDocumentEntity?,
+    palette: DocFlowPalette,
     isMultiSelectMode: Boolean,
     isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    onMoreClick: () -> Unit
+    onShare: () -> Unit,
+    onRename: () -> Unit,
+    onMoveToSafe: () -> Unit,
+    onDelete: () -> Unit
 ) {
-    val updatedMs = doc.updatedAt?.toDate()?.time ?: System.currentTimeMillis()
-    val relativeTime = remember(updatedMs) {
-        DateUtils.getRelativeTimeSpanString(
-            updatedMs,
-            System.currentTimeMillis(),
-            DateUtils.MINUTE_IN_MILLIS,
-            DateUtils.FORMAT_ABBREV_RELATIVE
-        ).toString()
+    var showOverflowMenu by remember { mutableStateOf(false) }
+    val ft = doc.fileType.lowercase()
+
+    val badgeColor = when (ft) {
+        "pdf", "scanned" -> DocFlowTokens.IconCircleRed
+        "docx", "doc" -> DocFlowTokens.AccentBlue
+        "xlsx", "xls", "csv" -> DocFlowTokens.IconCircleExcelGreen
+        "pptx", "ppt" -> DocFlowTokens.IconCircleOrange
+        else -> DocFlowTokens.IconCircleTeal
+    }
+
+    val badgeIcon = when (ft) {
+        "pdf", "scanned" -> Icons.Filled.PictureAsPdf
+        "docx", "doc" -> Icons.Filled.Description
+        "xlsx", "xls", "csv" -> Icons.Filled.TableChart
+        "pptx", "ppt" -> Icons.Filled.Slideshow
+        "pic" -> Icons.Filled.Image
+        else -> Icons.Filled.Description
+    }
+
+    val tsMillis = cached?.lastAccessedAtMillis ?: cached?.updatedAtMillis ?: ((doc.updatedAt?.seconds ?: 0L) * 1000L)
+    val timeStr = remember(tsMillis) {
+        if (tsMillis > 0L) {
+            SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(tsMillis)).lowercase()
+        } else {
+            "just now"
+        }
+    }
+    val sizeStr = remember(doc.fileSize) {
+        val kb = doc.fileSize.coerceAtLeast(1024L) / 1024.0
+        if (kb >= 1024.0) String.format("%.1f MB", kb / 1024.0) else String.format("%.0f KB", kb)
+    }
+    val resumeLabel = if ((cached?.lastPageViewed ?: 0) > 0) {
+        " • Page ${(cached?.lastPageViewed ?: 0) + 1}"
+    } else {
+        ""
     }
 
     Row(
@@ -1391,67 +929,118 @@ private fun RecentDocumentFlatRow(
                 onClick = onClick,
                 onLongClick = onLongClick
             )
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(
+                horizontal = DocFlowTokens.cardPaddingMin,
+                vertical = DocFlowTokens.space3
+            )
             .testTag("doc_row_${doc.id}"),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        FlatFileFormatBadge(fileType = doc.fileType, sizeDp = 44)
+        if (isMultiSelectMode) {
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) DocFlowTokens.AccentBlue else Color.Transparent)
+                    .border(
+                        width = 2.dp,
+                        color = if (isSelected) DocFlowTokens.AccentBlue else palette.textSecondary,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = "Selected",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(DocFlowTokens.space3))
+        }
 
-        Spacer(modifier = Modifier.width(14.dp))
+        // File Type Thumbnail / Icon with 8dp token radius
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(DocFlowTokens.thumbnailShape)
+                .background(badgeColor.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = badgeIcon,
+                contentDescription = doc.fileType,
+                tint = badgeColor,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(DocFlowTokens.space3))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = doc.title,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = DocFlowTokens.rowTitleStyle,
+                color = palette.textPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(3.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = "$relativeTime  •  ${formatDocumentBytes(doc.fileSize)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (doc.category.isNotBlank() && !doc.category.equals("Other", ignoreCase = true)) {
-                    Surface(
-                        color = DocFlowAccentBlue.copy(alpha = 0.10f),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = doc.category,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = DocFlowAccentBlue,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "$timeStr • $sizeStr • ${doc.fileType.uppercase()}$resumeLabel • Stored on this device",
+                style = DocFlowTokens.captionStyle,
+                color = palette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
 
-        if (isMultiSelectMode) {
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                    contentDescription = if (isSelected) "Selected" else "Not selected",
-                    tint = if (isSelected) DocFlowAccentBlue else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
+        Box {
             IconButton(
-                onClick = onMoreClick,
-                modifier = Modifier.size(36.dp)
+                onClick = { showOverflowMenu = true },
+                modifier = Modifier.size(DocFlowTokens.minTouchTarget)
             ) {
                 Icon(
-                    imageVector = Icons.Default.MoreHoriz,
-                    contentDescription = "Document options",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = "Document actions",
+                    tint = palette.textSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            DropdownMenu(
+                expanded = showOverflowMenu,
+                onDismissRequest = { showOverflowMenu = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Share") },
+                    onClick = {
+                        showOverflowMenu = false
+                        onShare()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Rename") },
+                    onClick = {
+                        showOverflowMenu = false
+                        onRename()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Move to Private Safe") },
+                    onClick = {
+                        showOverflowMenu = false
+                        onMoveToSafe()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete", color = DocFlowTokens.IconCircleRed) },
+                    onClick = {
+                        showOverflowMenu = false
+                        onDelete()
+                    }
                 )
             }
         }
@@ -1459,97 +1048,39 @@ private fun RecentDocumentFlatRow(
 }
 
 @Composable
-fun FlatFileFormatBadge(
-    fileType: String,
-    sizeDp: Int = 44
-) {
-    val clean = fileType.lowercase().trim()
-    val (bgColor, shortLabel) = when {
-        clean.contains("pdf") -> BadgePdfRed to "PDF"
-        clean.contains("doc") -> BadgeDocBlue to "W"
-        clean.contains("xls") || clean.contains("csv") -> BadgeXlsGreen to "X"
-        clean.contains("ppt") -> BadgePptOrange to "P"
-        clean.contains("ofd") -> BadgeOfdPurple to "OFD"
-        else -> BadgeTxtSlate to "TXT"
-    }
-
-    Box(
-        modifier = Modifier
-            .size(sizeDp.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(bgColor),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = shortLabel,
-            color = Color.White,
-            fontSize = if (shortLabel.length > 2) 12.sp else 16.sp,
-            fontWeight = FontWeight.ExtraBold
-        )
-    }
-}
-
-@Composable
-private fun FabSheetOptionRow(
+private fun FabSheetRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    iconBgColor: Color,
+    iconBg: Color,
     title: String,
     subtitle: String,
-    testTag: String,
+    palette: DocFlowPalette,
     onClick: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
-            .testTag(testTag),
-        color = MaterialTheme.colorScheme.background,
-        shape = RoundedCornerShape(18.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(iconBgColor.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconBgColor,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+    DocFlowListRow(
+        title = title,
+        subtitle = subtitle,
+        palette = palette,
+        onClick = onClick,
+        leading = {
+            DocFlowIconCircle(
+                icon = icon,
+                circleColor = iconBg
+            )
         }
-    }
+    )
 }
 
-private fun formatDocumentBytes(bytes: Long): String {
-    val safe = bytes.coerceAtLeast(512L)
+private fun formatDateGroupHeader(timestampMillis: Long): String {
+    if (timestampMillis <= 0L) return "Today"
+    val nowCal = Calendar.getInstance()
+    val itemCal = Calendar.getInstance().apply { timeInMillis = timestampMillis }
+
+    val sameYear = nowCal.get(Calendar.YEAR) == itemCal.get(Calendar.YEAR)
+    val dayDiff = nowCal.get(Calendar.DAY_OF_YEAR) - itemCal.get(Calendar.DAY_OF_YEAR)
+
     return when {
-        safe >= 1024L * 1024L -> String.format(Locale.US, "%.1f MB", safe / (1024f * 1024f))
-        safe >= 1024L -> "${safe / 1024L} KB"
-        else -> "$safe B"
+        sameYear && dayDiff == 0 -> "Today"
+        sameYear && dayDiff == 1 -> "Yesterday"
+        else -> SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(timestampMillis))
     }
 }

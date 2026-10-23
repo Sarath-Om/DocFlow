@@ -457,13 +457,17 @@ object ImageProcessingPdfPipeline {
 
     /**
      * Converts a list of processed Bitmaps into a standard multi-page PDF file on local storage
-     * using Android's PdfDocument API.
+     * using Android's PdfDocument API, with optional text watermark, page size, and margin controls.
      */
     suspend fun convertBitmapsToPdfFile(
         context: Context,
         fileName: String,
         bitmaps: List<Bitmap>,
-        ocrText: String = ""
+        ocrText: String = "",
+        watermarkConfig: PdfWatermarkConfig = PdfWatermarkConfig(enabled = false),
+        pageSizeOption: String = "A4", // A4, LETTER, FIT
+        orientationOption: String = "PORTRAIT", // PORTRAIT, LANDSCAPE
+        marginOption: String = "SMALL" // NONE, SMALL, BIG
     ): Result<PdfConversionResult> = withContext(Dispatchers.IO) {
         try {
             val scansDir = File(context.filesDir, "scanned_pdfs")
@@ -477,21 +481,67 @@ object ImageProcessingPdfPipeline {
             }
             val outFile = File(scansDir, safeName)
 
-            val pageWidth = 595
-            val pageHeight = 842
+            val baseDims = when (pageSizeOption.uppercase()) {
+                "LETTER" -> 612 to 792
+                "LEGAL" -> 612 to 1008
+                "FIT" -> {
+                    val first = bitmaps.firstOrNull()
+                    if (first != null) {
+                        first.width.coerceIn(400, 1200) to first.height.coerceIn(500, 1600)
+                    } else {
+                        595 to 842
+                    }
+                }
+                else -> 595 to 842 // A4
+            }
+            val (pageWidth, pageHeight) = if (orientationOption.equals("LANDSCAPE", ignoreCase = true)) {
+                maxOf(baseDims.first, baseDims.second) to minOf(baseDims.first, baseDims.second)
+            } else {
+                baseDims.first to baseDims.second
+            }
 
+            val marginPx = when (marginOption.uppercase()) {
+                "NONE" -> 0f
+                "BIG" -> 42f
+                else -> 18f // SMALL
+            }
+
+            val totalPages = bitmaps.size.coerceAtLeast(1)
             val wroteViaNativePdf = runCatching {
                 val pdfDocument = PdfDocument()
                 try {
                     bitmaps.forEachIndexed { index, bitmap ->
-                        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, index + 1).create()
+                        val pageNumber1Based = index + 1
+                        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber1Based).create()
                         val page = pdfDocument.startPage(pageInfo)
                         val canvas = page.canvas
                         canvas.drawColor(Color.WHITE)
 
-                        val destRect = RectF(16f, 16f, pageWidth - 16f, pageHeight - 16f)
+                        val shouldDrawWatermark = watermarkConfig.enabled &&
+                            watermarkConfig.text.isNotBlank() &&
+                            isPageInWatermarkRange(pageNumber1Based, totalPages, watermarkConfig)
+
+                        if (shouldDrawWatermark && watermarkConfig.layerBehindContent) {
+                            drawWatermarkOnCanvas(
+                                canvas = canvas,
+                                pageWidth = pageWidth.toFloat(),
+                                pageHeight = pageHeight.toFloat(),
+                                config = watermarkConfig
+                            )
+                        }
+
+                        val destRect = RectF(
+                            marginPx,
+                            marginPx,
+                            pageWidth - marginPx,
+                            pageHeight - marginPx
+                        )
                         val srcRect = Rect(0, 0, bitmap.width, bitmap.height)
-                        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+                        val paint = Paint(Paint.FILTER_BITMAP_FLAG).apply {
+                            if (shouldDrawWatermark && watermarkConfig.layerBehindContent) {
+                                alpha = 235
+                            }
+                        }
                         canvas.drawBitmap(bitmap, srcRect, destRect, paint)
 
                         if (ocrText.isNotBlank()) {
@@ -502,6 +552,15 @@ object ImageProcessingPdfPipeline {
                             ocrText.lines().take(25).forEachIndexed { lineIdx, line ->
                                 canvas.drawText(line.take(120), 20f, 30f + (lineIdx * 8f), ocrPaint)
                             }
+                        }
+
+                        if (shouldDrawWatermark && !watermarkConfig.layerBehindContent) {
+                            drawWatermarkOnCanvas(
+                                canvas = canvas,
+                                pageWidth = pageWidth.toFloat(),
+                                pageHeight = pageHeight.toFloat(),
+                                config = watermarkConfig
+                            )
                         }
 
                         pdfDocument.finishPage(page)
@@ -518,7 +577,14 @@ object ImageProcessingPdfPipeline {
             }.getOrDefault(false)
 
             if (!wroteViaNativePdf || !outFile.exists() || outFile.length() == 0L) {
-                writeStandardMultiPagePdfFallback(outFile, bitmaps, pageWidth, pageHeight, ocrText)
+                writeStandardMultiPagePdfFallback(
+                    outFile = outFile,
+                    bitmaps = bitmaps,
+                    pageWidth = pageWidth,
+                    pageHeight = pageHeight,
+                    ocrText = ocrText,
+                    watermarkText = if (watermarkConfig.enabled) watermarkConfig.text else ""
+                )
             }
 
             Result.success(
@@ -534,12 +600,93 @@ object ImageProcessingPdfPipeline {
         }
     }
 
+    fun isPageInWatermarkRange(
+        pageNumber1Based: Int,
+        totalPages: Int,
+        config: PdfWatermarkConfig
+    ): Boolean {
+        return when (config.pageRangeMode.uppercase()) {
+            "FIRST" -> pageNumber1Based == 1
+            "CUSTOM" -> {
+                val rangeParts = config.customPageRange.split("-").mapNotNull { it.trim().toIntOrNull() }
+                if (rangeParts.size == 2) {
+                    pageNumber1Based in rangeParts[0]..rangeParts[1]
+                } else if (rangeParts.size == 1) {
+                    pageNumber1Based == rangeParts[0]
+                } else {
+                    true
+                }
+            }
+            else -> pageNumber1Based in 1..totalPages
+        }
+    }
+
+    fun drawWatermarkOnCanvas(
+        canvas: Canvas,
+        pageWidth: Float,
+        pageHeight: Float,
+        config: PdfWatermarkConfig
+    ) {
+        val text = config.text.take(40).ifBlank { return }
+        val baseColor = runCatching { Color.parseColor(config.colorHex) }.getOrDefault(Color.GRAY)
+        val alphaVal = ((config.opacityPercent.coerceIn(5, 100) / 100f) * 255f).toInt().coerceIn(12, 255)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(
+                alphaVal,
+                Color.red(baseColor),
+                Color.green(baseColor),
+                Color.blue(baseColor)
+            )
+            textSize = config.fontSizeSp.coerceIn(14, 72).toFloat()
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+
+        if (config.positionIndex == 9) {
+            // Tile across page
+            val stepX = (pageWidth / 2.6f).coerceAtLeast(160f)
+            val stepY = (pageHeight / 3.8f).coerceAtLeast(150f)
+            var y = stepY * 0.55f
+            while (y < pageHeight - 30f) {
+                var x = stepX * 0.5f
+                while (x < pageWidth - 30f) {
+                    canvas.save()
+                    canvas.translate(x, y)
+                    canvas.rotate(config.rotationDegrees.toFloat())
+                    canvas.drawText(text, 0f, 0f, paint)
+                    canvas.restore()
+                    x += stepX
+                }
+                y += stepY
+            }
+        } else {
+            val col = (config.positionIndex.coerceIn(0, 8)) % 3
+            val row = (config.positionIndex.coerceIn(0, 8)) / 3
+            val targetX = when (col) {
+                0 -> pageWidth * 0.24f
+                2 -> pageWidth * 0.76f
+                else -> pageWidth * 0.50f
+            }
+            val targetY = when (row) {
+                0 -> pageHeight * 0.18f
+                2 -> pageHeight * 0.82f
+                else -> pageHeight * 0.50f
+            }
+            canvas.save()
+            canvas.translate(targetX, targetY)
+            canvas.rotate(config.rotationDegrees.toFloat())
+            canvas.drawText(text, 0f, 0f, paint)
+            canvas.restore()
+        }
+    }
+
     private fun writeStandardMultiPagePdfFallback(
         outFile: File,
         bitmaps: List<Bitmap>,
         pageWidth: Int,
         pageHeight: Int,
-        ocrText: String = ""
+        ocrText: String = "",
+        watermarkText: String = ""
     ) {
         val count = bitmaps.size.coerceAtLeast(1)
         val sanitizedOcr = ocrText
@@ -548,6 +695,11 @@ object ImageProcessingPdfPipeline {
             .replace(")", "]")
             .replace("\r", " ")
             .replace("\n", " ")
+            .trim()
+        val sanitizedWatermark = watermarkText
+            .replace("\\", " ")
+            .replace("(", "[")
+            .replace(")", "]")
             .trim()
         val sb = StringBuilder()
         sb.append("%PDF-1.4\n")
@@ -559,7 +711,7 @@ object ImageProcessingPdfPipeline {
             val bmp = bitmaps.getOrNull(i)
             val dims = if (bmp != null) "${bmp.width}x${bmp.height}" else "${pageWidth}x${pageHeight}"
             sb.append(
-                "$objId 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 $pageWidth $pageHeight] /Resources << /ProcSet [/PDF /Text /ImageC] >> /PieceInfo << /DocFlowScan ($dims) /MlKitOcr ($sanitizedOcr) >> >> endobj\n"
+                "$objId 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 $pageWidth $pageHeight] /Resources << /ProcSet [/PDF /Text /ImageC] >> /PieceInfo << /DocFlowScan ($dims) /MlKitOcr ($sanitizedOcr) /Watermark ($sanitizedWatermark) >> >> endobj\n"
             )
         }
         sb.append("trailer << /Root 1 0 R >>\n%%EOF\n")

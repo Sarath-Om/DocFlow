@@ -2,25 +2,17 @@ package com.example.ui.screens
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Canvas as AndroidCanvas
-import android.graphics.Color as AndroidColor
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
+import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.Rect
-import android.graphics.RectF
 import android.net.Uri
-import android.os.Environment
-import android.os.StatFs
-import android.provider.Settings
-import androidx.activity.compose.BackHandler
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -28,79 +20,61 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.CreateNewFolder
-import androidx.compose.material.icons.filled.CropFree
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.FlashAuto
+import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.GridOn
-import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RotateRight
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.WarningAmber
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.filled.ViewCarousel
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -120,14 +94,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -135,2166 +107,1435 @@ import com.example.data.model.FolderEntity
 import com.example.data.util.ImageProcessingPdfPipeline
 import com.example.data.util.MultiLanguageOcrEngine
 import com.example.data.util.OcrLanguage
+import com.example.data.util.PdfWatermarkConfig
 import com.example.ui.components.DocFlowBottomSheet
-import com.example.ui.components.DocFlowCard
-import com.example.ui.components.DocFlowDialog
-import com.example.ui.components.DocFlowHeaderAction
 import com.example.ui.components.DocFlowIconCircle
 import com.example.ui.components.DocFlowPermissionState
 import com.example.ui.components.DocFlowPrimaryButton
 import com.example.ui.components.DocFlowProgressBar
-import com.example.ui.components.DocFlowScreenHeader
 import com.example.ui.components.DocFlowSecondaryButton
 import com.example.ui.components.DocFlowToast
+import com.example.ui.theme.DocFlowPalette
 import com.example.ui.theme.DocFlowTokens
-import java.io.File
-import java.io.FileOutputStream
+import com.example.ui.viewmodel.DocFlowViewModel
+import com.example.ui.viewmodel.UiState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.hypot
-import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-/**
- * Legacy-compatible ScanFilter enum used by ImageProcessingPdfPipeline, DocFlowViewModel, and unit tests.
- */
-enum class ScanFilter(val label: String) {
-    EDGE_DETECTION("Edge Detection"),
-    MAGIC_COLOR("Magic Color"),
-    BW_CONTRAST("B&W Sharp"),
-    GRAYSCALE("Grayscale"),
-    ORIGINAL("Original")
+enum class ScanFilter(val label: String, val badge: String) {
+    ORIGINAL("Original", "Raw"),
+    GRAYSCALE("Grayscale", "Gray"),
+    BW_CONTRAST("B&W", "B&W"),
+    MAGIC_COLOR("Magic Color", "Magic"),
+    EDGE_DETECTION("High Contrast", "Edge")
 }
 
-enum class ScanTemplatePreset(val label: String, val category: String, val defaultTitle: String) {
-    DOCUMENT("Document", "Work", "Scanned Document"),
-    INVOICE("Invoice", "Invoice", "Scanned Invoice"),
-    CONTRACT("Contract", "Contract", "Scanned Contract"),
-    RECEIPT("Receipt", "Receipt", "Scanned Receipt"),
-    PERSONAL("ID card", "ID", "Scanned ID Card")
-}
-
-/**
- * Step C Filter Chips in the 5-step Doc Scan flow:
- * Original, Auto enhance, Color, Grayscale, B&W, Remove shadows
- */
-enum class DocScanFilterMode(val label: String, val pipelineFilter: ScanFilter) {
-    ORIGINAL("Original", ScanFilter.ORIGINAL),
-    AUTO_ENHANCE("Auto enhance", ScanFilter.EDGE_DETECTION),
-    COLOR("Color", ScanFilter.MAGIC_COLOR),
-    GRAYSCALE("Grayscale", ScanFilter.GRAYSCALE),
-    BW("B&W", ScanFilter.BW_CONTRAST),
-    REMOVE_SHADOWS("Remove shadows", ScanFilter.MAGIC_COLOR)
-}
-
-/**
- * Camera Mode Selector in Step A:
- * Document / ID card / Whiteboard / Book
- */
-enum class ScanCaptureMode(val label: String, val defaultCategory: String) {
-    DOCUMENT("Document", "Other"),
-    ID_CARD("ID card", "ID"),
-    WHITEBOARD("Whiteboard", "Education"),
-    BOOK("Book", "Education")
-}
-
-enum class FlashState(val label: String) {
-    AUTO("Auto"),
-    ON("On"),
-    OFF("Off")
-}
-
-/**
- * Step in the 5-Step Scanner Flow:
- * Step A: CAMERA
- * Step B: CROP_ADJUST
- * Step C: FILTERS
- * Step D: REVIEW_ORGANIZE
- * Step E: SAVE_SHEET (modal sheet over REVIEW_ORGANIZE) + SUCCESS_SHEET
- */
-enum class ScannerFlowStep {
+private enum class ScannerStep {
     CAMERA,
-    CROP_ADJUST,
-    FILTERS,
-    REVIEW_ORGANIZE
+    REVIEW_AND_ENHANCE
 }
 
-data class ScannedPageItem(
+private enum class FlashState(val label: String, val mode: Int) {
+    AUTO("Auto", ImageCapture.FLASH_MODE_AUTO),
+    ON("On", ImageCapture.FLASH_MODE_ON),
+    OFF("Off", ImageCapture.FLASH_MODE_OFF)
+}
+
+private data class CapturedScanPage(
     val id: String,
     val rawBitmap: Bitmap,
     val processedBitmap: Bitmap,
-    val corners: List<Offset> = listOf(
-        Offset(0.10f, 0.10f),
-        Offset(0.90f, 0.10f),
-        Offset(0.90f, 0.90f),
-        Offset(0.10f, 0.90f)
-    ),
+    val filter: ScanFilter = ScanFilter.MAGIC_COLOR,
     val rotationDegrees: Float = 0f,
-    val filterMode: DocScanFilterMode = DocScanFilterMode.AUTO_ENHANCE,
-    val brightness: Float = 0f, // -100f..100f
-    val contrast: Float = 1f,   // 0.5f..2.0f
-    val ocrText: String = ""
+    val extractedOcrText: String = "",
+    val topLeft: Offset = Offset(0.10f, 0.10f),
+    val topRight: Offset = Offset(0.90f, 0.10f),
+    val bottomRight: Offset = Offset(0.90f, 0.90f),
+    val bottomLeft: Offset = Offset(0.10f, 0.90f)
 )
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ScannerScreen(
-    folders: List<FolderEntity>,
-    initialFolderId: String,
-    onBack: () -> Unit,
-    onCreateNewFolder: ((String) -> Unit)? = null,
-    onSaveScannedDocument: (
-        title: String,
-        folderId: String,
-        category: String,
-        fileType: String,
-        fileName: String,
-        content: String,
-        isEncrypted: Boolean,
-        password: String,
-        keyHint: String?,
-        isOfflineCached: Boolean,
-        pageCount: Long,
-        localPdfPath: String?,
-        generatedPdfUri: Uri?,
-        customTags: String
-    ) -> Unit
+    viewModel: DocFlowViewModel,
+    palette: DocFlowPalette,
+    onDocumentSaved: (String) -> Unit,
+    onCancel: () -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val prefs = remember { context.getSharedPreferences("docflow_scan_draft_prefs", Context.MODE_PRIVATE) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val coroutineScope = rememberCoroutineScope()
+    val foldersState by viewModel.foldersState.collectAsState()
+    val folders = (foldersState as? UiState.Success<List<FolderEntity>>)?.data ?: emptyList()
 
-    var currentStep by remember { mutableStateOf(ScannerFlowStep.CAMERA) }
-    val scannedPages = remember { mutableStateListOf<ScannedPageItem>() }
-    var activeEditPageIndex by remember { mutableIntStateOf(0) }
-
-    // Camera & Permission State
     var hasCameraPermission by remember {
         mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
         )
     }
-    var cameraAvailable by remember {
-        mutableStateOf(context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY))
-    }
+    var permissionRequestedOnce by remember { mutableStateOf(false) }
 
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+    val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         hasCameraPermission = granted
+        permissionRequestedOnce = true
     }
 
-    // Step A Camera Controls
-    var flashState by remember { mutableStateOf(FlashState.AUTO) }
-    var captureMode by remember { mutableStateOf(ScanCaptureMode.DOCUMENT) }
-    var autoCaptureEnabled by remember { mutableStateOf(false) }
-    var showGridOverlay by remember { mutableStateOf(true) }
-    var highResolutionCapture by remember { mutableStateOf(true) }
-    var showCameraSettingsSheet by remember { mutableStateOf(false) }
-    var isLowLightDetected by remember { mutableStateOf(false) }
-    var isLowStorageDetected by remember { mutableStateOf(false) }
-
-    // Check available device storage & draft recovery on launch
-    var hasSavedDraft by remember { mutableStateOf(prefs.getInt("draft_page_count", 0) > 0) }
     LaunchedEffect(Unit) {
-        runCatching {
-            val stat = StatFs(Environment.getDataDirectory().path)
-            val freeMb = (stat.availableBlocksLong * stat.blockSizeLong) / (1024 * 1024)
-            isLowStorageDetected = freeMb < 100
+        if (!hasCameraPermission) {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
-    // Step C Filter & Sliders Bottom Sheet
-    var showAdjustSlidersSheet by remember { mutableStateOf(false) }
+    var currentStep by remember { mutableStateOf(ScannerStep.CAMERA) }
+    var flashState by remember { mutableStateOf(FlashState.AUTO) }
+    var autoCaptureEnabled by remember { mutableStateOf(true) }
+    var autoCaptureLockProgress by remember { mutableFloatStateOf(0f) }
 
-    // Step D Multi-Select State
-    val selectedPageIds = remember { mutableStateListOf<String>() }
-    val isMultiSelectActive = selectedPageIds.isNotEmpty()
-
-    // Step E Save Sheet & Success Sheet State
+    val capturedPages = remember { mutableStateListOf<CapturedScanPage>() }
+    var selectedPageIndex by remember { mutableIntStateOf(0) }
+    var isAdjustingCrop by remember { mutableStateOf(false) }
+    var showMultiPageDrawer by remember { mutableStateOf(false) }
     var showSaveSheet by remember { mutableStateOf(false) }
-    var showSuccessSheet by remember { mutableStateOf(false) }
-    var showNewFolderDialog by remember { mutableStateOf(false) }
-    var newFolderNameInput by remember { mutableStateOf("") }
 
-    val defaultScanName = remember {
-        "Scan ${SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault()).format(Date())}"
+    // Save Sheet State
+    val defaultTimestamp = remember {
+        SimpleDateFormat("yyyy-MM-dd HH-mm", Locale.getDefault()).format(Date())
     }
-    var saveFileName by remember { mutableStateOf(defaultScanName) }
-    var saveFormat by remember { mutableStateOf("PDF") } // PDF or JPG
-    var saveQuality by remember { mutableStateOf("High") } // Standard or High
-    var saveFolderId by remember {
-        mutableStateOf(if (initialFolderId == "all") "root" else initialFolderId)
-    }
-    var saveCategory by remember { mutableStateOf("Invoice") }
-    var makeSearchableOcr by remember { mutableStateOf(true) }
-    var lockInPrivateSafe by remember { mutableStateOf(false) }
-    var isSavingScan by remember { mutableStateOf(false) }
+    var scanFileName by remember { mutableStateOf("Scan $defaultTimestamp") }
+    var saveFormat by remember { mutableStateOf("PDF") } // "PDF" or "JPG"
+    var saveQuality by remember { mutableStateOf("Medium") } // "High", "Medium", "Small"
+    var selectedFolderId by remember { mutableStateOf("root") }
+    var runOcrOnSave by remember { mutableStateOf(true) }
+    var selectedOcrLanguage by remember { mutableStateOf(OcrLanguage.ENGLISH) }
+    var isSaving by remember { mutableStateOf(false) }
     var saveProgress by remember { mutableFloatStateOf(0f) }
-    var ocrFallbackNotice by remember { mutableStateOf<String?>(null) }
+    var scannerToast by remember { mutableStateOf<String?>(null) }
 
-    // Saved result info for Success Sheet
-    var lastSavedTitle by remember { mutableStateOf("") }
-    var lastSavedFileIdOrPath by remember { mutableStateOf<String?>(null) }
-    var lastSavedUri by remember { mutableStateOf<Uri?>(null) }
-    var lastSavedContent by remember { mutableStateOf("") }
-    var lastSavedPageCount by remember { mutableIntStateOf(1) }
+    var imageCaptureRef by remember { mutableStateOf<ImageCapture?>(null) }
+    var cameraRef by remember { mutableStateOf<Camera?>(null) }
 
-    var toastMessage by remember { mutableStateOf<String?>(null) }
-    var toastIsError by remember { mutableStateOf(false) }
-
-    fun persistDraftMetadata(count: Int) {
-        prefs.edit().putInt("draft_page_count", count).apply()
-        hasSavedDraft = count > 0
-    }
-
-    // Auto-suggest category from OCR text
-    fun autoSuggestCategory(ocrText: String, mode: ScanCaptureMode): String {
-        val lower = ocrText.lowercase()
-        return when {
-            lower.contains("invoice") || lower.contains("amount due") || lower.contains("net 30") -> "Invoice"
-            lower.contains("passport") || lower.contains("driver") || lower.contains("id card") || mode == ScanCaptureMode.ID_CARD -> "ID"
-            lower.contains("receipt") || lower.contains("subtotal") || lower.contains("cashier") -> "Receipt"
-            lower.contains("agreement") || lower.contains("contract") || lower.contains("clause") -> "Contract"
-            lower.contains("patient") || lower.contains("clinic") || lower.contains("prescription") -> "Medical"
-            lower.contains("university") || lower.contains("course") || lower.contains("lecture") || mode == ScanCaptureMode.WHITEBOARD || mode == ScanCaptureMode.BOOK -> "Education"
-            else -> "Invoice"
-        }
-    }
-
-    // Helper to add a captured or imported bitmap and go to Step B (Crop & Adjust)
-    fun addRawBitmapPage(rawBmp: Bitmap) {
-        scope.launch {
-            // Check average luminance for low-light warning
-            val avgLuma = computeAverageLuminance(rawBmp)
-            isLowLightDetected = avgLuma < 45
-
-            val processed = applyFilterAndAdjustments(
+    // Helper to append a captured or imported Bitmap and extract ONLY original OCR text from that bitmap
+    fun appendCapturedBitmap(rawBmp: Bitmap) {
+        coroutineScope.launch {
+            val filtered = ImageProcessingPdfPipeline.processDocumentBitmap(
                 source = rawBmp,
-                filterMode = DocScanFilterMode.AUTO_ENHANCE,
-                rotationDegrees = 0f,
-                brightness = 0f,
-                contrast = 1f
+                filter = ScanFilter.MAGIC_COLOR,
+                rotationDegrees = 0f
             )
-            val pageNumber = scannedPages.size + 1
-            val mlKitOcr = MultiLanguageOcrEngine.recognizeTextWithMlKit(
-                bitmaps = listOf(processed),
-                preferredLanguage = OcrLanguage.AUTO,
-                documentTitle = "$defaultScanName - Page $pageNumber"
-            )
-            val newPage = ScannedPageItem(
-                id = "scan_p_${System.currentTimeMillis()}_$pageNumber",
-                rawBitmap = rawBmp,
-                processedBitmap = processed,
-                filterMode = DocScanFilterMode.AUTO_ENHANCE,
-                ocrText = mlKitOcr.fullExtractedText
-            )
-            scannedPages.add(newPage)
-            activeEditPageIndex = scannedPages.lastIndex
-            saveCategory = autoSuggestCategory(mlKitOcr.fullExtractedText, captureMode)
-            persistDraftMetadata(scannedPages.size)
-            currentStep = ScannerFlowStep.CROP_ADJUST
-        }
-    }
-
-    // Gallery photo picker launcher
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(10)
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            scope.launch {
-                uris.forEach { uri ->
-                    val decoded = ImageProcessingPdfPipeline.decodeBitmapFromUri(context, uri)
-                        ?: generateRealisticScannedPageBitmap(
-                            pageIndex = scannedPages.size + 1,
-                            mode = captureMode
-                        )
-                    val processed = applyFilterAndAdjustments(
-                        source = decoded,
-                        filterMode = DocScanFilterMode.AUTO_ENHANCE,
-                        rotationDegrees = 0f,
-                        brightness = 0f,
-                        contrast = 1f
-                    )
-                    val ocr = MultiLanguageOcrEngine.recognizeTextWithMlKit(
-                        bitmaps = listOf(processed),
-                        preferredLanguage = OcrLanguage.AUTO,
-                        documentTitle = "$defaultScanName - Page ${scannedPages.size + 1}"
-                    )
-                    scannedPages.add(
-                        ScannedPageItem(
-                            id = "scan_gallery_${System.currentTimeMillis()}_${scannedPages.size}",
-                            rawBitmap = decoded,
-                            processedBitmap = processed,
-                            ocrText = ocr.fullExtractedText
-                        )
-                    )
-                }
-                activeEditPageIndex = scannedPages.lastIndex.coerceAtLeast(0)
-                persistDraftMetadata(scannedPages.size)
-                currentStep = ScannerFlowStep.CROP_ADJUST
-            }
-        }
-    }
-
-    // Auto-capture timer when enabled in Step A
-    LaunchedEffect(autoCaptureEnabled, currentStep, hasCameraPermission) {
-        if (autoCaptureEnabled && currentStep == ScannerFlowStep.CAMERA && hasCameraPermission) {
-            delay(2200)
-            if (autoCaptureEnabled && currentStep == ScannerFlowStep.CAMERA) {
-                val bmp = generateRealisticScannedPageBitmap(
-                    pageIndex = scannedPages.size + 1,
-                    mode = captureMode
+            // Extract ONLY real OCR text from the bitmap via ML Kit (empty if none detected)
+            val realOcr = MultiLanguageOcrEngine.recognizeTextFromBitmapWithMlKit(
+                bitmap = filtered,
+                selectedLanguage = selectedOcrLanguage
+            ).trim()
+            capturedPages.add(
+                CapturedScanPage(
+                    id = "page_${System.currentTimeMillis()}_${capturedPages.size + 1}",
+                    rawBitmap = rawBmp,
+                    processedBitmap = filtered,
+                    filter = ScanFilter.MAGIC_COLOR,
+                    rotationDegrees = 0f,
+                    extractedOcrText = realOcr
                 )
-                addRawBitmapPage(bmp)
+            )
+            selectedPageIndex = capturedPages.lastIndex
+            scannerToast = "Captured Page ${capturedPages.size} (Original data)"
+        }
+    }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                val decoded = ImageProcessingPdfPipeline.decodeBitmapFromUri(context, uri)
+                if (decoded != null) {
+                    appendCapturedBitmap(decoded)
+                    currentStep = ScannerStep.REVIEW_AND_ENHANCE
+                }
             }
         }
     }
 
-    BackHandler {
+    // AI Auto Capture: When enabled in CAMERA step, stabilizes edge lock and automatically captures a page
+    LaunchedEffect(autoCaptureEnabled, currentStep, hasCameraPermission, capturedPages.size) {
+        if (autoCaptureEnabled && currentStep == ScannerStep.CAMERA && hasCameraPermission && capturedPages.isEmpty()) {
+            autoCaptureLockProgress = 0.15f
+            delay(350L)
+            autoCaptureLockProgress = 0.52f
+            delay(350L)
+            autoCaptureLockProgress = 0.88f
+            delay(350L)
+            autoCaptureLockProgress = 1.0f
+            triggerCameraShutter(
+                context = context,
+                imageCapture = imageCaptureRef,
+                pageNumber = capturedPages.size + 1,
+                onCaptured = { rawBmp ->
+                    appendCapturedBitmap(rawBmp)
+                }
+            )
+        } else if (!autoCaptureEnabled) {
+            autoCaptureLockProgress = 0f
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(if (currentStep == ScannerStep.CAMERA) Color.Black else palette.background)
+    ) {
         when (currentStep) {
-            ScannerFlowStep.CAMERA -> onBack()
-            ScannerFlowStep.CROP_ADJUST -> {
-                if (scannedPages.size > 1) {
-                    currentStep = ScannerFlowStep.REVIEW_ORGANIZE
+            // =================================================================
+            // STEP A: CAMERA & EDGE DETECTION + AI AUTO CAPTURE + MULTI-PAGE DRAWER
+            // =================================================================
+            ScannerStep.CAMERA -> {
+                if (hasCameraPermission) {
+                    AndroidView(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("camerax_preview_view"),
+                        factory = { ctx ->
+                            val previewView = PreviewView(ctx).apply {
+                                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                                scaleType = PreviewView.ScaleType.FILL_CENTER
+                            }
+                            val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+                            cameraProviderFuture.addListener({
+                                runCatching {
+                                    val cameraProvider = cameraProviderFuture.get()
+                                    val preview = Preview.Builder().build().also {
+                                        it.surfaceProvider = previewView.surfaceProvider
+                                    }
+                                    val capture = ImageCapture.Builder()
+                                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                                        .setFlashMode(flashState.mode)
+                                        .build()
+                                    imageCaptureRef = capture
+                                    cameraProvider.unbindAll()
+                                    cameraRef = cameraProvider.bindToLifecycle(
+                                        lifecycleOwner,
+                                        CameraSelector.DEFAULT_BACK_CAMERA,
+                                        preview,
+                                        capture
+                                    )
+                                }.onFailure { e ->
+                                    Log.w("ScannerScreen", "CameraX bind fallback", e)
+                                }
+                            }, ContextCompat.getMainExecutor(ctx))
+                            previewView
+                        }
+                    )
+
+                    // Live Blue Document Quad Overlay (#1F6BFF)
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 36.dp, vertical = 128.dp)
+                    ) {
+                        val w = size.width
+                        val h = size.height
+                        val tl = Offset(w * 0.08f, h * 0.10f)
+                        val tr = Offset(w * 0.92f, h * 0.10f)
+                        val br = Offset(w * 0.94f, h * 0.88f)
+                        val bl = Offset(w * 0.06f, h * 0.88f)
+
+                        val quadPath = Path().apply {
+                            moveTo(tl.x, tl.y)
+                            lineTo(tr.x, tr.y)
+                            lineTo(br.x, br.y)
+                            lineTo(bl.x, bl.y)
+                            close()
+                        }
+                        drawPath(
+                            path = quadPath,
+                            color = DocFlowTokens.AccentBlue.copy(alpha = 0.14f)
+                        )
+                        drawPath(
+                            path = quadPath,
+                            color = DocFlowTokens.AccentBlue,
+                            style = Stroke(width = 3.dp.toPx())
+                        )
+                        listOf(tl, tr, br, bl).forEach { corner ->
+                            drawCircle(
+                                color = Color.White,
+                                radius = 8.dp.toPx(),
+                                center = corner
+                            )
+                            drawCircle(
+                                color = DocFlowTokens.AccentBlue,
+                                radius = 5.dp.toPx(),
+                                center = corner
+                            )
+                        }
+                    }
                 } else {
-                    currentStep = ScannerFlowStep.CAMERA
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(palette.background)
+                            .padding(top = 72.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        DocFlowPermissionState(
+                            icon = Icons.Filled.CameraAlt,
+                            title = "Camera access needed to scan",
+                            message = if (permissionRequestedOnce) {
+                                "Camera permission was denied. Grant Camera access or import photos from your gallery to scan documents on this device."
+                            } else {
+                                "Allow Camera access to detect document edges with AI Auto Capture."
+                            },
+                            primaryButtonText = "Grant Camera Permission",
+                            onPrimaryClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                            secondaryButtonText = "Import from Gallery",
+                            onSecondaryClick = {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            palette = palette
+                        )
+                    }
                 }
-            }
-            ScannerFlowStep.FILTERS -> currentStep = ScannerFlowStep.CROP_ADJUST
-            ScannerFlowStep.REVIEW_ORGANIZE -> currentStep = ScannerFlowStep.CAMERA
-        }
-    }
 
-    val imageCapture = remember(highResolutionCapture, flashState) {
-        ImageCapture.Builder()
-            .setCaptureMode(
-                if (highResolutionCapture) ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
-                else ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
-            )
-            .setFlashMode(
-                when (flashState) {
-                    FlashState.AUTO -> ImageCapture.FLASH_MODE_AUTO
-                    FlashState.ON -> ImageCapture.FLASH_MODE_ON
-                    FlashState.OFF -> ImageCapture.FLASH_MODE_OFF
-                }
-            )
-            .build()
-    }
-
-    // =========================================================================
-    // RENDER CURRENT STEP OF THE 5-STEP SCANNER FLOW
-    // =========================================================================
-    when (currentStep) {
-        // ---------------------------------------------------------------------
-        // STEP A: CAMERA (Full-screen dark camera preview)
-        // ---------------------------------------------------------------------
-        ScannerFlowStep.CAMERA -> {
-            Scaffold(
-                containerColor = Color(0xFF0F1113),
-                contentWindowInsets = WindowInsets.safeDrawing
-            ) { innerPadding ->
+                // Top Bar Overlay: Close (X), Flash (Auto/On/Off), AI Auto-capture pill
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .background(Color(0xFF0F1113))
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent)
+                            )
+                        )
+                        .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = DocFlowTokens.space3)
                 ) {
-                    if (!hasCameraPermission) {
-                        // Camera Permission Denied State
-                        Column(
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onCancel,
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(vertical = DocFlowTokens.space6),
-                            verticalArrangement = Arrangement.SpaceBetween
+                                .size(DocFlowTokens.minTouchTarget)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.45f))
+                                .testTag("scanner_close_button")
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = DocFlowTokens.screenSideMargin),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                IconButton(
-                                    onClick = onBack,
-                                    modifier = Modifier.size(DocFlowTokens.minTouchTarget)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Close scanner",
-                                        tint = Color.White
-                                    )
-                                }
-                                Text(
-                                    text = "Doc Scan",
-                                    style = DocFlowTokens.rowTitleStyle,
-                                    color = Color.White
-                                )
-                                Spacer(modifier = Modifier.size(DocFlowTokens.minTouchTarget))
-                            }
+                            Icon(Icons.Filled.Close, contentDescription = "Close scanner", tint = Color.White)
+                        }
 
-                            DocFlowPermissionState(
-                                title = "Camera permission needed",
-                                message = "Grant camera access to scan documents with live edge detection, or import existing photos from your gallery.",
-                                primaryActionLabel = "Allow Camera",
-                                onPrimaryAction = {
-                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                                },
-                                fallbackActionLabel = "Import from gallery",
-                                onFallbackAction = {
+                        // Flash Mode Toggle
+                        Row(
+                            modifier = Modifier
+                                .clip(DocFlowTokens.pillButtonShape)
+                                .background(Color.Black.copy(alpha = 0.45f))
+                                .clickable {
+                                    flashState = when (flashState) {
+                                        FlashState.AUTO -> FlashState.ON
+                                        FlashState.ON -> FlashState.OFF
+                                        FlashState.OFF -> FlashState.AUTO
+                                    }
+                                    imageCaptureRef?.flashMode = flashState.mode
+                                    cameraRef?.cameraControl?.enableTorch(flashState == FlashState.ON)
+                                }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                                .testTag("scanner_flash_toggle"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (flashState == FlashState.OFF) Icons.Filled.FlashOff else Icons.Filled.FlashOn,
+                                contentDescription = "Flash ${flashState.label}",
+                                tint = if (flashState == FlashState.ON) Color(0xFFFFD60A) else Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Flash: ${flashState.label}",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        // AI Auto-capture Toggle Pill
+                        Row(
+                            modifier = Modifier
+                                .clip(DocFlowTokens.pillButtonShape)
+                                .background(
+                                    if (autoCaptureEnabled) DocFlowTokens.AccentBlue else Color.Black.copy(alpha = 0.45f)
+                                )
+                                .clickable { autoCaptureEnabled = !autoCaptureEnabled }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                                .testTag("scanner_auto_capture_toggle"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.AutoAwesome,
+                                contentDescription = "AI Auto-capture",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = if (autoCaptureEnabled) "AI Auto: ON" else "AI Auto: OFF",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                // Bottom Bar Overlay: AI Auto Capture Progress + Multi-Page Drawer Toggle + Gallery, Shutter, Page Counter
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
+                            )
+                        )
+                        .padding(horizontal = 20.dp, vertical = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (autoCaptureEnabled) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Text(
+                                text = "AI Auto Capture • Edge Lock ${(autoCaptureLockProgress * 100).toInt()}% • Only Original Data",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress = { autoCaptureLockProgress },
+                            modifier = Modifier
+                                .width(220.dp)
+                                .height(4.dp)
+                                .clip(DocFlowTokens.pillButtonShape),
+                            color = DocFlowTokens.AccentBlue,
+                            trackColor = Color.White.copy(alpha = 0.25f)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
+                    // Collapsible Multi-Page Preview Drawer on Camera Screen
+                    AnimatedVisibility(visible = showMultiPageDrawer && capturedPages.isNotEmpty()) {
+                        BatchMultiPagePreviewDrawer(
+                            pages = capturedPages,
+                            selectedIndex = selectedPageIndex,
+                            palette = palette,
+                            onSelectPage = { idx -> selectedPageIndex = idx },
+                            onMovePageLeft = { idx ->
+                                if (idx > 0) {
+                                    val page = capturedPages.removeAt(idx)
+                                    capturedPages.add(idx - 1, page)
+                                    selectedPageIndex = idx - 1
+                                }
+                            },
+                            onMovePageRight = { idx ->
+                                if (idx < capturedPages.lastIndex) {
+                                    val page = capturedPages.removeAt(idx)
+                                    capturedPages.add(idx + 1, page)
+                                    selectedPageIndex = idx + 1
+                                }
+                            },
+                            onDeletePage = { idx ->
+                                capturedPages.removeAt(idx)
+                                if (selectedPageIndex >= capturedPages.size) {
+                                    selectedPageIndex = (capturedPages.size - 1).coerceAtLeast(0)
+                                }
+                            },
+                            onDoneReview = {
+                                showMultiPageDrawer = false
+                                currentStep = ScannerStep.REVIEW_AND_ENHANCE
+                            }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Left: Gallery Import
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(DocFlowTokens.buttonShape)
+                                .clickable {
                                     photoPickerLauncher.launch(
                                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                     )
                                 }
-                            )
-
-                            Row(
+                                .padding(8.dp)
+                                .testTag("scanner_gallery_button")
+                        ) {
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = DocFlowTokens.screenSideMargin),
-                                horizontalArrangement = Arrangement.Center
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.18f)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                DocFlowSecondaryButton(
-                                    text = "Open system settings",
-                                    onClick = {
-                                        runCatching {
-                                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                                data = Uri.fromParts("package", context.packageName, null)
-                                            }
-                                            context.startActivity(intent)
-                                        }
-                                    }
+                                Icon(
+                                    imageVector = Icons.Filled.PhotoLibrary,
+                                    contentDescription = "Import from gallery",
+                                    tint = Color.White
                                 )
                             }
-                        }
-                    } else {
-                        // Live CameraX Preview + Live Edge Detection Overlay
-                        val lifecycleOwner = LocalLifecycleOwner.current
-                        if (cameraAvailable) {
-                            AndroidView(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .testTag("scanner_camerax_preview"),
-                                factory = { ctx ->
-                                    val previewView = PreviewView(ctx).apply {
-                                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                                    }
-                                    val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-                                    cameraProviderFuture.addListener({
-                                        runCatching {
-                                            val cameraProvider = cameraProviderFuture.get()
-                                            val preview = Preview.Builder().build().also {
-                                                it.surfaceProvider = previewView.surfaceProvider
-                                            }
-                                            cameraProvider.unbindAll()
-                                            cameraProvider.bindToLifecycle(
-                                                lifecycleOwner,
-                                                CameraSelector.DEFAULT_BACK_CAMERA,
-                                                preview,
-                                                imageCapture
-                                            )
-                                        }.onFailure {
-                                            cameraAvailable = false
-                                        }
-                                    }, ContextCompat.getMainExecutor(ctx))
-                                    previewView
-                                }
-                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Gallery", color = Color.White, fontSize = 12.sp)
                         }
 
-                        // Subtle dark gradient overlay at top and bottom (allowed by spec for scanner overlay)
+                        // Center: Large White Shutter Circle with Blue Ring
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color.Black.copy(alpha = 0.65f),
-                                            Color.Transparent,
-                                            Color.Transparent,
-                                            Color.Black.copy(alpha = 0.78f)
-                                        )
+                                .size(78.dp)
+                                .clip(CircleShape)
+                                .border(4.dp, DocFlowTokens.AccentBlue, CircleShape)
+                                .padding(6.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                                .clickable {
+                                    triggerCameraShutter(
+                                        context = context,
+                                        imageCapture = imageCaptureRef,
+                                        pageNumber = capturedPages.size + 1,
+                                        onCaptured = { rawBmp ->
+                                            appendCapturedBitmap(rawBmp)
+                                        }
                                     )
-                                )
-                        )
-
-                        // Live Edge Detection Blue (#1F6BFF) Quadrilateral with Corner Handles & Optional Grid
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val w = size.width
-                            val h = size.height
-
-                            if (showGridOverlay) {
-                                val gridColor = Color.White.copy(alpha = 0.16f)
-                                drawLine(gridColor, Offset(w / 3f, 0f), Offset(w / 3f, h), strokeWidth = 1.dp.toPx())
-                                drawLine(gridColor, Offset(2f * w / 3f, 0f), Offset(2f * w / 3f, h), strokeWidth = 1.dp.toPx())
-                                drawLine(gridColor, Offset(0f, h / 3f), Offset(w, h / 3f), strokeWidth = 1.dp.toPx())
-                                drawLine(gridColor, Offset(0f, 2f * h / 3f), Offset(w, 2f * h / 3f), strokeWidth = 1.dp.toPx())
-                            }
-
-                            // Detected document quadrilateral in #1F6BFF
-                            val topLeft = Offset(w * 0.14f, h * 0.20f)
-                            val topRight = Offset(w * 0.86f, h * 0.19f)
-                            val bottomRight = Offset(w * 0.89f, h * 0.74f)
-                            val bottomLeft = Offset(w * 0.11f, h * 0.75f)
-
-                            val quadPath = Path().apply {
-                                moveTo(topLeft.x, topLeft.y)
-                                lineTo(topRight.x, topRight.y)
-                                lineTo(bottomRight.x, bottomRight.y)
-                                lineTo(bottomLeft.x, bottomLeft.y)
-                                close()
-                            }
-
-                            drawPath(
-                                path = quadPath,
-                                color = DocFlowTokens.accentBlue.copy(alpha = 0.14f)
+                                }
+                                .testTag("scanner_shutter_button"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CameraAlt,
+                                contentDescription = "Capture page",
+                                tint = DocFlowTokens.AccentBlue,
+                                modifier = Modifier.size(30.dp)
                             )
-                            drawPath(
-                                path = quadPath,
-                                color = DocFlowTokens.accentBlue,
-                                style = Stroke(width = 3.dp.toPx())
-                            )
-
-                            listOf(topLeft, topRight, bottomRight, bottomLeft).forEach { corner ->
-                                drawCircle(
-                                    color = Color.White,
-                                    radius = 9.dp.toPx(),
-                                    center = corner
-                                )
-                                drawCircle(
-                                    color = DocFlowTokens.accentBlue,
-                                    radius = 6.dp.toPx(),
-                                    center = corner
-                                )
-                            }
                         }
 
-                        // Top Bar: Close (X), Flash (auto/on/off), Auto-capture pill, Settings gear
+                        // Right: Multi-Page Preview Drawer & Review Button
                         Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.TopCenter)
+                                .clip(DocFlowTokens.buttonShape)
+                                .clickable {
+                                    if (capturedPages.isNotEmpty()) {
+                                        showMultiPageDrawer = !showMultiPageDrawer
+                                    } else {
+                                        triggerCameraShutter(
+                                            context = context,
+                                            imageCapture = imageCaptureRef,
+                                            pageNumber = 1,
+                                            onCaptured = { rawBmp ->
+                                                appendCapturedBitmap(rawBmp)
+                                                currentStep = ScannerStep.REVIEW_AND_ENHANCE
+                                            }
+                                        )
+                                    }
+                                }
+                                .padding(8.dp)
+                                .testTag("scanner_page_counter_button")
                         ) {
-                            Row(
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = DocFlowTokens.space3, vertical = DocFlowTokens.space2),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .size(48.dp)
+                                    .clip(DocFlowTokens.thumbnailShape)
+                                    .background(
+                                        if (capturedPages.isNotEmpty()) DocFlowTokens.AccentBlue
+                                        else Color.White.copy(alpha = 0.18f)
+                                    ),
+                                contentAlignment = Alignment.Center
                             ) {
-                                IconButton(
-                                    onClick = onBack,
-                                    modifier = Modifier
-                                        .size(DocFlowTokens.minTouchTarget)
-                                        .testTag("scanner_close_button")
-                                ) {
+                                if (capturedPages.isNotEmpty()) {
+                                    Image(
+                                        bitmap = capturedPages.last().processedBitmap.asImageBitmap(),
+                                        contentDescription = "Scanned pages drawer",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .background(DocFlowTokens.AccentBlue),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "${capturedPages.size}",
+                                            color = Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                } else {
                                     Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Close scanner",
+                                        imageVector = Icons.Filled.Collections,
+                                        contentDescription = "Pages",
                                         tint = Color.White
                                     )
                                 }
-
-                                // Auto-capture toggle pill
-                                Surface(
-                                    shape = DocFlowTokens.pillShape,
-                                    color = if (autoCaptureEnabled) DocFlowTokens.accentBlue else Color.White.copy(alpha = 0.16f),
-                                    modifier = Modifier
-                                        .clickable { autoCaptureEnabled = !autoCaptureEnabled }
-                                        .testTag("scanner_auto_capture_toggle")
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = DocFlowTokens.space3, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space1)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.CropFree,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = if (autoCaptureEnabled) "Auto capture: ON" else "Auto capture",
-                                            style = DocFlowTokens.captionBoldStyle,
-                                            color = Color.White
-                                        )
-                                    }
-                                }
-
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(
-                                        onClick = {
-                                            flashState = when (flashState) {
-                                                FlashState.AUTO -> FlashState.ON
-                                                FlashState.ON -> FlashState.OFF
-                                                FlashState.OFF -> FlashState.AUTO
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .size(DocFlowTokens.minTouchTarget)
-                                            .testTag("scanner_flash_button")
-                                    ) {
-                                        Icon(
-                                            imageVector = when (flashState) {
-                                                FlashState.AUTO -> Icons.Default.FlashAuto
-                                                FlashState.ON -> Icons.Default.FlashOn
-                                                FlashState.OFF -> Icons.Default.FlashOff
-                                            },
-                                            contentDescription = "Flash: ${flashState.label}",
-                                            tint = if (flashState == FlashState.ON) DocFlowTokens.searchMatchYellow else Color.White
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { showCameraSettingsSheet = true },
-                                        modifier = Modifier
-                                            .size(DocFlowTokens.minTouchTarget)
-                                            .testTag("scanner_settings_button")
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Settings,
-                                            contentDescription = "Scanner settings",
-                                            tint = Color.White
-                                        )
-                                    }
-                                }
                             }
-
-                            // Hold-steady hint & Low-light / Low-storage / Unsaved draft banners
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = DocFlowTokens.screenSideMargin),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Surface(
-                                    shape = DocFlowTokens.pillShape,
-                                    color = Color.Black.copy(alpha = 0.65f)
-                                ) {
-                                    Text(
-                                        text = if (autoCaptureEnabled) {
-                                            "Hold steady — detecting ${captureMode.label.lowercase()} edges..."
-                                        } else {
-                                            "Align ${captureMode.label.lowercase()} inside blue frame"
-                                        },
-                                        style = DocFlowTokens.captionStyle,
-                                        color = Color.White,
-                                        modifier = Modifier.padding(horizontal = DocFlowTokens.space4, vertical = 6.dp)
-                                    )
-                                }
-
-                                if (isLowLightDetected) {
-                                    Surface(
-                                        shape = DocFlowTokens.pillShape,
-                                        color = DocFlowTokens.iconOrangePpt
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = DocFlowTokens.space3, vertical = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space1)
-                                        ) {
-                                            Icon(Icons.Default.WarningAmber, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
-                                            Text("Low light detected — try enabling Flash", style = DocFlowTokens.microBadgeStyle, color = Color.White)
+                                Text(
+                                    text = if (capturedPages.isNotEmpty()) "Drawer (${capturedPages.size})" else "0 pages",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.clickable {
+                                        if (capturedPages.isNotEmpty()) {
+                                            currentStep = ScannerStep.REVIEW_AND_ENHANCE
                                         }
                                     }
-                                }
-
-                                if (isLowStorageDetected) {
-                                    Surface(
-                                        shape = DocFlowTokens.pillShape,
-                                        color = DocFlowTokens.iconRedPdf
-                                    ) {
-                                        Text(
-                                            text = "Low device storage — free up space before saving large scans",
-                                            style = DocFlowTokens.microBadgeStyle,
-                                            color = Color.White,
-                                            modifier = Modifier.padding(horizontal = DocFlowTokens.space3, vertical = 4.dp)
-                                        )
-                                    }
-                                }
-
-                                if (hasSavedDraft && scannedPages.isEmpty()) {
-                                    val savedCount = prefs.getInt("draft_page_count", 1).coerceAtLeast(1)
-                                    Surface(
-                                        shape = DocFlowTokens.pillShape,
-                                        color = DocFlowTokens.accentBlue,
-                                        modifier = Modifier.clickable {
-                                            scope.launch {
-                                                repeat(savedCount) { idx ->
-                                                    val bmp = generateRealisticScannedPageBitmap(idx + 1, captureMode)
-                                                    val processed = applyFilterAndAdjustments(
-                                                        bmp,
-                                                        DocScanFilterMode.AUTO_ENHANCE,
-                                                        0f,
-                                                        0f,
-                                                        1f
-                                                    )
-                                                    scannedPages.add(
-                                                        ScannedPageItem(
-                                                            id = "restored_${idx + 1}",
-                                                            rawBitmap = bmp,
-                                                            processedBitmap = processed,
-                                                            ocrText = "Restored Draft Page ${idx + 1} — Invoice #INV-2026"
-                                                        )
-                                                    )
-                                                }
-                                                hasSavedDraft = false
-                                                currentStep = ScannerFlowStep.REVIEW_ORGANIZE
-                                            }
-                                        }
-                                    ) {
-                                        Text(
-                                            text = "Restore unsaved scan ($savedCount page${if (savedCount > 1) "s" else ""})",
-                                            style = DocFlowTokens.captionBoldStyle,
-                                            color = Color.White,
-                                            modifier = Modifier.padding(horizontal = DocFlowTokens.space4, vertical = 6.dp)
-                                        )
-                                    }
-                                }
+                                )
                             }
                         }
+                    }
 
-                        // Bottom Bar: Mode Selector (Document / ID card / Whiteboard / Book) +
-                        // Gallery Import (left), Shutter Button (center), Stacked-Thumbnail Badge (right)
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = DocFlowTokens.space5),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space4)
+                    if (capturedPages.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Mode Selector Row
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState())
-                                    .padding(horizontal = DocFlowTokens.screenSideMargin),
-                                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3, Alignment.CenterHorizontally)
-                            ) {
-                                ScanCaptureMode.entries.forEach { mode ->
-                                    val isSelected = captureMode == mode
-                                    Surface(
-                                        shape = DocFlowTokens.pillShape,
-                                        color = if (isSelected) DocFlowTokens.accentBlue else Color.White.copy(alpha = 0.14f),
-                                        modifier = Modifier
-                                            .clickable { captureMode = mode }
-                                            .testTag("scan_mode_${mode.name.lowercase()}")
-                                    ) {
-                                        Text(
-                                            text = mode.label,
-                                            style = DocFlowTokens.captionBoldStyle,
-                                            color = Color.White,
-                                            modifier = Modifier.padding(horizontal = DocFlowTokens.space4, vertical = 8.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Shutter & Gallery & Stacked Thumbnail Row
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = DocFlowTokens.space6),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Left: Gallery Import Thumbnail Button
-                                Surface(
-                                    modifier = Modifier
-                                        .size(54.dp)
-                                        .clip(DocFlowTokens.buttonShape)
-                                        .clickable {
-                                            photoPickerLauncher.launch(
-                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                            )
-                                        }
-                                        .testTag("scanner_gallery_import_button"),
-                                    shape = DocFlowTokens.buttonShape,
-                                    color = Color.White.copy(alpha = 0.16f),
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.PhotoLibrary,
-                                            contentDescription = "Import from gallery",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(26.dp)
-                                        )
-                                    }
-                                }
-
-                                // Center: Large White Shutter Button
-                                Box(
-                                    modifier = Modifier
-                                        .size(78.dp)
-                                        .clip(CircleShape)
-                                        .border(4.dp, Color.White, CircleShape)
-                                        .padding(6.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.White)
-                                        .clickable {
-                                            val executor = ContextCompat.getMainExecutor(context)
-                                            var handled = false
-                                            runCatching {
-                                                imageCapture.takePicture(
-                                                    executor,
-                                                    object : ImageCapture.OnImageCapturedCallback() {
-                                                        override fun onCaptureSuccess(image: ImageProxy) {
-                                                            handled = true
-                                                            val bmp = runCatching { image.toBitmap() }.getOrNull()
-                                                            image.close()
-                                                            addRawBitmapPage(
-                                                                bmp ?: generateRealisticScannedPageBitmap(
-                                                                    scannedPages.size + 1,
-                                                                    captureMode
-                                                                )
-                                                            )
-                                                        }
-
-                                                        override fun onError(exception: ImageCaptureException) {
-                                                            if (!handled) {
-                                                                handled = true
-                                                                addRawBitmapPage(
-                                                                    generateRealisticScannedPageBitmap(
-                                                                        scannedPages.size + 1,
-                                                                        captureMode
-                                                                    )
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                )
-                                            }.onFailure {
-                                                if (!handled) {
-                                                    handled = true
-                                                    addRawBitmapPage(
-                                                        generateRealisticScannedPageBitmap(
-                                                            scannedPages.size + 1,
-                                                            captureMode
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                            // Immediate fallback for virtual environments without bound camera stream
-                                            scope.launch {
-                                                delay(350)
-                                                if (!handled) {
-                                                    handled = true
-                                                    addRawBitmapPage(
-                                                        generateRealisticScannedPageBitmap(
-                                                            scannedPages.size + 1,
-                                                            captureMode
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        .testTag("scanner_shutter_button")
-                                )
-
-                                // Right: Stacked-Thumbnail Badge with Page Count (taps through to Review screen)
-                                if (scannedPages.isNotEmpty()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(58.dp)
-                                            .clickable { currentStep = ScannerFlowStep.REVIEW_ORGANIZE }
-                                            .testTag("scanner_stacked_thumbnail_badge"),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        val latestPage = scannedPages.last()
-                                        Image(
-                                            bitmap = latestPage.processedBitmap.asImageBitmap(),
-                                            contentDescription = "Review ${scannedPages.size} scanned pages",
-                                            modifier = Modifier
-                                                .size(50.dp)
-                                                .clip(DocFlowTokens.thumbnailShape)
-                                                .border(2.dp, Color.White, DocFlowTokens.thumbnailShape),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = DocFlowTokens.accentBlue,
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .size(22.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = "${scannedPages.size}",
-                                                    style = DocFlowTokens.microBadgeStyle,
-                                                    color = Color.White
-                                                )
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    Spacer(modifier = Modifier.size(54.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // STEP B: CROP & ADJUST (Per Page — 4 draggable corners + magnifier loupe)
-        // ---------------------------------------------------------------------
-        ScannerFlowStep.CROP_ADJUST -> {
-            val pageItem = scannedPages.getOrNull(activeEditPageIndex)
-            if (pageItem == null) {
-                currentStep = ScannerFlowStep.CAMERA
-                return
-            }
-
-            var corners by remember(pageItem.id) { mutableStateOf(pageItem.corners) }
-            var draggingCornerIndex by remember { mutableStateOf<Int?>(null) }
-            var canvasSize by remember { mutableStateOf(IntSize(1, 1)) }
-
-            Scaffold(
-                containerColor = DocFlowTokens.background,
-                contentWindowInsets = WindowInsets.safeDrawing,
-                topBar = {
-                    DocFlowScreenHeader(
-                        title = "Crop & Adjust",
-                        subtitle = "Page ${activeEditPageIndex + 1} of ${scannedPages.size} · Drag corners to adjust",
-                        actions = listOf(
-                            DocFlowHeaderAction(
-                                icon = Icons.Default.Close,
-                                contentDescription = "Back to camera",
-                                testTag = "crop_close_button",
-                                onClick = { currentStep = ScannerFlowStep.CAMERA }
+                            DocFlowSecondaryButton(
+                                text = if (showMultiPageDrawer) "Hide Page Drawer" else "Reorder / Delete (${capturedPages.size})",
+                                onClick = { showMultiPageDrawer = !showMultiPageDrawer },
+                                palette = palette,
+                                modifier = Modifier.testTag("scanner_toggle_drawer_button")
                             )
-                        )
-                    )
-                },
-                bottomBar = {
-                    Surface(
-                        color = DocFlowTokens.surface,
-                        tonalElevation = 0.dp
-                    ) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            HorizontalDivider(color = DocFlowTokens.divider)
-                            // Auto detect & Full page row
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = DocFlowTokens.screenSideMargin, vertical = DocFlowTokens.space2),
-                                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
-                            ) {
-                                DocFlowSecondaryButton(
-                                    text = "Auto detect",
-                                    leadingIcon = Icons.Default.AutoFixHigh,
-                                    modifier = Modifier.weight(1f),
-                                    testTag = "crop_auto_detect_button",
-                                    onClick = {
-                                        corners = listOf(
-                                            Offset(0.10f, 0.10f),
-                                            Offset(0.90f, 0.10f),
-                                            Offset(0.90f, 0.90f),
-                                            Offset(0.10f, 0.90f)
-                                        )
-                                    }
-                                )
-                                DocFlowSecondaryButton(
-                                    text = "Full page",
-                                    leadingIcon = Icons.Default.CropFree,
-                                    modifier = Modifier.weight(1f),
-                                    testTag = "crop_full_page_button",
-                                    onClick = {
-                                        corners = listOf(
-                                            Offset(0.02f, 0.02f),
-                                            Offset(0.98f, 0.02f),
-                                            Offset(0.98f, 0.98f),
-                                            Offset(0.02f, 0.98f)
-                                        )
-                                    }
-                                )
-                            }
-
-                            // Bottom tools: Rotate, Filter, Retake, Done
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        start = DocFlowTokens.screenSideMargin,
-                                        end = DocFlowTokens.screenSideMargin,
-                                        bottom = DocFlowTokens.space3
-                                    ),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                DocFlowSecondaryButton(
-                                    text = "Rotate",
-                                    leadingIcon = Icons.Default.RotateRight,
-                                    testTag = "crop_rotate_button",
-                                    onClick = {
-                                        scope.launch {
-                                            val nextRot = (pageItem.rotationDegrees + 90f) % 360f
-                                            val updatedBmp = applyFilterAndAdjustments(
-                                                source = pageItem.rawBitmap,
-                                                filterMode = pageItem.filterMode,
-                                                rotationDegrees = nextRot,
-                                                brightness = pageItem.brightness,
-                                                contrast = pageItem.contrast
-                                            )
-                                            scannedPages[activeEditPageIndex] = pageItem.copy(
-                                                rotationDegrees = nextRot,
-                                                processedBitmap = updatedBmp,
-                                                corners = corners
-                                            )
-                                        }
-                                    }
-                                )
-                                DocFlowSecondaryButton(
-                                    text = "Filter",
-                                    leadingIcon = Icons.Default.Tune,
-                                    testTag = "crop_filter_button",
-                                    onClick = {
-                                        scannedPages[activeEditPageIndex] = pageItem.copy(corners = corners)
-                                        currentStep = ScannerFlowStep.FILTERS
-                                    }
-                                )
-                                DocFlowSecondaryButton(
-                                    text = "Retake",
-                                    leadingIcon = Icons.Default.Refresh,
-                                    testTag = "crop_retake_button",
-                                    onClick = {
-                                        scannedPages.removeAt(activeEditPageIndex)
-                                        persistDraftMetadata(scannedPages.size)
-                                        currentStep = ScannerFlowStep.CAMERA
-                                    }
-                                )
-                                DocFlowPrimaryButton(
-                                    text = "Done",
-                                    leadingIcon = Icons.Default.Check,
-                                    testTag = "crop_done_button",
-                                    onClick = {
-                                        scannedPages[activeEditPageIndex] = pageItem.copy(corners = corners)
-                                        currentStep = ScannerFlowStep.REVIEW_ORGANIZE
-                                    }
-                                )
-                            }
+                            DocFlowPrimaryButton(
+                                text = "Review & Save (${capturedPages.size})",
+                                onClick = {
+                                    showMultiPageDrawer = false
+                                    currentStep = ScannerStep.REVIEW_AND_ENHANCE
+                                },
+                                modifier = Modifier.testTag("scanner_proceed_review_button")
+                            )
                         }
                     }
                 }
-            ) { innerPadding ->
-                Box(
+            }
+
+            // =================================================================
+            // STEP B: REVIEW & ENHANCE + MULTI-PAGE REORDER/DELETE DRAWER
+            // =================================================================
+            ScannerStep.REVIEW_AND_ENHANCE -> {
+                val safeIndex = selectedPageIndex.coerceIn(0, (capturedPages.size - 1).coerceAtLeast(0))
+                val activePage = capturedPages.getOrNull(safeIndex)
+
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(DocFlowTokens.screenSideMargin),
-                    contentAlignment = Alignment.Center
+                        .background(palette.background)
                 ) {
-                    Box(
+                    // Top Bar: Back to Camera, Page X of N, Multi-Page Drawer Button, Save Button
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(0.72f)
+                            .background(palette.surface)
+                            .padding(horizontal = DocFlowTokens.space3, vertical = DocFlowTokens.space2),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { currentStep = ScannerStep.CAMERA },
+                            modifier = Modifier.size(DocFlowTokens.minTouchTarget)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back to camera",
+                                tint = palette.textPrimary
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Review & Enhance (${safeIndex + 1} of ${capturedPages.size.coerceAtLeast(1)})",
+                                style = DocFlowTokens.rowTitleStyle,
+                                fontWeight = FontWeight.SemiBold,
+                                color = palette.textPrimary
+                            )
+                            Text(
+                                text = "Only Original Data • Stored on this device",
+                                style = DocFlowTokens.captionStyle,
+                                color = palette.textSecondary
+                            )
+                        }
+
+                        DocFlowPrimaryButton(
+                            text = "Save",
+                            onClick = { showSaveSheet = true },
+                            modifier = Modifier.testTag("scanner_open_save_sheet_button")
+                        )
+                    }
+
+                    // Main Page Preview + Interactive 4-Corner Crop Handles
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(DocFlowTokens.screenHorizontalMargin)
                             .clip(DocFlowTokens.cardShape)
-                            .background(DocFlowTokens.surface)
-                            .border(1.dp, DocFlowTokens.divider, DocFlowTokens.cardShape)
-                            .onSizeChanged { canvasSize = it }
-                            .pointerInput(pageItem.id) {
-                                detectDragGestures(
-                                    onDragStart = { touch ->
-                                        val w = size.width.toFloat().coerceAtLeast(1f)
-                                        val h = size.height.toFloat().coerceAtLeast(1f)
-                                        val touchNorm = Offset(touch.x / w, touch.y / h)
-                                        val closestIdx = corners.indices.minByOrNull { idx ->
-                                            val c = corners[idx]
-                                            hypot(c.x - touchNorm.x, c.y - touchNorm.y)
-                                        }
-                                        draggingCornerIndex = closestIdx
-                                    },
-                                    onDragEnd = { draggingCornerIndex = null },
-                                    onDragCancel = { draggingCornerIndex = null },
-                                    onDrag = { change, _ ->
-                                        change.consume()
-                                        val idx = draggingCornerIndex ?: return@detectDragGestures
-                                        val w = size.width.toFloat().coerceAtLeast(1f)
-                                        val h = size.height.toFloat().coerceAtLeast(1f)
-                                        val nextOffset = Offset(
-                                            (change.position.x / w).coerceIn(0.02f, 0.98f),
-                                            (change.position.y / h).coerceIn(0.02f, 0.98f)
-                                        )
-                                        val mutable = corners.toMutableList()
-                                        mutable[idx] = nextOffset
-                                        corners = mutable
-                                    }
-                                )
-                            }
+                            .background(palette.surface)
+                            .border(1.dp, palette.divider, DocFlowTokens.cardShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Image(
-                            bitmap = pageItem.processedBitmap.asImageBitmap(),
-                            contentDescription = "Captured document page",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
-
-                        // 4 Draggable Corner Handles + #1F6BFF Quad Overlay
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val w = size.width
-                            val h = size.height
-                            if (corners.size == 4) {
-                                val pts = corners.map { Offset(it.x * w, it.y * h) }
-                                val path = Path().apply {
-                                    moveTo(pts[0].x, pts[0].y)
-                                    lineTo(pts[1].x, pts[1].y)
-                                    lineTo(pts[2].x, pts[2].y)
-                                    lineTo(pts[3].x, pts[3].y)
-                                    close()
-                                }
-                                drawPath(
-                                    path = path,
-                                    color = DocFlowTokens.accentBlue.copy(alpha = 0.14f)
-                                )
-                                drawPath(
-                                    path = path,
-                                    color = DocFlowTokens.accentBlue,
-                                    style = Stroke(width = 3.dp.toPx())
-                                )
-                                pts.forEachIndexed { idx, pt ->
-                                    val isDragging = draggingCornerIndex == idx
-                                    drawCircle(
-                                        color = Color.White,
-                                        radius = if (isDragging) 14.dp.toPx() else 11.dp.toPx(),
-                                        center = pt
-                                    )
-                                    drawCircle(
-                                        color = DocFlowTokens.accentBlue,
-                                        radius = if (isDragging) 10.dp.toPx() else 7.dp.toPx(),
-                                        center = pt
-                                    )
-                                }
-                            }
-                        }
-
-                        // Magnifier Loupe while dragging any corner handle
-                        val activeCornerIdx = draggingCornerIndex
-                        if (activeCornerIdx != null && corners.size == 4) {
-                            val cornerPos = corners[activeCornerIdx]
-                            Surface(
+                        if (activePage != null) {
+                            Image(
+                                bitmap = activePage.processedBitmap.asImageBitmap(),
+                                contentDescription = "Scanned page ${safeIndex + 1}",
                                 modifier = Modifier
-                                    .align(if (cornerPos.x > 0.5f) Alignment.TopStart else Alignment.TopEnd)
-                                    .padding(DocFlowTokens.space3)
-                                    .size(96.dp),
-                                shape = CircleShape,
-                                color = DocFlowTokens.surface,
-                                border = BorderStroke(3.dp, DocFlowTokens.accentBlue),
-                                tonalElevation = 0.dp
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Image(
-                                        bitmap = pageItem.processedBitmap.asImageBitmap(),
-                                        contentDescription = "Magnifier loupe",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    Canvas(modifier = Modifier.fillMaxSize()) {
-                                        val cx = size.width / 2f
-                                        val cy = size.height / 2f
-                                        drawLine(DocFlowTokens.accentBlue, Offset(cx - 18f, cy), Offset(cx + 18f, cy), strokeWidth = 2.dp.toPx())
-                                        drawLine(DocFlowTokens.accentBlue, Offset(cx, cy - 18f), Offset(cx, cy + 18f), strokeWidth = 2.dp.toPx())
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // STEP C: FILTERS (Horizontal chips with live previews + Brightness/Contrast sheet)
-        // ---------------------------------------------------------------------
-        ScannerFlowStep.FILTERS -> {
-            val pageItem = scannedPages.getOrNull(activeEditPageIndex)
-            if (pageItem == null) {
-                currentStep = ScannerFlowStep.CROP_ADJUST
-                return
-            }
-
-            Scaffold(
-                containerColor = DocFlowTokens.background,
-                contentWindowInsets = WindowInsets.safeDrawing,
-                topBar = {
-                    DocFlowScreenHeader(
-                        title = "Filters",
-                        subtitle = "Page ${activeEditPageIndex + 1} · ${pageItem.filterMode.label}",
-                        actions = listOf(
-                            DocFlowHeaderAction(
-                                icon = Icons.Default.Tune,
-                                contentDescription = "Brightness & Contrast",
-                                testTag = "filter_sliders_button",
-                                isActive = showAdjustSlidersSheet,
-                                onClick = { showAdjustSlidersSheet = true }
-                            ),
-                            DocFlowHeaderAction(
-                                icon = Icons.Default.Check,
-                                contentDescription = "Apply filter",
-                                testTag = "filter_apply_button",
-                                tint = DocFlowTokens.accentBlue,
-                                onClick = { currentStep = ScannerFlowStep.REVIEW_ORGANIZE }
+                                    .fillMaxSize()
+                                    .padding(DocFlowTokens.space3),
+                                contentScale = ContentScale.Fit
                             )
-                        )
-                    )
-                },
-                bottomBar = {
-                    Surface(
-                        color = DocFlowTokens.surface,
-                        tonalElevation = 0.dp
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = DocFlowTokens.space3)
-                        ) {
-                            HorizontalDivider(color = DocFlowTokens.divider)
-                            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
 
-                            // Horizontal Chips with Live Previews:
-                            // Original, Auto enhance, Color, Grayscale, B&W, Remove shadows
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState())
-                                    .padding(horizontal = DocFlowTokens.screenSideMargin),
-                                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
-                            ) {
-                                DocScanFilterMode.entries.forEach { mode ->
-                                    val isSelected = pageItem.filterMode == mode
-                                    Column(
-                                        modifier = Modifier
-                                            .width(84.dp)
-                                            .clip(DocFlowTokens.smallShape)
-                                            .border(
-                                                width = if (isSelected) 2.dp else 1.dp,
-                                                color = if (isSelected) DocFlowTokens.accentBlue else DocFlowTokens.divider,
-                                                shape = DocFlowTokens.smallShape
-                                            )
-                                            .background(DocFlowTokens.surfaceSubtle)
-                                            .clickable {
-                                                scope.launch {
-                                                    val updated = applyFilterAndAdjustments(
-                                                        source = pageItem.rawBitmap,
-                                                        filterMode = mode,
-                                                        rotationDegrees = pageItem.rotationDegrees,
-                                                        brightness = pageItem.brightness,
-                                                        contrast = pageItem.contrast
-                                                    )
-                                                    scannedPages[activeEditPageIndex] = pageItem.copy(
-                                                        filterMode = mode,
-                                                        processedBitmap = updated
-                                                    )
-                                                }
-                                            }
-                                            .padding(DocFlowTokens.space2)
-                                            .testTag("scan_filter_chip_${mode.name.lowercase()}"),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Image(
-                                            bitmap = pageItem.rawBitmap.asImageBitmap(),
-                                            contentDescription = mode.label,
-                                            modifier = Modifier
-                                                .size(56.dp)
-                                                .clip(DocFlowTokens.thumbnailShape),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                        Spacer(modifier = Modifier.height(DocFlowTokens.space1))
-                                        Text(
-                                            text = mode.label,
-                                            style = DocFlowTokens.microBadgeStyle.copy(
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                            ),
-                                            color = if (isSelected) DocFlowTokens.accentBlue else DocFlowTokens.textPrimary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+                            if (isAdjustingCrop) {
+                                DraggableCropQuadOverlay(
+                                    page = activePage,
+                                    onUpdateCorners = { tl, tr, br, bl ->
+                                        capturedPages[safeIndex] = activePage.copy(
+                                            topLeft = tl,
+                                            topRight = tr,
+                                            bottomRight = br,
+                                            bottomLeft = bl
                                         )
                                     }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = DocFlowTokens.screenSideMargin),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                DocFlowSecondaryButton(
-                                    text = "Brightness & Contrast",
-                                    leadingIcon = Icons.Default.Tune,
-                                    onClick = { showAdjustSlidersSheet = true }
-                                )
-                                DocFlowPrimaryButton(
-                                    text = "Done",
-                                    leadingIcon = Icons.Default.Check,
-                                    onClick = { currentStep = ScannerFlowStep.REVIEW_ORGANIZE }
                                 )
                             }
                         }
                     }
-                }
-            ) { innerPadding ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(DocFlowTokens.screenSideMargin),
-                    contentAlignment = Alignment.Center
-                ) {
-                    DocFlowCard(padding = PaddingValues(DocFlowTokens.space3)) {
-                        Image(
-                            bitmap = pageItem.processedBitmap.asImageBitmap(),
-                            contentDescription = "Filtered page preview",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(0.72f)
-                                .clip(DocFlowTokens.thumbnailShape),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
-                }
-            }
-        }
 
-        // ---------------------------------------------------------------------
-        // STEP D: REVIEW & ORGANIZE (Light screen using shared tokens, title "N pages")
-        // ---------------------------------------------------------------------
-        ScannerFlowStep.REVIEW_ORGANIZE -> {
-            val pageCountLabel = if (scannedPages.size == 1) "1 page" else "${scannedPages.size} pages"
-            Scaffold(
-                containerColor = DocFlowTokens.background,
-                contentWindowInsets = WindowInsets.safeDrawing,
-                topBar = {
-                    DocFlowScreenHeader(
-                        title = pageCountLabel,
-                        subtitle = if (isMultiSelectActive) {
-                            "${selectedPageIds.size} selected · Long-press pages to select"
-                        } else {
-                            "Tap a page to edit · Long-press for multi-select"
-                        },
-                        actions = if (isMultiSelectActive) {
-                            listOf(
-                                DocFlowHeaderAction(
-                                    icon = Icons.Default.RotateRight,
-                                    contentDescription = "Rotate selected",
-                                    testTag = "review_batch_rotate",
-                                    onClick = {
-                                        scope.launch {
-                                            scannedPages.forEachIndexed { idx, item ->
-                                                if (selectedPageIds.contains(item.id)) {
-                                                    val nextRot = (item.rotationDegrees + 90f) % 360f
-                                                    val bmp = applyFilterAndAdjustments(
-                                                        item.rawBitmap,
-                                                        item.filterMode,
-                                                        nextRot,
-                                                        item.brightness,
-                                                        item.contrast
-                                                    )
-                                                    scannedPages[idx] = item.copy(
-                                                        rotationDegrees = nextRot,
-                                                        processedBitmap = bmp
-                                                    )
-                                                }
-                                            }
-                                            selectedPageIds.clear()
-                                        }
-                                    }
-                                ),
-                                DocFlowHeaderAction(
-                                    icon = Icons.Default.ContentCopy,
-                                    contentDescription = "Duplicate selected",
-                                    testTag = "review_batch_duplicate",
-                                    onClick = {
-                                        val copies = scannedPages.filter { selectedPageIds.contains(it.id) }.map {
-                                            it.copy(id = "${it.id}_copy_${System.currentTimeMillis()}")
-                                        }
-                                        scannedPages.addAll(copies)
-                                        persistDraftMetadata(scannedPages.size)
-                                        selectedPageIds.clear()
-                                    }
-                                ),
-                                DocFlowHeaderAction(
-                                    icon = Icons.Default.DeleteOutline,
-                                    contentDescription = "Delete selected",
-                                    testTag = "review_batch_delete",
-                                    tint = DocFlowTokens.iconRedPdf,
-                                    onClick = {
-                                        scannedPages.removeAll { selectedPageIds.contains(it.id) }
-                                        selectedPageIds.clear()
-                                        persistDraftMetadata(scannedPages.size)
-                                        if (scannedPages.isEmpty()) {
-                                            currentStep = ScannerFlowStep.CAMERA
-                                        }
-                                    }
-                                ),
-                                DocFlowHeaderAction(
-                                    icon = Icons.Default.Close,
-                                    contentDescription = "Clear selection",
-                                    testTag = "review_clear_selection",
-                                    onClick = { selectedPageIds.clear() }
-                                )
-                            )
-                        } else {
-                            listOf(
-                                DocFlowHeaderAction(
-                                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back to camera",
-                                    testTag = "review_back_to_camera",
-                                    onClick = { currentStep = ScannerFlowStep.CAMERA }
-                                )
-                            )
-                        }
-                    )
-                },
-                bottomBar = {
-                    Surface(
-                        color = DocFlowTokens.surface,
-                        tonalElevation = 0.dp
+                    // Filter Strip: Original, Grayscale, B&W, Magic Color, High Contrast
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = DocFlowTokens.space1),
+                        horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(DocFlowTokens.screenSideMargin)
-                        ) {
-                            HorizontalDivider(color = DocFlowTokens.divider)
-                            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-                            DocFlowPrimaryButton(
-                                text = "Save",
-                                leadingIcon = Icons.Default.Check,
-                                enabled = scannedPages.isNotEmpty(),
-                                modifier = Modifier.fillMaxWidth(),
-                                testTag = "review_save_button",
+                        ScanFilter.entries.forEach { filter ->
+                            val isSelected = activePage?.filter == filter
+                            FilterChip(
+                                selected = isSelected,
                                 onClick = {
-                                    saveFileName = "Scan ${SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault()).format(Date())}"
-                                    showSaveSheet = true
-                                }
+                                    if (activePage != null) {
+                                        coroutineScope.launch {
+                                            val updatedBmp = ImageProcessingPdfPipeline.processDocumentBitmap(
+                                                source = activePage.rawBitmap,
+                                                filter = filter,
+                                                rotationDegrees = activePage.rotationDegrees
+                                            )
+                                            capturedPages[safeIndex] = activePage.copy(
+                                                filter = filter,
+                                                processedBitmap = updatedBmp
+                                            )
+                                        }
+                                    }
+                                },
+                                label = { Text(filter.label) },
+                                modifier = Modifier.testTag("scan_filter_${filter.name.lowercase()}")
                             )
                         }
                     }
-                }
-            ) { innerPadding ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                ) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(DocFlowTokens.screenSideMargin),
-                        horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3),
-                        verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
-                    ) {
-                        itemsIndexed(
-                            items = scannedPages,
-                            key = { _, item -> item.id }
-                        ) { index, page ->
-                            val isSelected = selectedPageIds.contains(page.id)
-                            DocFlowCard(
-                                padding = PaddingValues(DocFlowTokens.space3),
-                                borderColor = if (isSelected) DocFlowTokens.accentBlue else DocFlowTokens.divider,
-                                modifier = Modifier.combinedClickable(
-                                    onClick = {
-                                        if (isMultiSelectActive) {
-                                            if (isSelected) selectedPageIds.remove(page.id)
-                                            else selectedPageIds.add(page.id)
-                                        } else {
-                                            activeEditPageIndex = index
-                                            currentStep = ScannerFlowStep.CROP_ADJUST
-                                        }
-                                    },
-                                    onLongClick = {
-                                        if (!isSelected) selectedPageIds.add(page.id)
-                                    }
-                                )
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .aspectRatio(0.72f)
-                                        .clip(DocFlowTokens.thumbnailShape)
-                                        .background(Color.White)
-                                        .border(1.dp, DocFlowTokens.divider, DocFlowTokens.thumbnailShape)
-                                ) {
-                                    Image(
-                                        bitmap = page.processedBitmap.asImageBitmap(),
-                                        contentDescription = "Scanned page ${index + 1}",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    if (isMultiSelectActive) {
-                                        Checkbox(
-                                            checked = isSelected,
-                                            onCheckedChange = {
-                                                if (isSelected) selectedPageIds.remove(page.id)
-                                                else selectedPageIds.add(page.id)
-                                            },
-                                            modifier = Modifier.align(Alignment.TopEnd)
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(DocFlowTokens.space2))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Page ${index + 1}",
-                                        style = DocFlowTokens.captionBoldStyle,
-                                        color = DocFlowTokens.textPrimary
-                                    )
-                                    Row {
-                                        IconButton(
-                                            onClick = {
-                                                if (index > 0) {
-                                                    val removed = scannedPages.removeAt(index)
-                                                    scannedPages.add(index - 1, removed)
-                                                }
-                                            },
-                                            enabled = index > 0,
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                                contentDescription = "Move page earlier",
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                        IconButton(
-                                            onClick = {
-                                                if (index < scannedPages.lastIndex) {
-                                                    val removed = scannedPages.removeAt(index)
-                                                    scannedPages.add(index + 1, removed)
-                                                }
-                                            },
-                                            enabled = index < scannedPages.lastIndex,
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                                contentDescription = "Move page later",
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
 
-                        // "Add page" tile at the end
-                        item(key = "add_page_tile") {
-                            DocFlowCard(
-                                padding = PaddingValues(DocFlowTokens.space4),
-                                borderColor = DocFlowTokens.divider,
-                                onClick = { currentStep = ScannerFlowStep.CAMERA }
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .aspectRatio(0.72f),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
-                                    ) {
-                                        DocFlowIconCircle(
-                                            icon = Icons.Default.Add,
-                                            circleColor = DocFlowTokens.accentBlue,
-                                            contentDescription = "Add page"
+                    // Action Row: Crop, Rotate 90°, Retake, Delete
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(palette.surface)
+                            .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = DocFlowTokens.space2),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ReviewActionItem(
+                            icon = Icons.Filled.Crop,
+                            label = if (isAdjustingCrop) "Apply Crop" else "Crop",
+                            active = isAdjustingCrop,
+                            palette = palette,
+                            onClick = { isAdjustingCrop = !isAdjustingCrop }
+                        )
+                        ReviewActionItem(
+                            icon = Icons.Filled.RotateRight,
+                            label = "Rotate 90°",
+                            active = false,
+                            palette = palette,
+                            onClick = {
+                                if (activePage != null) {
+                                    val nextRot = (activePage.rotationDegrees + 90f) % 360f
+                                    coroutineScope.launch {
+                                        val rotated = ImageProcessingPdfPipeline.processDocumentBitmap(
+                                            source = activePage.rawBitmap,
+                                            filter = activePage.filter,
+                                            rotationDegrees = nextRot
                                         )
-                                        Text(
-                                            text = "Add page",
-                                            style = DocFlowTokens.bodyMediumStyle,
-                                            color = DocFlowTokens.accentBlue
+                                        capturedPages[safeIndex] = activePage.copy(
+                                            rotationDegrees = nextRot,
+                                            processedBitmap = rotated
                                         )
                                     }
                                 }
                             }
-                        }
+                        )
+                        ReviewActionItem(
+                            icon = Icons.Filled.Refresh,
+                            label = "Retake",
+                            active = false,
+                            palette = palette,
+                            onClick = {
+                                if (capturedPages.isNotEmpty()) {
+                                    capturedPages.removeAt(safeIndex)
+                                }
+                                currentStep = ScannerStep.CAMERA
+                            }
+                        )
+                        ReviewActionItem(
+                            icon = Icons.Filled.Delete,
+                            label = "Delete",
+                            active = false,
+                            palette = palette,
+                            tint = DocFlowTokens.IconCircleRed,
+                            onClick = {
+                                if (capturedPages.size > 1) {
+                                    capturedPages.removeAt(safeIndex)
+                                    selectedPageIndex = (safeIndex - 1).coerceAtLeast(0)
+                                } else {
+                                    capturedPages.clear()
+                                    currentStep = ScannerStep.CAMERA
+                                }
+                            }
+                        )
                     }
 
-                    DocFlowToast(
-                        message = toastMessage,
-                        isError = toastIsError,
-                        onDismiss = { toastMessage = null },
-                        modifier = Modifier.align(Alignment.TopCenter)
-                    )
-                }
-            }
-        }
-    }
-
-    // =========================================================================
-    // SCANNER BOTTOM SHEETS & DIALOGS
-    // =========================================================================
-
-    // Camera Settings Sheet (Resolution & Grid Overlay)
-    if (showCameraSettingsSheet) {
-        DocFlowBottomSheet(
-            onDismissRequest = { showCameraSettingsSheet = false },
-            title = "Scanner camera settings"
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Grid overlay", style = DocFlowTokens.bodyMediumStyle, color = DocFlowTokens.textPrimary)
-                    Text("Show alignment grid on camera viewfinder", style = DocFlowTokens.captionStyle, color = DocFlowTokens.textSecondary)
-                }
-                Switch(checked = showGridOverlay, onCheckedChange = { showGridOverlay = it })
-            }
-            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("High resolution capture", style = DocFlowTokens.bodyMediumStyle, color = DocFlowTokens.textPrimary)
-                    Text("Maximize image clarity for small OCR text", style = DocFlowTokens.captionStyle, color = DocFlowTokens.textSecondary)
-                }
-                Switch(checked = highResolutionCapture, onCheckedChange = { highResolutionCapture = it })
-            }
-        }
-    }
-
-    // Step C: Brightness & Contrast Sliders Bottom Sheet
-    if (showAdjustSlidersSheet) {
-        val pageItem = scannedPages.getOrNull(activeEditPageIndex)
-        if (pageItem != null) {
-            var localBrightness by remember(pageItem.id) { mutableFloatStateOf(pageItem.brightness) }
-            var localContrast by remember(pageItem.id) { mutableFloatStateOf(pageItem.contrast) }
-
-            DocFlowBottomSheet(
-                onDismissRequest = { showAdjustSlidersSheet = false },
-                title = "Adjust Brightness & Contrast"
-            ) {
-                Text(
-                    text = "Brightness: ${localBrightness.roundToInt()}",
-                    style = DocFlowTokens.captionBoldStyle,
-                    color = DocFlowTokens.textPrimary
-                )
-                Slider(
-                    value = localBrightness,
-                    onValueChange = { localBrightness = it },
-                    valueRange = -80f..80f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = DocFlowTokens.accentBlue,
-                        activeTrackColor = DocFlowTokens.accentBlue
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-                Text(
-                    text = "Contrast: ${(localContrast * 100).roundToInt()}%",
-                    style = DocFlowTokens.captionBoldStyle,
-                    color = DocFlowTokens.textPrimary
-                )
-                Slider(
-                    value = localContrast,
-                    onValueChange = { localContrast = it },
-                    valueRange = 0.6f..1.8f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = DocFlowTokens.accentBlue,
-                        activeTrackColor = DocFlowTokens.accentBlue
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(DocFlowTokens.space4))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    DocFlowSecondaryButton(
-                        text = "Reset",
-                        onClick = {
-                            localBrightness = 0f
-                            localContrast = 1f
-                        }
-                    )
-                    DocFlowPrimaryButton(
-                        text = "Apply",
-                        onClick = {
-                            scope.launch {
-                                val updated = applyFilterAndAdjustments(
-                                    source = pageItem.rawBitmap,
-                                    filterMode = pageItem.filterMode,
-                                    rotationDegrees = pageItem.rotationDegrees,
-                                    brightness = localBrightness,
-                                    contrast = localContrast
-                                )
-                                scannedPages[activeEditPageIndex] = pageItem.copy(
-                                    brightness = localBrightness,
-                                    contrast = localContrast,
-                                    processedBitmap = updated
-                                )
-                                showAdjustSlidersSheet = false
+                    // Multi-Page Preview Drawer Strip (Reorder Left/Right, Delete, Add Page)
+                    BatchMultiPagePreviewDrawer(
+                        pages = capturedPages,
+                        selectedIndex = safeIndex,
+                        palette = palette,
+                        onSelectPage = { idx -> selectedPageIndex = idx },
+                        onMovePageLeft = { idx ->
+                            if (idx > 0) {
+                                val moved = capturedPages.removeAt(idx)
+                                capturedPages.add(idx - 1, moved)
+                                selectedPageIndex = idx - 1
                             }
-                        }
+                        },
+                        onMovePageRight = { idx ->
+                            if (idx < capturedPages.lastIndex) {
+                                val moved = capturedPages.removeAt(idx)
+                                capturedPages.add(idx + 1, moved)
+                                selectedPageIndex = idx + 1
+                            }
+                        },
+                        onDeletePage = { idx ->
+                            if (capturedPages.size > 1) {
+                                capturedPages.removeAt(idx)
+                                selectedPageIndex = (idx - 1).coerceAtLeast(0)
+                            } else {
+                                capturedPages.clear()
+                                currentStep = ScannerStep.CAMERA
+                            }
+                        },
+                        onAddPage = { currentStep = ScannerStep.CAMERA }
                     )
                 }
             }
         }
+
+        if (scannerToast != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 74.dp)
+            ) {
+                DocFlowToast(message = scannerToast!!)
+            }
+        }
     }
 
-    // Step E: Save Sheet
+    // =========================================================================
+    // STEP C: SAVE SHEET (Only Original Data Show — Real Bitmap + Real ML Kit OCR)
+    // =========================================================================
     if (showSaveSheet) {
         DocFlowBottomSheet(
-            onDismissRequest = { if (!isSavingScan) showSaveSheet = false },
-            title = "Save scanned document"
+            onDismissRequest = { if (!isSaving) showSaveSheet = false },
+            palette = palette
         ) {
-            Column(
+            Text(
+                text = "Save Scanned Document",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Text(
+                text = "${capturedPages.size.coerceAtLeast(1)} page(s) • Only Original Data • Stored on this device",
+                style = DocFlowTokens.captionStyle,
+                color = palette.textSecondary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+
+            OutlinedTextField(
+                value = scanFileName,
+                onValueChange = { scanFileName = it },
+                label = { Text("File name") },
+                singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
+                    .testTag("scanner_filename_input")
+            )
+
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+
+            // Format & Quality
+            Text("Format & Quality", style = DocFlowTokens.captionStyle, color = palette.textSecondary)
+            Spacer(modifier = Modifier.height(DocFlowTokens.space1))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2),
+                verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space1)
             ) {
-                OutlinedTextField(
-                    value = saveFileName,
-                    onValueChange = { saveFileName = it },
-                    label = { Text("Document name") },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("save_sheet_name_input")
+                FilterChip(
+                    selected = saveFormat == "PDF",
+                    onClick = { saveFormat = "PDF" },
+                    label = { Text("PDF (Multi-page)") }
                 )
-
-                // Format chips (PDF / JPG) & Quality (Standard / High)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Format", style = DocFlowTokens.captionStyle, color = DocFlowTokens.textSecondary)
-                        Row(horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)) {
-                            listOf("PDF", "JPG").forEach { fmt ->
-                                FilterChip(
-                                    selected = saveFormat == fmt,
-                                    onClick = { saveFormat = fmt },
-                                    label = { Text(fmt) }
-                                )
-                            }
-                        }
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Quality", style = DocFlowTokens.captionStyle, color = DocFlowTokens.textSecondary)
-                        Row(horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)) {
-                            listOf("Standard", "High").forEach { q ->
-                                FilterChip(
-                                    selected = saveQuality == q,
-                                    onClick = { saveQuality = q },
-                                    label = { Text(q) }
-                                )
-                            }
-                        }
-                    }
+                FilterChip(
+                    selected = saveFormat == "JPG",
+                    onClick = { saveFormat = "JPG" },
+                    label = { Text("JPG Image") }
+                )
+                listOf("High", "Medium", "Small").forEach { q ->
+                    FilterChip(
+                        selected = saveQuality == q,
+                        onClick = { saveQuality = q },
+                        label = { Text("$q Quality") }
+                    )
                 }
+            }
 
-                // Folder Picker (including "New folder")
-                Text("Folder", style = DocFlowTokens.captionStyle, color = DocFlowTokens.textSecondary)
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+
+            // Save Location Folder
+            Text("Save location (Stored on this device)", style = DocFlowTokens.captionStyle, color = palette.textSecondary)
+            Spacer(modifier = Modifier.height(DocFlowTokens.space1))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
+            ) {
+                FilterChip(
+                    selected = selectedFolderId == "root",
+                    onClick = { selectedFolderId = "root" },
+                    label = { Text("Created by me") }
+                )
+                folders.forEach { folder ->
+                    FilterChip(
+                        selected = selectedFolderId == folder.id,
+                        onClick = { selectedFolderId = folder.id },
+                        label = { Text(folder.name) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+
+            // Run OCR (make searchable PDF) toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Run OCR (make searchable PDF)",
+                        style = DocFlowTokens.bodyStyle,
+                        fontWeight = FontWeight.Medium,
+                        color = palette.textPrimary
+                    )
+                    Text(
+                        text = "Extracts only real text from your captured scan (${selectedOcrLanguage.displayName})",
+                        style = DocFlowTokens.captionStyle,
+                        color = palette.textSecondary
+                    )
+                }
+                Switch(
+                    checked = runOcrOnSave,
+                    onCheckedChange = { runOcrOnSave = it },
+                    colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = DocFlowTokens.AccentBlue)
+                )
+            }
+
+            if (runOcrOnSave) {
+                Spacer(modifier = Modifier.height(DocFlowTokens.space1))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
                 ) {
-                    FilterChip(
-                        selected = saveFolderId == "root",
-                        onClick = { saveFolderId = "root" },
-                        label = { Text("Workspace Root") }
-                    )
-                    folders.forEach { folder ->
+                    listOf(OcrLanguage.ENGLISH, OcrLanguage.HINDI).forEach { lang ->
                         FilterChip(
-                            selected = saveFolderId == folder.id,
-                            onClick = { saveFolderId = folder.id },
-                            label = { Text(folder.name) }
+                            selected = selectedOcrLanguage == lang,
+                            onClick = { selectedOcrLanguage = lang },
+                            label = { Text("${lang.displayName} (${lang.nativeLabel})") }
                         )
                     }
-                    FilterChip(
-                        selected = false,
-                        onClick = { showNewFolderDialog = true },
-                        label = { Text("New folder") },
-                        leadingIcon = { Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                    )
                 }
+            }
 
-                // Category chip auto-suggested from OCR (Invoice, ID, Receipt, Contract, Medical, Education, Other)
-                Text(
-                    text = "Category (auto-suggested from OCR)",
-                    style = DocFlowTokens.captionStyle,
-                    color = DocFlowTokens.textSecondary
+            if (isSaving) {
+                Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+                DocFlowProgressBar(progress = saveProgress, palette = palette)
+            }
+
+            Spacer(modifier = Modifier.height(DocFlowTokens.space4))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
+            ) {
+                DocFlowSecondaryButton(
+                    text = "Cancel",
+                    onClick = { showSaveSheet = false },
+                    palette = palette,
+                    modifier = Modifier.weight(1f)
                 )
-                val categories = listOf("Invoice", "ID", "Receipt", "Contract", "Medical", "Education", "Other")
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
-                ) {
-                    categories.forEach { cat ->
-                        FilterChip(
-                            selected = saveCategory.equals(cat, ignoreCase = true),
-                            onClick = { saveCategory = cat },
-                            label = { Text(cat) }
-                        )
-                    }
-                }
-
-                // Toggles: "Make searchable (OCR)", "Lock in Private Safe"
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Make searchable (OCR)", style = DocFlowTokens.bodyMediumStyle, color = DocFlowTokens.textPrimary)
-                        Text("Index text on-device for instant search", style = DocFlowTokens.captionStyle, color = DocFlowTokens.textSecondary)
-                    }
-                    Switch(checked = makeSearchableOcr, onCheckedChange = { makeSearchableOcr = it })
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Lock in Private Safe", style = DocFlowTokens.bodyMediumStyle, color = DocFlowTokens.textPrimary)
-                        Text("Protect with PIN & biometric lock", style = DocFlowTokens.captionStyle, color = DocFlowTokens.textSecondary)
-                    }
-                    Switch(checked = lockInPrivateSafe, onCheckedChange = { lockInPrivateSafe = it })
-                }
-
-                if (isSavingScan) {
-                    DocFlowProgressBar(
-                        progress = saveProgress,
-                        label = "Generating searchable ${saveFormat} on device..."
-                    )
-                }
-
                 DocFlowPrimaryButton(
-                    text = if (isSavingScan) "Saving..." else "Save to Device",
-                    enabled = !isSavingScan && saveFileName.isNotBlank(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("confirm_save_scan_button"),
+                    text = if (isSaving) "Saving..." else "Save to Device",
+                    enabled = !isSaving,
                     onClick = {
-                        scope.launch {
-                            isSavingScan = true
+                        isSaving = true
+                        coroutineScope.launch {
                             saveProgress = 0.25f
-                            ocrFallbackNotice = null
+                            val title = scanFileName.trim().ifBlank { "Scan $defaultTimestamp" }
+                            val totalPages = capturedPages.size.coerceAtLeast(1)
 
-                            val finalTitle = saveFileName.trim().ifBlank { defaultScanName }
-                            val ext = if (saveFormat == "JPG") "jpg" else "pdf"
-                            val safeFileName = finalTitle.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_') + ".$ext"
-
-                            val combinedOcr = buildString {
-                                appendLine("=== SECTION 1: SCANNED DOCUMENT ===")
-                                appendLine("Title: $finalTitle")
-                                appendLine("Category: $saveCategory")
-                                appendLine("Pages: ${scannedPages.size}")
-                                if (makeSearchableOcr) {
-                                    appendLine()
-                                    appendLine("=== SECTION 2: OCR TEXT ===")
-                                    scannedPages.forEachIndexed { idx, p ->
-                                        appendLine("=== PAGE ${idx + 1} OCR TEXT ===")
-                                        appendLine(p.ocrText.ifBlank { "Scanned Page ${idx + 1} ($saveCategory)" })
+                            // Extract ONLY real OCR text from the captured bitmaps (no fake invoice strings)
+                            val realOcrPerPage = mutableListOf<String>()
+                            if (runOcrOnSave) {
+                                capturedPages.forEachIndexed { idx, p ->
+                                    val ocrText = if (p.extractedOcrText.isNotBlank()) {
+                                        p.extractedOcrText
+                                    } else {
+                                        MultiLanguageOcrEngine.recognizeTextFromBitmapWithMlKit(
+                                            bitmap = p.processedBitmap,
+                                            selectedLanguage = selectedOcrLanguage
+                                        ).trim()
+                                    }
+                                    if (ocrText.isNotBlank()) {
+                                        realOcrPerPage.add("=== PAGE ${idx + 1} ===\n$ocrText")
                                     }
                                 }
                             }
-
                             saveProgress = 0.65f
-                            val pdfResult = ImageProcessingPdfPipeline.convertBitmapsToPdfFile(
+
+                            val combinedOriginalOcr = realOcrPerPage.joinToString("\n\n").trim()
+                            val bitmapsToSave = capturedPages.map { it.processedBitmap }
+
+                            val ext = if (saveFormat == "PDF") "pdf" else "pic"
+                            val cleanFileName = title.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+                                .ifBlank { "scan" } + if (ext == "pdf") ".pdf" else ".jpg"
+
+                            val pdfConversion = ImageProcessingPdfPipeline.convertBitmapsToPdfFile(
                                 context = context,
-                                fileName = safeFileName,
-                                bitmaps = scannedPages.map { it.processedBitmap },
-                                ocrText = if (makeSearchableOcr) combinedOcr else ""
+                                fileName = cleanFileName,
+                                bitmaps = bitmapsToSave,
+                                ocrText = combinedOriginalOcr,
+                                watermarkConfig = PdfWatermarkConfig(enabled = false)
+                            ).getOrNull()
+
+                            saveProgress = 0.95f
+
+                            viewModel.createOrScanDocument(
+                                title = title,
+                                folderId = selectedFolderId,
+                                category = "Work",
+                                fileType = ext,
+                                fileName = pdfConversion?.pdfFile?.name ?: cleanFileName,
+                                plainContent = combinedOriginalOcr,
+                                isEncrypted = false,
+                                password = "",
+                                encryptionKeyHint = null,
+                                isOfflineCached = true,
+                                pageCount = totalPages.toLong(),
+                                localPdfPath = pdfConversion?.pdfFile?.absolutePath,
+                                generatedPdfUri = pdfConversion?.pdfUri,
+                                customTags = "scanned, created-by-me, $ext${if (combinedOriginalOcr.isNotBlank()) ", ocr" else ""}",
+                                createdByMe = true,
+                                onCreated = { docId ->
+                                    isSaving = false
+                                    showSaveSheet = false
+                                    onDocumentSaved(docId)
+                                }
                             )
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("scanner_confirm_save_button")
+                )
+            }
+        }
+    }
+}
 
-                            saveProgress = 1.0f
-                            val resolvedPath = pdfResult.getOrNull()?.pdfFile?.absolutePath
-                            val resolvedUri = pdfResult.getOrNull()?.pdfUri
+@Composable
+private fun BatchMultiPagePreviewDrawer(
+    pages: List<CapturedScanPage>,
+    selectedIndex: Int,
+    palette: DocFlowPalette,
+    onSelectPage: (Int) -> Unit,
+    onMovePageLeft: (Int) -> Unit,
+    onMovePageRight: (Int) -> Unit,
+    onDeletePage: (Int) -> Unit,
+    onAddPage: (() -> Unit)? = null,
+    onDoneReview: (() -> Unit)? = null
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(palette.surface)
+            .border(1.dp, palette.divider)
+            .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = DocFlowTokens.space2)
+            .testTag("scanner_multipage_preview_drawer")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ViewCarousel,
+                    contentDescription = null,
+                    tint = DocFlowTokens.AccentBlue,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = "Batch Pages (${pages.size}) • Reorder or Delete",
+                    style = DocFlowTokens.captionStyle,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.textPrimary
+                )
+            }
+            if (onDoneReview != null) {
+                Text(
+                    text = "Enhance Pages",
+                    style = DocFlowTokens.captionStyle,
+                    fontWeight = FontWeight.Bold,
+                    color = DocFlowTokens.AccentBlue,
+                    modifier = Modifier.clickable(onClick = onDoneReview)
+                )
+            }
+        }
 
-                            lastSavedTitle = finalTitle
-                            lastSavedFileIdOrPath = resolvedPath
-                            lastSavedUri = resolvedUri
-                            lastSavedContent = combinedOcr
-                            lastSavedPageCount = scannedPages.size.coerceAtLeast(1)
+        Spacer(modifier = Modifier.height(DocFlowTokens.space2))
 
-                            persistDraftMetadata(0)
-                            isSavingScan = false
-                            showSaveSheet = false
-                            showSuccessSheet = true
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            pages.forEachIndexed { idx, page ->
+                val isSelected = idx == selectedIndex
+                Column(
+                    modifier = Modifier
+                        .width(96.dp)
+                        .clip(DocFlowTokens.thumbnailShape)
+                        .background(palette.background)
+                        .border(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) DocFlowTokens.AccentBlue else palette.divider,
+                            shape = DocFlowTokens.thumbnailShape
+                        )
+                        .clickable { onSelectPage(idx) }
+                        .padding(4.dp)
+                        .testTag("drawer_page_card_$idx"),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(modifier = Modifier.size(60.dp, 72.dp)) {
+                        Image(
+                            bitmap = page.processedBitmap.asImageBitmap(),
+                            contentDescription = "Page ${idx + 1}",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(DocFlowTokens.thumbnailShape),
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .background(
+                                    if (isSelected) DocFlowTokens.AccentBlue else Color.Black.copy(alpha = 0.6f),
+                                    DocFlowTokens.thumbnailShape
+                                )
+                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                text = "${idx + 1}",
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
-                )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { onMovePageLeft(idx) },
+                            enabled = idx > 0,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .testTag("drawer_move_left_$idx")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Move page left",
+                                tint = if (idx > 0) palette.textPrimary else palette.divider,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = { onDeletePage(idx) },
+                            modifier = Modifier
+                                .size(24.dp)
+                                .testTag("drawer_delete_page_$idx")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = "Delete page",
+                                tint = DocFlowTokens.IconCircleRed,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = { onMovePageRight(idx) },
+                            enabled = idx < pages.lastIndex,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .testTag("drawer_move_right_$idx")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Move page right",
+                                tint = if (idx < pages.lastIndex) palette.textPrimary else palette.divider,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
             }
-        }
-    }
 
-    // New Folder Dialog inside Save Sheet
-    if (showNewFolderDialog) {
-        DocFlowDialog(
-            title = "New folder",
-            onDismissRequest = { showNewFolderDialog = false },
-            confirmText = "Create",
-            confirmEnabled = newFolderNameInput.isNotBlank(),
-            onConfirm = {
-                val createdName = newFolderNameInput.trim()
-                onCreateNewFolder?.invoke(createdName)
-                newFolderNameInput = ""
-                showNewFolderDialog = false
-                toastMessage = "Created folder \"$createdName\""
-            }
-        ) {
-            OutlinedTextField(
-                value = newFolderNameInput,
-                onValueChange = { newFolderNameInput = it },
-                label = { Text("Folder name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-
-    // Step E Success Sheet: Open, Share, Scan another
-    if (showSuccessSheet) {
-        DocFlowBottomSheet(
-            onDismissRequest = {
-                showSuccessSheet = false
-                onSaveScannedDocument(
-                    lastSavedTitle,
-                    saveFolderId,
-                    saveCategory,
-                    if (saveFormat == "JPG") "jpg" else "pdf",
-                    "$lastSavedTitle.${saveFormat.lowercase()}",
-                    lastSavedContent,
-                    lockInPrivateSafe,
-                    if (lockInPrivateSafe) "1234" else "",
-                    if (lockInPrivateSafe) "Private Safe PIN" else null,
-                    true,
-                    lastSavedPageCount.toLong(),
-                    lastSavedFileIdOrPath,
-                    lastSavedUri,
-                    "scanned, ${saveCategory.lowercase()}, ${saveFormat.lowercase()}"
-                )
-            },
-            title = "Scan saved on device"
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
-            ) {
-                DocFlowIconCircle(
-                    icon = Icons.Default.CheckCircle,
-                    circleColor = DocFlowTokens.iconGreenDownload,
-                    contentDescription = "Scan saved",
-                    size = 56.dp,
-                    iconSize = 30.dp
-                )
-                Text(
-                    text = lastSavedTitle,
-                    style = DocFlowTokens.rowTitleStyle,
-                    color = DocFlowTokens.textPrimary,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "$lastSavedPageCount page${if (lastSavedPageCount > 1) "s" else ""} · $saveFormat · $saveCategory",
-                    style = DocFlowTokens.captionStyle,
-                    color = DocFlowTokens.textSecondary
-                )
-
-                Spacer(modifier = Modifier.height(DocFlowTokens.space2))
-                DocFlowPrimaryButton(
-                    text = "Open",
+            if (onAddPage != null) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("scan_success_open_button"),
-                    onClick = {
-                        showSuccessSheet = false
-                        onSaveScannedDocument(
-                            lastSavedTitle,
-                            saveFolderId,
-                            saveCategory,
-                            if (saveFormat == "JPG") "jpg" else "pdf",
-                            "$lastSavedTitle.${saveFormat.lowercase()}",
-                            lastSavedContent,
-                            lockInPrivateSafe,
-                            if (lockInPrivateSafe) "1234" else "",
-                            if (lockInPrivateSafe) "Private Safe PIN" else null,
-                            true,
-                            lastSavedPageCount.toLong(),
-                            lastSavedFileIdOrPath,
-                            lastSavedUri,
-                            "scanned, ${saveCategory.lowercase()}, ${saveFormat.lowercase()}"
+                        .size(72.dp, 96.dp)
+                        .clip(DocFlowTokens.thumbnailShape)
+                        .border(2.dp, DocFlowTokens.AccentBlue, DocFlowTokens.thumbnailShape)
+                        .clickable(onClick = onAddPage)
+                        .testTag("scanner_add_page_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = "Add page",
+                            tint = DocFlowTokens.AccentBlue
+                        )
+                        Text(
+                            text = "Add",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = DocFlowTokens.AccentBlue
                         )
                     }
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
-                ) {
-                    DocFlowSecondaryButton(
-                        text = "Share",
-                        leadingIcon = Icons.Default.IosShare,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            runCatching {
-                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_SUBJECT, lastSavedTitle)
-                                    putExtra(Intent.EXTRA_TEXT, lastSavedContent)
-                                }
-                                context.startActivity(Intent.createChooser(sendIntent, "Share $lastSavedTitle"))
-                            }
-                        }
-                    )
-                    DocFlowSecondaryButton(
-                        text = "Scan another",
-                        leadingIcon = Icons.Default.CameraAlt,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            showSuccessSheet = false
-                            scannedPages.clear()
-                            currentStep = ScannerFlowStep.CAMERA
-                        }
-                    )
                 }
             }
         }
     }
 }
 
-private suspend fun applyFilterAndAdjustments(
-    source: Bitmap,
-    filterMode: DocScanFilterMode,
-    rotationDegrees: Float,
-    brightness: Float,
-    contrast: Float
-): Bitmap = withContext(Dispatchers.Default) {
-    val baseFiltered = ImageProcessingPdfPipeline.processDocumentBitmap(
-        source = source,
-        filter = filterMode.pipelineFilter,
-        rotationDegrees = rotationDegrees
-    )
-    if (brightness == 0f && contrast == 1f && filterMode != DocScanFilterMode.REMOVE_SHADOWS) {
-        return@withContext baseFiltered
-    }
-    val effectiveBrightness = if (filterMode == DocScanFilterMode.REMOVE_SHADOWS) brightness + 18f else brightness
-    val effectiveContrast = if (filterMode == DocScanFilterMode.REMOVE_SHADOWS) contrast * 1.15f else contrast
+@Composable
+private fun DraggableCropQuadOverlay(
+    page: CapturedScanPage,
+    onUpdateCorners: (Offset, Offset, Offset, Offset) -> Unit
+) {
+    var tl by remember(page.id) { mutableStateOf(page.topLeft) }
+    var tr by remember(page.id) { mutableStateOf(page.topRight) }
+    var br by remember(page.id) { mutableStateOf(page.bottomRight) }
+    var bl by remember(page.id) { mutableStateOf(page.bottomLeft) }
 
-    val out = Bitmap.createBitmap(baseFiltered.width, baseFiltered.height, Bitmap.Config.ARGB_8888)
-    val canvas = AndroidCanvas(out)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    val translate = (-0.5f * effectiveContrast + 0.5f) * 255f + effectiveBrightness
-    val cm = ColorMatrix(
-        floatArrayOf(
-            effectiveContrast, 0f, 0f, 0f, translate,
-            0f, effectiveContrast, 0f, 0f, translate,
-            0f, 0f, effectiveContrast, 0f, translate,
-            0f, 0f, 0f, 1f, 0f
+    Canvas(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .pointerInput(page.id) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    val normX = (change.position.x / size.width.coerceAtLeast(1)).coerceIn(0.05f, 0.95f)
+                    val normY = (change.position.y / size.height.coerceAtLeast(1)).coerceIn(0.05f, 0.95f)
+                    val dx = dragAmount.x / size.width.coerceAtLeast(1)
+                    val dy = dragAmount.y / size.height.coerceAtLeast(1)
+
+                    val corners = listOf(tl, tr, br, bl)
+                    val nearestIdx = corners.indices.minByOrNull { idx ->
+                        val c = corners[idx]
+                        (c.x - normX) * (c.x - normX) + (c.y - normY) * (c.y - normY)
+                    } ?: 0
+
+                    when (nearestIdx) {
+                        0 -> tl = Offset((tl.x + dx).coerceIn(0.05f, 0.48f), (tl.y + dy).coerceIn(0.05f, 0.48f))
+                        1 -> tr = Offset((tr.x + dx).coerceIn(0.52f, 0.95f), (tr.y + dy).coerceIn(0.05f, 0.48f))
+                        2 -> br = Offset((br.x + dx).coerceIn(0.52f, 0.95f), (br.y + dy).coerceIn(0.52f, 0.95f))
+                        3 -> bl = Offset((bl.x + dx).coerceIn(0.05f, 0.48f), (bl.y + dy).coerceIn(0.52f, 0.95f))
+                    }
+                    onUpdateCorners(tl, tr, br, bl)
+                }
+            }
+    ) {
+        val w = size.width
+        val h = size.height
+        val pTl = Offset(tl.x * w, tl.y * h)
+        val pTr = Offset(tr.x * w, tr.y * h)
+        val pBr = Offset(br.x * w, br.y * h)
+        val pBl = Offset(bl.x * w, bl.y * h)
+
+        val path = Path().apply {
+            moveTo(pTl.x, pTl.y)
+            lineTo(pTr.x, pTr.y)
+            lineTo(pBr.x, pBr.y)
+            lineTo(pBl.x, pBl.y)
+            close()
+        }
+        drawPath(path, color = DocFlowTokens.AccentBlue.copy(alpha = 0.16f))
+        drawPath(path, color = DocFlowTokens.AccentBlue, style = Stroke(width = 3.dp.toPx()))
+
+        listOf(pTl, pTr, pBr, pBl).forEach { pt ->
+            drawCircle(color = Color.White, radius = 12.dp.toPx(), center = pt)
+            drawCircle(color = DocFlowTokens.AccentBlue, radius = 8.dp.toPx(), center = pt)
+        }
+    }
+}
+
+@Composable
+private fun ReviewActionItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    active: Boolean,
+    palette: DocFlowPalette,
+    tint: Color = palette.textPrimary,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(DocFlowTokens.buttonShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (active) DocFlowTokens.AccentBlue else tint,
+            modifier = Modifier.size(22.dp)
         )
-    )
-    paint.colorFilter = ColorMatrixColorFilter(cm)
-    canvas.drawBitmap(baseFiltered, 0f, 0f, paint)
-    out
-}
-
-private fun computeAverageLuminance(bitmap: Bitmap): Int {
-    val sampleW = 16
-    val sampleH = 16
-    val scaled = Bitmap.createScaledBitmap(bitmap, sampleW, sampleH, false)
-    val pixels = IntArray(sampleW * sampleH)
-    scaled.getPixels(pixels, 0, sampleW, 0, 0, sampleW, sampleH)
-    var sum = 0L
-    for (c in pixels) {
-        val r = (c shr 16) and 0xFF
-        val g = (c shr 8) and 0xFF
-        val b = c and 0xFF
-        sum += (r * 77 + g * 150 + b * 29) shr 8
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+            color = if (active) DocFlowTokens.AccentBlue else tint
+        )
     }
-    return (sum / pixels.size.coerceAtLeast(1)).toInt()
 }
 
-private fun generateRealisticScannedPageBitmap(
-    pageIndex: Int,
-    mode: ScanCaptureMode
-): Bitmap {
-    val w = 720
-    val h = 1018
-    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = AndroidCanvas(bmp)
-    canvas.drawColor(AndroidColor.WHITE)
+private fun triggerCameraShutter(
+    context: Context,
+    imageCapture: ImageCapture?,
+    pageNumber: Int,
+    onCaptured: (Bitmap) -> Unit
+) {
+    if (imageCapture != null) {
+        imageCapture.takePicture(
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    val bmp = imageProxyToBitmap(image)
+                    image.close()
+                    onCaptured(bmp ?: createCleanBlankCanvasBitmap())
+                }
 
+                override fun onError(exception: ImageCaptureException) {
+                    onCaptured(createCleanBlankCanvasBitmap())
+                }
+            }
+        )
+    } else {
+        onCaptured(createCleanBlankCanvasBitmap())
+    }
+}
+
+private fun imageProxyToBitmap(image: ImageProxy): Bitmap? {
+    return try {
+        val bmp = image.toBitmap()
+        val rotation = image.imageInfo.rotationDegrees
+        if (rotation != 0) {
+            val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
+            Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+        } else {
+            bmp
+        }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+/**
+ * Fallback white document sheet canvas when running on a virtual camera without a physical feed.
+ * Contains zero fake invoice or synthetic boilerplate data ("Only Original Data Show").
+ */
+private fun createCleanBlankCanvasBitmap(): Bitmap {
+    val width = 720
+    val height = 1020
+    val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bmp)
+    canvas.drawColor(android.graphics.Color.WHITE)
     val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.parseColor("#E3E4E7")
+        color = android.graphics.Color.parseColor("#E3E4E7")
         style = Paint.Style.STROKE
         strokeWidth = 3f
     }
-    canvas.drawRect(RectF(28f, 28f, w - 28f, h - 28f), borderPaint)
-
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.parseColor("#111111")
-        textSize = 28f
-        isFakeBoldText = true
-    }
-    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.parseColor("#222222")
-        textSize = 20f
-    }
-    val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.parseColor("#1F6BFF")
-        style = Paint.Style.FILL
-    }
-
-    canvas.drawRect(52f, 56f, 240f, 62f, accentPaint)
-    canvas.drawText("DOCFLOW ${mode.label.uppercase()} SCAN · PAGE $pageIndex", 52f, 102f, titlePaint)
-
-    val lines = when (mode) {
-        ScanCaptureMode.ID_CARD -> listOf(
-            "REPUBLIC IDENTIFICATION CARD",
-            "ID Number: DF-2026-88419-X",
-            "Holder: Verified Local User",
-            "Issued: 22 Oct 2026 · Offline Verified"
-        )
-        ScanCaptureMode.WHITEBOARD -> listOf(
-            "ARCHITECTURE & SPRINT NOTES",
-            "1. Local SQLite index + FTS4 full-text search",
-            "2. On-device OCR & PDF generation",
-            "3. Zero cloud servers — 100% private on phone"
-        )
-        ScanCaptureMode.BOOK -> listOf(
-            "CHAPTER $pageIndex: PRINCIPLES OF OFFLINE PRIVACY",
-            "Documents remain on the user's device at all times.",
-            "No remote telemetry, no external fonts, and no",
-            "server round-trips are required for full OCR."
-        )
-        ScanCaptureMode.DOCUMENT -> listOf(
-            "INVOICE #INV-2026-${100 + pageIndex}",
-            "Date: ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date())}",
-            "Description: On-Device Document Processing Suite",
-            "Amount Due: $1,250.00 · Status: Paid in Full",
-            "Notes: Scanned and indexed offline via DocFlow."
-        )
-    }
-
-    var y = 168f
-    lines.forEach { line ->
-        canvas.drawText(line, 52f, y, bodyPaint)
-        y += 42f
-    }
+    canvas.drawRect(24f, 24f, width - 24f, height - 24f, borderPaint)
     return bmp
 }

@@ -28,7 +28,12 @@ enum class OcrLanguage(
     HI("hi", "Hindi", "हिन्दी", "Devanagari"),
     ZH("zh", "Chinese", "中文 (简体)", "CJK Unified Ideographs"),
     JA("ja", "Japanese", "日本語", "Kanji / Kana"),
-    AR("ar", "Arabic", "العربية", "Arabic")
+    AR("ar", "Arabic", "العربية", "Arabic");
+
+    companion object {
+        val ENGLISH: OcrLanguage = EN
+        val HINDI: OcrLanguage = HI
+    }
 }
 
 data class LanguageDetectionResult(
@@ -57,6 +62,20 @@ data class MlKitOcrScanResult(
 )
 
 object MultiLanguageOcrEngine {
+
+    /**
+     * Convenience single-bitmap ML Kit OCR recognizer returning the raw recognized text string.
+     */
+    suspend fun recognizeTextFromBitmapWithMlKit(
+        bitmap: Bitmap,
+        selectedLanguage: OcrLanguage = OcrLanguage.AUTO
+    ): String {
+        val result = recognizeTextWithMlKit(
+            bitmaps = listOf(bitmap),
+            preferredLanguage = selectedLanguage
+        )
+        return result.pages.firstOrNull()?.rawText?.trim().orEmpty()
+    }
 
     /**
      * Runs Google ML Kit's on-device Text Recognition API (`com.google.mlkit:text-recognition`)

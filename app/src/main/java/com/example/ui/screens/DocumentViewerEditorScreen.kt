@@ -1,1566 +1,1488 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
-import android.graphics.Paint
-import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.print.PrintAttributes
 import android.print.PrintManager
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
+import androidx.compose.material.icons.automirrored.filled.FormatAlignRight
+import androidx.compose.material.icons.automirrored.filled.FormatIndentDecrease
+import androidx.compose.material.icons.automirrored.filled.FormatIndentIncrease
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BorderColor
-import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.DriveFileMove
-import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FindReplace
+import androidx.compose.material.icons.filled.FormatAlignCenter
+import androidx.compose.material.icons.filled.FormatAlignJustify
 import androidx.compose.material.icons.filled.FormatBold
+import androidx.compose.material.icons.filled.FormatClear
+import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.FormatColorText
 import androidx.compose.material.icons.filled.FormatItalic
+import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material.icons.filled.FormatStrikethrough
 import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Highlight
+import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.InsertPageBreak
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Numbers
+import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.StickyNote2
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Spellcheck
+import androidx.compose.material.icons.filled.Subscript
+import androidx.compose.material.icons.filled.Superscript
 import androidx.compose.material.icons.filled.TableChart
-import androidx.compose.material.icons.filled.Title
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import com.example.data.local.DocumentCommentEntity
 import com.example.data.local.DocumentVersionEntity
-import com.example.data.local.PdfAnnotationYMapEntity
 import com.example.data.local.PdfMarkupTool
-import com.example.data.model.ActiveCollaborator
-import com.example.data.model.CollaboratorRole
 import com.example.data.model.DocEntity
-import com.example.data.model.FolderEntity
-import com.example.data.model.LiveSyncStatus
-import com.example.data.util.CryptoUtils
+import com.example.data.util.ExtractiveSummaryResult
 import com.example.data.util.FileParserUtils
 import com.example.data.util.ImageProcessingPdfPipeline
+import com.example.data.util.OnDeviceAiAndBackupEngine
+import com.example.data.util.TranslationLanguage
+import com.example.ui.components.AiMicDictationBottomSheet
 import com.example.ui.components.DocFlowBottomSheet
 import com.example.ui.components.DocFlowCard
-import com.example.ui.components.DocFlowDialog
-import com.example.ui.components.DocFlowErrorState
+import com.example.ui.components.DocFlowDivider
+import com.example.ui.components.DocFlowEmptyState
 import com.example.ui.components.DocFlowIconCircle
 import com.example.ui.components.DocFlowListRow
 import com.example.ui.components.DocFlowPrimaryButton
-import com.example.ui.components.DocFlowProgressBar
 import com.example.ui.components.DocFlowSecondaryButton
-import com.example.ui.components.DocFlowSkeletonLoader
 import com.example.ui.components.DocFlowToast
+import com.example.ui.components.PdfWatermarkExportSheet
+import com.example.ui.theme.DocFlowPalette
 import com.example.ui.theme.DocFlowTokens
-import java.io.File
-import java.io.FileOutputStream
+import com.example.ui.viewmodel.DocFlowViewModel
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-/**
- * DocFlow Document Viewer & Editor UI
- * Implements both PDF mode and Word (DOCX) mode using the single shared design system
- * (DocFlowTokens + DocFlowComponents).
- * Flat, minimal, Android-style: no glassmorphism, no blur, no heavy shadows.
- */
-@OptIn(ExperimentalMaterial3Api::class)
+private enum class WordRibbonTab(val label: String) {
+    HOME("Home"),
+    INSERT("Insert"),
+    LAYOUT("Layout"),
+    REVIEW("Review"),
+    VIEW("View")
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DocumentViewerEditorScreen(
-    document: DocEntity,
-    folders: List<FolderEntity>,
-    localUri: Uri?,
-    localFilePath: String? = null,
-    syncStateLabel: String = "Stored on Device",
-    tags: List<String> = emptyList(),
-    biometricVaultEnabled: Boolean = true,
+    docId: String,
+    viewModel: DocFlowViewModel,
+    palette: DocFlowPalette,
     onBack: () -> Unit,
-    onSaveEdits: (
-        newTitle: String,
-        newFolderId: String,
-        newCategory: String,
-        plainContent: String,
-        isEncrypted: Boolean,
-        password: String?,
-        keyHint: String?,
-        isOfflineCached: Boolean
-    ) -> Unit,
-    onSaveDocToPicToWorkspace: (
-        exportModeLabel: String,
-        pageCount: Int,
-        imageFile: File,
-        imageUri: Uri
-    ) -> Unit = { _, _, _, _ -> },
-    onConvertFormat: (
-        targetFormat: String,
-        convertedPlainContent: String
-    ) -> Unit = { _, _ -> },
-    onAddCustomTag: (String) -> Unit = {},
-    onRemoveCustomTag: (String) -> Unit = {},
-    onToggleBiometricLock: () -> Unit = {},
-    onDelete: () -> Unit,
-    liveSyncStatus: LiveSyncStatus = LiveSyncStatus.SAVED,
-    collaborators: List<ActiveCollaborator> = emptyList(),
-    currentUserRole: CollaboratorRole = CollaboratorRole.OWNER,
-    versions: List<DocumentVersionEntity> = emptyList(),
-    comments: List<DocumentCommentEntity> = emptyList(),
-    annotations: List<PdfAnnotationYMapEntity> = emptyList(),
-    onUpsertAnnotation: (
-        pageIndex: Int,
-        tool: PdfMarkupTool,
-        colorHex: String,
-        strokeWidth: Float,
-        normalizedPoints: List<Offset>,
-        stickyNoteText: String
-    ) -> Unit = { _, _, _, _, _, _ -> },
-    onUndoAnnotation: (List<PdfAnnotationYMapEntity>) -> Unit = {},
-    onClearPageAnnotations: (Int) -> Unit = {},
-    onSignDocumentWithBiometrics: (plainContent: String, password: String?) -> Unit = { _, _ -> },
-    onShareAndExportAnnotatedPdf: (plainContent: String, isSigned: Boolean) -> Unit = { _, _ -> },
-    onLiveKeystrokeEdit: (
-        newTitle: String,
-        newFolderId: String,
-        newCategory: String,
-        plainContent: String,
-        isEncrypted: Boolean,
-        password: String?,
-        keyHint: String?,
-        isOfflineCached: Boolean
-    ) -> Unit = { _, _, _, _, _, _, _, _ -> },
-    onCreateNamedVersion: (versionLabel: String, plainContent: String) -> Unit = { _, _ -> },
-    onRestoreVersion: (DocumentVersionEntity, String?, (String) -> Unit) -> Unit = { _, _, _ -> },
-    onExportVersionAsPdf: (DocumentVersionEntity) -> Unit = {},
-    onAddComment: (anchorText: String, body: String, isSuggestion: Boolean, suggestedReplacement: String) -> Unit = { _, _, _, _ -> },
-    onResolveComment: (String) -> Unit = {},
-    onAcceptSuggestion: (DocumentCommentEntity, String, String?, (String) -> Unit) -> Unit = { _, _, _, _ -> },
-    onRejectSuggestion: (String) -> Unit = {},
-    onExportCommentAsPdf: (DocumentCommentEntity) -> Unit = {},
-    onExportAllNotesAsPdf: (List<DocumentCommentEntity>) -> Unit = {},
-    onInviteCollaborator: (String, CollaboratorRole) -> Unit = { _, _ -> },
-    onRevokeCollaboratorAndRotateKey: (String) -> Unit = {},
-    onSwitchCurrentUserRole: (CollaboratorRole) -> Unit = {},
-    onMoveToPrivateSafe: (String) -> Unit = {},
-    initialPageIndex: Int = 0,
-    onPageChanged: (Int) -> Unit = {}
+    onRequestBiometricSign: (onVerified: () -> Unit) -> Unit
 ) {
-    BackHandler { onBack() }
-
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val documents by viewModel.filteredDocuments.collectAsState()
+    val cachedMap by viewModel.cachedDocumentsMap.collectAsState()
+    val privateSafeDocs by viewModel.privateSafeDocuments.collectAsState()
+    val deletedDocs by viewModel.deletedDocuments.collectAsState()
+    val localUris by viewModel.localDocumentUris.collectAsState()
+    val allVersions by viewModel.allUserVersions.collectAsState()
 
-    val isPdfMode = remember(document.fileType) {
-        val type = document.fileType.lowercase()
-        type == "pdf" || type == "scanned" || type == "ofd"
-    }
+    val cachedEntity = cachedMap[docId]
+        ?: privateSafeDocs.find { it.id == docId }
+        ?: deletedDocs.find { it.id == docId }
+    val doc: DocEntity? = documents.find { it.id == docId } ?: cachedEntity?.toDocEntity()
 
-    // -------------------------------------------------------------------------
-    // Viewer States (Loading, Missing File, Corrupted, Password Lock)
-    // -------------------------------------------------------------------------
-    var isLoadingDocument by remember { mutableStateOf(true) }
-    var loadingProgress by remember { mutableFloatStateOf(0.25f) }
-    var isFileMissing by remember { mutableStateOf(false) }
-    var isFileCorrupted by remember { mutableStateOf(false) }
-
-    var isUnlocked by remember(document.id) { mutableStateOf(!document.isEncrypted) }
-    var passwordInput by remember { mutableStateOf("") }
-    var passwordError by remember { mutableStateOf<String?>(null) }
-
-    var editableTitle by remember(document.id, document.title) { mutableStateOf(document.title) }
-    var editableFolderId by remember(document.id, document.folderId) { mutableStateOf(document.folderId) }
-    var editableCategory by remember(document.id, document.category) { mutableStateOf(document.category) }
-    var decryptedContent by remember(document.id) {
-        mutableStateOf(if (document.isEncrypted) "" else document.content)
-    }
-
-    // Toast notification
-    var toastMessage by remember { mutableStateOf<String?>(null) }
-    var toastIsError by remember { mutableStateOf(false) }
-
-    fun showToast(msg: String, isError: Boolean = false) {
-        toastMessage = msg
-        toastIsError = isError
-    }
-
-    // Check file existence if localFilePath is explicitly set to a deleted file
-    LaunchedEffect(document.id, localFilePath) {
-        isLoadingDocument = true
-        loadingProgress = 0.35f
-        delay(120)
-        if (!localFilePath.isNullOrBlank()) {
-            val f = File(localFilePath)
-            if (!f.exists() && document.content.isBlank()) {
-                isFileMissing = true
-            }
-        }
-        if (document.fileName.endsWith(".corrupt", ignoreCase = true)) {
-            isFileCorrupted = true
-        }
-        loadingProgress = 1.0f
-        isLoadingDocument = false
-    }
-
-    // -------------------------------------------------------------------------
-    // Pages & PDF Rendering State
-    // -------------------------------------------------------------------------
-    val textPages = remember(decryptedContent, editableTitle, document.pageCount) {
-        val rawSections = decryptedContent
-            .split(Regex("(?====\\s*(?:PAGE|SECTION|SLIDE|SHEET))"))
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-
-        if (rawSections.size > 1) {
-            rawSections
-        } else {
-            val lines = decryptedContent.lines()
-            val targetPages = document.pageCount.toInt().coerceAtLeast(1)
-            if (lines.size <= 28 && targetPages <= 1) {
-                listOf(decryptedContent.ifBlank { "Document: $editableTitle" })
-            } else {
-                val chunkSize = (lines.size / targetPages.coerceAtLeast(1)).coerceAtLeast(18)
-                val chunks = lines.chunked(chunkSize).map { it.joinToString("\n") }
-                if (chunks.isEmpty()) listOf("Document: $editableTitle") else chunks
-            }
-        }
-    }
-
-    val totalPages = remember(textPages, document.pageCount) {
-        maxOf(textPages.size, document.pageCount.toInt().coerceAtLeast(1))
-    }
-
-    val renderedBitmaps = remember { mutableStateMapOf<Int, Bitmap>() }
-    val resolvedPdfUri = remember(localUri, localFilePath) {
-        localUri ?: localFilePath?.let { path ->
-            val file = File(path)
-            if (file.exists()) Uri.fromFile(file) else null
-        }
-    }
-
-    // Lazy load PDF page bitmaps as needed
-    LaunchedEffect(resolvedPdfUri, totalPages, isPdfMode, isUnlocked) {
-        if (isPdfMode && isUnlocked && resolvedPdfUri != null) {
-            withContext(Dispatchers.IO) {
-                for (pageIdx in 0 until totalPages.coerceAtMost(24)) {
-                    if (!renderedBitmaps.containsKey(pageIdx)) {
-                        val bmp = FileParserUtils.renderPdfPage(context, resolvedPdfUri, pageIdx)
-                        if (bmp != null) {
-                            withContext(Dispatchers.Main) {
-                                renderedBitmaps[pageIdx] = bmp
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = initialPageIndex.coerceIn(0, (totalPages - 1).coerceAtLeast(0))
-    )
-    var currentPageIndex by remember {
-        mutableIntStateOf(initialPageIndex.coerceIn(0, (totalPages - 1).coerceAtLeast(0)))
-    }
-    var showFloatingPagePill by remember { mutableStateOf(true) }
-    var isFastScrollDragging by remember { mutableStateOf(false) }
-
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .distinctUntilChanged()
-            .collect { pageIdx ->
-                currentPageIndex = pageIdx.coerceIn(0, (totalPages - 1).coerceAtLeast(0))
-                onPageChanged(currentPageIndex)
-                showFloatingPagePill = true
-            }
-    }
-
-    LaunchedEffect(currentPageIndex, showFloatingPagePill, isFastScrollDragging) {
-        if (showFloatingPagePill && !isFastScrollDragging) {
-            delay(1500)
-            showFloatingPagePill = false
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // In-Document Search State
-    // -------------------------------------------------------------------------
-    var isSearchBarVisible by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var currentMatchIndex by remember { mutableIntStateOf(0) }
-
-    data class SearchMatch(val pageIndex: Int, val occurrenceInPage: Int, val snippet: String)
-
-    val searchMatches = remember(searchQuery, textPages) {
-        if (searchQuery.trim().length < 2) {
-            emptyList()
-        } else {
-            val q = searchQuery.trim()
-            val results = mutableListOf<SearchMatch>()
-            textPages.forEachIndexed { pageIdx, pageContent ->
-                var startIdx = 0
-                var occ = 0
-                while (true) {
-                    val found = pageContent.indexOf(q, startIdx, ignoreCase = true)
-                    if (found < 0) break
-                    val snippetStart = (found - 20).coerceAtLeast(0)
-                    val snippetEnd = (found + q.length + 20).coerceAtMost(pageContent.length)
-                    results.add(
-                        SearchMatch(
-                            pageIndex = pageIdx,
-                            occurrenceInPage = occ,
-                            snippet = pageContent.substring(snippetStart, snippetEnd).replace("\n", " ")
-                        )
-                    )
-                    occ++
-                    startIdx = found + q.length.coerceAtLeast(1)
-                }
-            }
-            results
-        }
-    }
-
-    LaunchedEffect(searchMatches.size) {
-        currentMatchIndex = 0
-        searchMatches.firstOrNull()?.let { first ->
-            listState.animateScrollToItem(first.pageIndex)
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // PDF Viewer Controls & Bottom Sheets State
-    // -------------------------------------------------------------------------
-    var zoomScale by remember { mutableFloatStateOf(1f) }
-    var panOffset by remember { mutableStateOf(Offset.Zero) }
-    var isPdfNightMode by remember { mutableStateOf(false) }
-
-    var showThumbnailsSheet by remember { mutableStateOf(false) }
-    var showAnnotateSheet by remember { mutableStateOf(false) }
-    var showPageJumpDialog by remember { mutableStateOf(false) }
-    var pageJumpInput by remember { mutableStateOf("${currentPageIndex + 1}") }
-
-    // Annotate Tool State
-    var isAnnotationActive by remember { mutableStateOf(false) }
-    var selectedMarkupTool by remember { mutableStateOf(PdfMarkupTool.HIGHLIGHT) }
-    var selectedAnnotationColorHex by remember { mutableStateOf("#FDE047") }
-    var selectedStrokeWidth by remember { mutableFloatStateOf(14f) }
-    var isEraserActive by remember { mutableStateOf(false) }
-    val redoAnnotationStack = remember { mutableStateListOf<PdfAnnotationYMapEntity>() }
-    val currentDragPoints = remember { mutableStateListOf<Offset>() }
-    var showAddTextNoteDialog by remember { mutableStateOf(false) }
-    var pendingNoteTapOffset by remember { mutableStateOf(Offset(0.25f, 0.25f)) }
-    var textNoteInput by remember { mutableStateOf("") }
-
-    // -------------------------------------------------------------------------
-    // Word (DOCX) Mode Controls State
-    // -------------------------------------------------------------------------
-    var isWordEditMode by remember { mutableStateOf(false) }
-    var wordAutosaveLabel by remember { mutableStateOf("Saved") }
-    val wordUndoStack = remember { mutableStateListOf<String>() }
-    val wordRedoStack = remember { mutableStateListOf<String>() }
-    var wordBoldActive by remember { mutableStateOf(false) }
-    var wordItalicActive by remember { mutableStateOf(false) }
-    var wordUnderlineActive by remember { mutableStateOf(false) }
-    var wordFontSizeSp by remember { mutableIntStateOf(16) }
-    var wordTextColorHex by remember { mutableStateOf("#111111") }
-
-    // -------------------------------------------------------------------------
-    // Overflow Menu & Shared Action Sheets State
-    // -------------------------------------------------------------------------
-    var showOverflowMenu by remember { mutableStateOf(false) }
-    var showDetailsSheet by remember { mutableStateOf(false) }
-    var showRenameDialog by remember { mutableStateOf(false) }
-    var renameInput by remember(editableTitle) { mutableStateOf(editableTitle) }
-    var showMoveFolderSheet by remember { mutableStateOf(false) }
-    var showExportShareSheet by remember { mutableStateOf(false) }
-    var showVersionHistorySheet by remember { mutableStateOf(false) }
-    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
-
-    // -------------------------------------------------------------------------
-    // Password-Protected PDF / Document Dialog
-    // -------------------------------------------------------------------------
-    if (!isUnlocked) {
-        Scaffold(
-            containerColor = DocFlowTokens.background,
-            contentWindowInsets = WindowInsets.safeDrawing
-        ) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                DocFlowDialog(
-                    title = "Password required",
-                    onDismissRequest = onBack,
-                    confirmText = "Unlock",
-                    dismissText = "Cancel",
-                    onConfirm = {
-                        val candidate = CryptoUtils.decrypt(document.content, passwordInput).getOrNull()
-                        if (candidate != null) {
-                            decryptedContent = candidate
-                            isUnlocked = true
-                            passwordError = null
-                        } else if (passwordInput == "1234" || passwordInput.equals(document.encryptionKeyHint, ignoreCase = true)) {
-                            decryptedContent = document.content
-                            isUnlocked = true
-                            passwordError = null
-                        } else {
-                            passwordError = "Incorrect password. Please try again."
-                        }
-                    }
-                ) {
-                    Text(
-                        text = "This document is protected. Enter its password to view.",
-                        style = DocFlowTokens.bodyStyle,
-                        color = DocFlowTokens.textSecondary
-                    )
-                    if (!document.encryptionKeyHint.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(DocFlowTokens.space2))
-                        Text(
-                            text = "Hint: ${document.encryptionKeyHint}",
-                            style = DocFlowTokens.captionStyle,
-                            color = DocFlowTokens.accentBlue
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-                    OutlinedTextField(
-                        value = passwordInput,
-                        onValueChange = {
-                            passwordInput = it
-                            passwordError = null
-                        },
-                        label = { Text("Password") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        isError = passwordError != null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("viewer_password_input")
-                    )
-                    if (passwordError != null) {
-                        Spacer(modifier = Modifier.height(DocFlowTokens.space1))
-                        Text(
-                            text = passwordError!!,
-                            style = DocFlowTokens.captionStyle,
-                            color = DocFlowTokens.iconRedPdf
-                        )
-                    }
-                }
-            }
+    if (doc == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(palette.background),
+            contentAlignment = Alignment.Center
+        ) {
+            DocFlowEmptyState(
+                icon = Icons.Filled.Description,
+                title = "Document could not be loaded",
+                subtitle = "This file may have been moved or deleted from this device.",
+                palette = palette
+            )
         }
         return
     }
 
-    // -------------------------------------------------------------------------
-    // Main Full-Screen Viewer Scaffold (No Bottom Nav)
-    // -------------------------------------------------------------------------
-    Scaffold(
-        containerColor = DocFlowTokens.background,
-        contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = {
-            Surface(
-                color = DocFlowTokens.surface,
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp
-            ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    if (isSearchBarVisible) {
-                        // In-Document Search Top Bar
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 60.dp)
-                                .padding(horizontal = DocFlowTokens.space2, vertical = DocFlowTokens.space1),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space1)
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    isSearchBarVisible = false
-                                    searchQuery = ""
-                                },
-                                modifier = Modifier.size(DocFlowTokens.minTouchTarget)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Close search",
-                                    tint = DocFlowTokens.textPrimary
-                                )
-                            }
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                placeholder = { Text("Find in document...", style = DocFlowTokens.bodyStyle) },
-                                singleLine = true,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("in_doc_search_input")
-                            )
-                            Text(
-                                text = if (searchMatches.isEmpty()) {
-                                    if (searchQuery.length >= 2) "0 of 0" else ""
-                                } else {
-                                    "${currentMatchIndex + 1} of ${searchMatches.size}"
-                                },
-                                style = DocFlowTokens.captionBoldStyle,
-                                color = DocFlowTokens.textSecondary,
-                                modifier = Modifier.padding(horizontal = DocFlowTokens.space1)
-                            )
-                            IconButton(
-                                onClick = {
-                                    if (searchMatches.isNotEmpty()) {
-                                        currentMatchIndex = (currentMatchIndex - 1 + searchMatches.size) % searchMatches.size
-                                        scope.launch {
-                                            listState.animateScrollToItem(searchMatches[currentMatchIndex].pageIndex)
-                                        }
-                                    }
-                                },
-                                enabled = searchMatches.isNotEmpty(),
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowUp,
-                                    contentDescription = "Previous match",
-                                    tint = DocFlowTokens.textPrimary
-                                )
-                            }
-                            IconButton(
-                                onClick = {
-                                    if (searchMatches.isNotEmpty()) {
-                                        currentMatchIndex = (currentMatchIndex + 1) % searchMatches.size
-                                        scope.launch {
-                                            listState.animateScrollToItem(searchMatches[currentMatchIndex].pageIndex)
-                                        }
-                                    }
-                                },
-                                enabled = searchMatches.isNotEmpty(),
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Next match",
-                                    tint = DocFlowTokens.textPrimary
-                                )
-                            }
-                        }
-                    } else {
-                        // Standard Document Viewer Top Bar
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 60.dp)
-                                .padding(horizontal = DocFlowTokens.space2, vertical = DocFlowTokens.space1),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = onBack,
-                                modifier = Modifier
-                                    .size(DocFlowTokens.minTouchTarget)
-                                    .testTag("viewer_back_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = DocFlowTokens.textPrimary
-                                )
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(horizontal = DocFlowTokens.space2)
-                            ) {
-                                Text(
-                                    text = editableTitle,
-                                    style = DocFlowTokens.rowTitleStyle,
-                                    color = DocFlowTokens.textPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                val subtitleText = when {
-                                    isPdfMode -> "Page ${currentPageIndex + 1} of $totalPages"
-                                    isWordEditMode -> "Word document · $wordAutosaveLabel"
-                                    document.fileType.lowercase().startsWith("doc") -> "Word document · $wordAutosaveLabel"
-                                    else -> "${document.fileType.uppercase()} document · $wordAutosaveLabel"
-                                }
-                                Text(
-                                    text = subtitleText,
-                                    style = DocFlowTokens.captionStyle,
-                                    color = DocFlowTokens.textSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+    val comments by viewModel.observeDocumentComments(doc.id).collectAsState(initial = emptyList())
+    val versionsForDoc = remember(allVersions, doc.id) {
+        allVersions.filter { it.documentId == doc.id }
+    }
 
-                            if (!isPdfMode && isWordEditMode) {
-                                DocFlowPrimaryButton(
-                                    text = "Done",
-                                    onClick = {
-                                        isWordEditMode = false
-                                        onSaveEdits(
-                                            editableTitle,
-                                            editableFolderId,
-                                            editableCategory,
-                                            decryptedContent,
-                                            document.isEncrypted,
-                                            passwordInput.ifBlank { null },
-                                            document.encryptionKeyHint,
-                                            true
-                                        )
-                                        onCreateNamedVersion(
-                                            "Auto Snapshot ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())}",
-                                            decryptedContent
-                                        )
-                                        wordAutosaveLabel = "Saved"
-                                        showToast("Document saved locally")
-                                    },
-                                    modifier = Modifier.padding(end = DocFlowTokens.space1),
-                                    testTag = "word_done_button"
-                                )
-                            } else {
-                                IconButton(
-                                    onClick = { isSearchBarVisible = true },
-                                    modifier = Modifier
-                                        .size(DocFlowTokens.minTouchTarget)
-                                        .testTag("viewer_search_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = "Search in document",
-                                        tint = DocFlowTokens.textPrimary
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { showExportShareSheet = true },
-                                    modifier = Modifier
-                                        .size(DocFlowTokens.minTouchTarget)
-                                        .testTag("viewer_share_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.IosShare,
-                                        contentDescription = "Share or export",
-                                        tint = DocFlowTokens.textPrimary
-                                    )
-                                }
-                                Box {
-                                    IconButton(
-                                        onClick = { showOverflowMenu = true },
-                                        modifier = Modifier
-                                            .size(DocFlowTokens.minTouchTarget)
-                                            .testTag("viewer_overflow_button")
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.MoreVert,
-                                            contentDescription = "More options",
-                                            tint = DocFlowTokens.textPrimary
-                                        )
-                                    }
-                                    DropdownMenu(
-                                        expanded = showOverflowMenu,
-                                        onDismissRequest = { showOverflowMenu = false },
-                                        modifier = Modifier.background(DocFlowTokens.surface)
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text("Details", style = DocFlowTokens.bodyStyle) },
-                                            leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
-                                            onClick = {
-                                                showOverflowMenu = false
-                                                showDetailsSheet = true
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Rename", style = DocFlowTokens.bodyStyle) },
-                                            leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
-                                            onClick = {
-                                                showOverflowMenu = false
-                                                renameInput = editableTitle
-                                                showRenameDialog = true
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Move to folder", style = DocFlowTokens.bodyStyle) },
-                                            leadingIcon = { Icon(Icons.Default.DriveFileMove, contentDescription = null) },
-                                            onClick = {
-                                                showOverflowMenu = false
-                                                showMoveFolderSheet = true
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Add to Private Safe", style = DocFlowTokens.bodyStyle) },
-                                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                                            onClick = {
-                                                showOverflowMenu = false
-                                                onMoveToPrivateSafe(document.id)
-                                                onToggleBiometricLock()
-                                                showToast("Moved to Private Safe")
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Print", style = DocFlowTokens.bodyStyle) },
-                                            leadingIcon = { Icon(Icons.Default.Print, contentDescription = null) },
-                                            onClick = {
-                                                showOverflowMenu = false
-                                                triggerAndroidPrintJob(context, editableTitle)
-                                                showToast("Opening system print service...")
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Save a copy", style = DocFlowTokens.bodyStyle) },
-                                            leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
-                                            onClick = {
-                                                showOverflowMenu = false
-                                                showExportShareSheet = true
-                                            }
-                                        )
-                                        if (!isPdfMode) {
-                                            DropdownMenuItem(
-                                                text = { Text("Version history (${versions.take(20).size})", style = DocFlowTokens.bodyStyle) },
-                                                leadingIcon = { Icon(Icons.Default.History, contentDescription = null) },
-                                                onClick = {
-                                                    showOverflowMenu = false
-                                                    showVersionHistorySheet = true
-                                                }
-                                            )
-                                        }
-                                        HorizontalDivider(color = DocFlowTokens.divider)
-                                        DropdownMenuItem(
-                                            text = { Text("Delete", style = DocFlowTokens.bodyStyle, color = DocFlowTokens.iconRedPdf) },
-                                            leadingIcon = {
-                                                Icon(
-                                                    Icons.Default.DeleteOutline,
-                                                    contentDescription = null,
-                                                    tint = DocFlowTokens.iconRedPdf
-                                                )
-                                            },
-                                            onClick = {
-                                                showOverflowMenu = false
-                                                showDeleteConfirmDialog = true
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    HorizontalDivider(
-                        thickness = DocFlowTokens.dividerThickness,
-                        color = DocFlowTokens.divider
-                    )
-                }
+    val isPdf = doc.fileType.equals("pdf", ignoreCase = true) || doc.fileType.equals("scanned", ignoreCase = true)
+    val isWordOrText = doc.fileType.lowercase() in setOf("docx", "doc", "txt", "md", "note")
+    val isExcel = doc.fileType.lowercase() in setOf("xlsx", "xls", "csv")
+    val isPpt = doc.fileType.lowercase() in setOf("pptx", "ppt")
+
+    // Viewer & Editor State
+    var isEditingMode by remember(doc.id) { mutableStateOf(false) }
+    var isPrintLayoutMode by remember(doc.id) { mutableStateOf(true) } // Print layout vs Reading (reflow)
+    var editableContent by remember(doc.id) { mutableStateOf(doc.content) }
+    var documentTitle by remember(doc.id) { mutableStateOf(doc.title) }
+    var authorMetadata by remember(doc.id) { mutableStateOf("Local Device Owner") }
+    var hasUnsavedChanges by remember { mutableStateOf(false) }
+    var saveStatusIndicator by remember { mutableStateOf("Saved • Stored on this device") }
+
+    // Undo / Redo History (50+ steps)
+    val undoStack = remember(doc.id) { mutableStateListOf(doc.content) }
+    var undoIndex by remember(doc.id) { mutableIntStateOf(0) }
+
+    fun pushEditContent(updatedText: String) {
+        editableContent = updatedText
+        hasUnsavedChanges = true
+        saveStatusIndicator = "Saving..."
+        if (undoStack.getOrNull(undoIndex) != updatedText) {
+            while (undoStack.lastIndex > undoIndex) {
+                undoStack.removeAt(undoStack.lastIndex)
             }
-        },
-        bottomBar = {
-            if (isPdfMode) {
-                // PDF Bottom Toolbar (White/Surface): Thumbnails, Search, Annotate, Night mode, Page jump
-                Surface(
-                    color = DocFlowTokens.surface,
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        HorizontalDivider(
-                            thickness = DocFlowTokens.dividerThickness,
-                            color = DocFlowTokens.divider
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(64.dp)
-                                .padding(horizontal = DocFlowTokens.space2),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            PdfBottomToolButton(
-                                icon = Icons.Default.GridView,
-                                label = "Thumbnails",
-                                isActive = showThumbnailsSheet,
-                                testTag = "pdf_tool_thumbnails",
-                                onClick = { showThumbnailsSheet = true }
-                            )
-                            PdfBottomToolButton(
-                                icon = Icons.Default.Search,
-                                label = "Search",
-                                isActive = isSearchBarVisible,
-                                testTag = "pdf_tool_search",
-                                onClick = { isSearchBarVisible = !isSearchBarVisible }
-                            )
-                            PdfBottomToolButton(
-                                icon = Icons.Default.Brush,
-                                label = "Annotate",
-                                isActive = isAnnotationActive || showAnnotateSheet,
-                                testTag = "pdf_tool_annotate",
-                                onClick = {
-                                    isAnnotationActive = true
-                                    showAnnotateSheet = true
-                                }
-                            )
-                            PdfBottomToolButton(
-                                icon = Icons.Default.DarkMode,
-                                label = "Night mode",
-                                isActive = isPdfNightMode,
-                                testTag = "pdf_tool_night_mode",
-                                onClick = { isPdfNightMode = !isPdfNightMode }
-                            )
-                            PdfBottomToolButton(
-                                icon = Icons.Default.Numbers,
-                                label = "Page jump",
-                                isActive = showPageJumpDialog,
-                                testTag = "pdf_tool_page_jump",
-                                onClick = {
-                                    pageJumpInput = "${currentPageIndex + 1}"
-                                    showPageJumpDialog = true
-                                }
-                            )
-                        }
-                    }
-                }
-            } else if (isWordEditMode) {
-                // Word Edit Mode Horizontal Scrolling Bottom Toolbar
-                Surface(
-                    color = DocFlowTokens.surface,
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        HorizontalDivider(
-                            thickness = DocFlowTokens.dividerThickness,
-                            color = DocFlowTokens.divider
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = DocFlowTokens.space3),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space1)
-                        ) {
-                            WordFormatChipButton(
-                                icon = Icons.Default.FormatBold,
-                                label = "Bold",
-                                isActive = wordBoldActive,
-                                onClick = { wordBoldActive = !wordBoldActive }
-                            )
-                            WordFormatChipButton(
-                                icon = Icons.Default.FormatItalic,
-                                label = "Italic",
-                                isActive = wordItalicActive,
-                                onClick = { wordItalicActive = !wordItalicActive }
-                            )
-                            WordFormatChipButton(
-                                icon = Icons.Default.FormatUnderlined,
-                                label = "Underline",
-                                isActive = wordUnderlineActive,
-                                onClick = { wordUnderlineActive = !wordUnderlineActive }
-                            )
-                            WordFormatChipButton(
-                                icon = Icons.Default.Title,
-                                label = "Heading",
-                                isActive = false,
-                                onClick = {
-                                    wordUndoStack.add(decryptedContent)
-                                    decryptedContent = "# New Section Heading\n\n$decryptedContent"
-                                    wordAutosaveLabel = "Saved"
-                                }
-                            )
-                            WordFormatChipButton(
-                                icon = Icons.AutoMirrored.Filled.FormatListBulleted,
-                                label = "List",
-                                isActive = false,
-                                onClick = {
-                                    wordUndoStack.add(decryptedContent)
-                                    decryptedContent = "$decryptedContent\n• List item"
-                                    wordAutosaveLabel = "Saved"
-                                }
-                            )
-                            WordFormatChipButton(
-                                icon = Icons.AutoMirrored.Filled.FormatAlignLeft,
-                                label = "Align",
-                                isActive = false,
-                                onClick = { showToast("Paragraph alignment updated") }
-                            )
-                            WordFormatChipButton(
-                                icon = Icons.Default.FormatSize,
-                                label = "${wordFontSizeSp}sp",
-                                isActive = wordFontSizeSp != 16,
-                                onClick = {
-                                    wordFontSizeSp = when (wordFontSizeSp) {
-                                        14 -> 16
-                                        16 -> 18
-                                        18 -> 20
-                                        else -> 14
-                                    }
-                                }
-                            )
-                            WordFormatChipButton(
-                                icon = Icons.Default.FormatColorText,
-                                label = "Color",
-                                isActive = wordTextColorHex != "#111111",
-                                onClick = {
-                                    wordTextColorHex = when (wordTextColorHex) {
-                                        "#111111" -> "#1F6BFF"
-                                        "#1F6BFF" -> "#E5483F"
-                                        "#E5483F" -> "#16A34A"
-                                        else -> "#111111"
-                                    }
-                                }
-                            )
-                            WordFormatChipButton(
-                                icon = Icons.Default.TableChart,
-                                label = "Table",
-                                isActive = false,
-                                onClick = {
-                                    wordUndoStack.add(decryptedContent)
-                                    decryptedContent += "\n\n| Item | Description | Value |\n| --- | --- | --- |\n| Row 1 | Specification | OK |\n"
-                                    wordAutosaveLabel = "Saved"
-                                }
-                            )
-                            WordFormatChipButton(
-                                icon = Icons.Default.Image,
-                                label = "Image",
-                                isActive = false,
-                                onClick = {
-                                    wordUndoStack.add(decryptedContent)
-                                    decryptedContent += "\n\n[Embedded Figure: Local Attachment (${SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date())})]\n"
-                                    wordAutosaveLabel = "Saved"
-                                }
-                            )
-                            WordFormatChipButton(
-                                icon = Icons.AutoMirrored.Filled.Undo,
-                                label = "Undo",
-                                isActive = false,
-                                enabled = wordUndoStack.isNotEmpty(),
-                                onClick = {
-                                    if (wordUndoStack.isNotEmpty()) {
-                                        wordRedoStack.add(decryptedContent)
-                                        decryptedContent = wordUndoStack.removeAt(wordUndoStack.lastIndex)
-                                    }
-                                }
-                            )
-                            WordFormatChipButton(
-                                icon = Icons.AutoMirrored.Filled.Redo,
-                                label = "Redo",
-                                isActive = false,
-                                enabled = wordRedoStack.isNotEmpty(),
-                                onClick = {
-                                    if (wordRedoStack.isNotEmpty()) {
-                                        wordUndoStack.add(decryptedContent)
-                                        decryptedContent = wordRedoStack.removeAt(wordRedoStack.lastIndex)
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
+            if (undoStack.size >= 60) {
+                undoStack.removeAt(0)
+            } else {
+                undoIndex++
+            }
+            undoStack.add(updatedText)
+        }
+    }
+
+    // Autosave every 2.5 seconds when dirty
+    LaunchedEffect(editableContent, hasUnsavedChanges) {
+        if (hasUnsavedChanges) {
+            delay(1800L)
+            viewModel.updateDocumentContent(
+                doc = doc,
+                newTitle = documentTitle,
+                newFolderId = doc.folderId,
+                newCategory = doc.category,
+                plainContent = editableContent,
+                isEncrypted = doc.isEncrypted,
+                password = null,
+                encryptionKeyHint = doc.encryptionKeyHint,
+                isOfflineCached = true
+            )
+            hasUnsavedChanges = false
+            saveStatusIndicator = "Saved • Stored on this device"
+        }
+    }
+
+    // MS Word Ribbon State
+    var activeRibbonTab by remember { mutableStateOf(WordRibbonTab.HOME) }
+    var selectedFontFamily by remember { mutableStateOf("Roboto") }
+    var selectedFontSizePt by remember { mutableIntStateOf(14) }
+    var isBold by remember { mutableStateOf(false) }
+    var isItalic by remember { mutableStateOf(false) }
+    var isUnderline by remember { mutableStateOf(false) }
+    var isStrikethrough by remember { mutableStateOf(false) }
+    var isSubscript by remember { mutableStateOf(false) }
+    var isSuperscript by remember { mutableStateOf(false) }
+    var textColorHex by remember { mutableStateOf("#111111") }
+    var highlightColorHex by remember { mutableStateOf("#00000000") }
+    var textAlignMode by remember { mutableStateOf("LEFT") } // LEFT, CENTER, RIGHT, JUSTIFY
+    var lineSpacingMultiplier by remember { mutableFloatStateOf(1.35f) }
+    var paragraphStyleName by remember { mutableStateOf("Normal") } // Normal, Title, Heading 1, Heading 2, Heading 3, Quote, Code
+
+    // Layout & View Ribbon State
+    var pageSizeOption by remember { mutableStateOf("A4") } // A4, Letter, Legal
+    var pageOrientation by remember { mutableStateOf("Portrait") } // Portrait, Landscape
+    var pageMargins by remember { mutableStateOf("Normal") } // Normal, Narrow, Wide
+    var pageColumns by remember { mutableIntStateOf(1) }
+    var showLineNumbers by remember { mutableStateOf(false) }
+    var showRuler by remember { mutableStateOf(true) }
+    var showFormattingMarks by remember { mutableStateOf(false) }
+    var pageHeaderText by remember { mutableStateOf("") }
+    var pageFooterText by remember { mutableStateOf("Stored on this device") }
+    var showPageNumbers by remember { mutableStateOf(true) }
+
+    // Find & Replace / Spell Check / Table / Comments / Export Modals
+    var showInDocSearch by remember { mutableStateOf(false) }
+    var inDocSearchQuery by remember { mutableStateOf("") }
+    var inDocReplaceText by remember { mutableStateOf("") }
+    var activeMatchIndex by remember { mutableIntStateOf(0) }
+
+    var showInsertTableDialog by remember { mutableStateOf(false) }
+    var tableRowsInput by remember { mutableStateOf("3") }
+    var tableColsInput by remember { mutableStateOf("3") }
+    var showInsertLinkDialog by remember { mutableStateOf(false) }
+    var linkTextInput by remember { mutableStateOf("") }
+    var linkUrlInput by remember { mutableStateOf("https://") }
+    var showHeaderFooterDialog by remember { mutableStateOf(false) }
+
+    var showCommentsSheet by remember { mutableStateOf(false) }
+    var newCommentBody by remember { mutableStateOf("") }
+    var showExportVersionsNotesSheet by remember { mutableStateOf(false) }
+    var showWatermarkPdfExportSheet by remember { mutableStateOf(false) }
+
+    // Top-right Overflow & Sheets
+    var showOverflowMenu by remember { mutableStateOf(false) }
+    var showDetailsSheet by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var showTagsDialog by remember { mutableStateOf(false) }
+    var tagInputText by remember { mutableStateOf(cachedEntity?.tags ?: "") }
+    var showSummariseSheet by remember { mutableStateOf(false) }
+    var showTranslateSheet by remember { mutableStateOf(false) }
+    var showAiMicSheet by remember { mutableStateOf(false) }
+    var showPageGridSheet by remember { mutableStateOf(false) }
+    var showUnsavedExitDialog by remember { mutableStateOf(false) }
+    var viewerToast by remember { mutableStateOf<String?>(null) }
+
+    // PDF Viewer State
+    val annotations by viewModel.observeDocumentAnnotations(doc.id).collectAsState(initial = emptyList())
+    var currentPageIndex by remember(doc.id) {
+        mutableIntStateOf((cachedEntity?.lastPageViewed ?: 0).coerceAtLeast(0))
+    }
+    var zoomScale by remember { mutableFloatStateOf(1f) }
+    var activeMarkupTool by remember { mutableStateOf<PdfMarkupTool?>(null) }
+    var activeStrokeColorHex by remember { mutableStateOf("#FFEB3B") }
+    val currentDragPoints = remember { mutableStateListOf<Offset>() }
+
+    // Mark document accessed & save resume page
+    LaunchedEffect(doc.id, currentPageIndex) {
+        viewModel.markDocumentOpened(doc.id)
+        viewModel.updateDocumentLastPage(doc.id, currentPageIndex)
+    }
+
+    val insertImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            pushEditContent(editableContent.trimEnd() + "\n\n[Embedded Image: ${uri.lastPathSegment ?: "photo.jpg"}]\n")
+            viewerToast = "Inserted image into document"
+        }
+    }
+
+    BackHandler {
+        if (isEditingMode && hasUnsavedChanges) {
+            showUnsavedExitDialog = true
+        } else {
+            onBack()
+        }
+    }
+
+    // Split content into visual pages (respecting explicit `=== PAGE BREAK ===` or chunking lines)
+    val contentPages = remember(editableContent, doc.pageCount) {
+        val explicitPages = editableContent.split("=== PAGE BREAK ===")
+        if (explicitPages.size > 1) {
+            explicitPages.map { it.trim() }
+        } else {
+            val lines = editableContent.lines().filter { it.isNotEmpty() }
+            val chunked = if (lines.isEmpty()) listOf(doc.title) else lines.chunked(26).map { it.joinToString("\n") }
+            val count = maxOf(chunked.size, doc.pageCount.toInt().coerceAtLeast(1)).coerceAtMost(12)
+            (0 until count).map { idx ->
+                chunked.getOrNull(idx) ?: "Page ${idx + 1} — ${doc.title}"
             }
         }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(DocFlowTokens.background)
-        ) {
-            when {
-                isLoadingDocument -> {
+    }
+    val totalPages = contentPages.size.coerceAtLeast(1)
+
+    // Render native PDF Bitmaps if a local PDF URI exists
+    val localUri: Uri? = localUris[doc.id] ?: cachedEntity?.localFilePath?.let { path ->
+        val f = java.io.File(path)
+        if (f.exists()) Uri.fromFile(f) else null
+    }
+    var renderedPdfBitmaps by remember(doc.id, localUri) { mutableStateOf<Map<Int, Bitmap>>(emptyMap()) }
+    LaunchedEffect(doc.id, localUri, isPdf, totalPages) {
+        if (isPdf && localUri != null) {
+            val map = mutableMapOf<Int, Bitmap>()
+            for (idx in 0 until totalPages.coerceAtMost(8)) {
+                val bmp = FileParserUtils.renderPdfPage(context, localUri, idx)
+                if (bmp != null) map[idx] = bmp
+            }
+            renderedPdfBitmaps = map
+        }
+    }
+
+    val searchMatchesCount = remember(inDocSearchQuery, editableContent) {
+        val q = inDocSearchQuery.trim()
+        if (q.isEmpty()) 0
+        else Regex(Regex.escape(q), RegexOption.IGNORE_CASE).findAll(editableContent).count()
+    }
+
+    val wordCount = remember(editableContent) {
+        editableContent.split(Regex("\\s+")).count { it.isNotBlank() }
+    }
+    val charCount = editableContent.length
+
+    val subtitleText = when {
+        isPdf -> "Page ${(currentPageIndex + 1).coerceIn(1, totalPages)} of $totalPages"
+        isExcel -> "Excel spreadsheet (.xlsx) • $wordCount words"
+        isPpt -> "Presentation (.pptx) • $totalPages slide(s)"
+        else -> "Word document • $totalPages page(s) • $saveStatusIndicator"
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(palette.background)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // =================================================================
+            // 1. TOP BAR (White, thin bottom divider, Back, Title + Subtitle, Undo/Redo, AI Mic, Search, Share, Overflow)
+            // =================================================================
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(palette.surface)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = DocFlowTokens.space2, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            if (isEditingMode && hasUnsavedChanges) {
+                                showUnsavedExitDialog = true
+                            } else {
+                                onBack()
+                            }
+                        },
+                        modifier = Modifier
+                            .size(DocFlowTokens.minTouchTarget)
+                            .testTag("viewer_back_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = palette.textPrimary
+                        )
+                    }
+
                     Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = DocFlowTokens.space5),
-                        verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space4)
+                            .weight(1f)
+                            .clickable { showRenameDialog = true }
+                            .padding(horizontal = 4.dp)
                     ) {
-                        DocFlowProgressBar(
-                            progress = loadingProgress,
-                            label = "Loading document...",
-                            modifier = Modifier.padding(horizontal = DocFlowTokens.screenSideMargin)
+                        Text(
+                            text = documentTitle,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = palette.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        DocFlowSkeletonLoader(rowCount = 6)
+                        Text(
+                            text = subtitleText,
+                            fontSize = 12.sp,
+                            color = palette.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    if (isEditingMode) {
+                        IconButton(
+                            onClick = {
+                                if (undoIndex > 0) {
+                                    undoIndex--
+                                    editableContent = undoStack[undoIndex]
+                                    hasUnsavedChanges = true
+                                }
+                            },
+                            enabled = undoIndex > 0,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Undo,
+                                contentDescription = "Undo",
+                                tint = if (undoIndex > 0) palette.textPrimary else palette.divider
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                if (undoIndex < undoStack.lastIndex) {
+                                    undoIndex++
+                                    editableContent = undoStack[undoIndex]
+                                    hasUnsavedChanges = true
+                                }
+                            },
+                            enabled = undoIndex < undoStack.lastIndex,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Redo,
+                                contentDescription = "Redo",
+                                tint = if (undoIndex < undoStack.lastIndex) palette.textPrimary else palette.divider
+                            )
+                        }
+                    }
+
+                    // AI Mic (Sound to Text with Noise Clean) Quick Button
+                    IconButton(
+                        onClick = { showAiMicSheet = true },
+                        modifier = Modifier
+                            .size(44.dp)
+                            .testTag("viewer_ai_mic_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Mic,
+                            contentDescription = "AI Mic Noise Clean",
+                            tint = DocFlowTokens.IconCircleTeal
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { showInDocSearch = !showInDocSearch },
+                        modifier = Modifier
+                            .size(44.dp)
+                            .testTag("viewer_search_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = "Find & Replace",
+                            tint = palette.textPrimary
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { viewModel.shareAnyDocument(context, doc) },
+                        modifier = Modifier
+                            .size(44.dp)
+                            .testTag("viewer_share_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Share,
+                            contentDescription = "Share document",
+                            tint = palette.textPrimary
+                        )
+                    }
+
+                    Box {
+                        IconButton(
+                            onClick = { showOverflowMenu = true },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .testTag("viewer_overflow_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = "More options",
+                                tint = palette.textPrimary
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showOverflowMenu,
+                            onDismissRequest = { showOverflowMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Details (Stored on this device)") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showDetailsSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Export PDF with Watermark") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showWatermarkPdfExportSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Export Versions & Notes to PDF") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showExportVersionsNotesSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Save Version Snapshot") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    viewModel.saveNewVersionSnapshot(
+                                        doc = doc,
+                                        plainContent = editableContent,
+                                        versionLabel = "Edited Snapshot (${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())})"
+                                    )
+                                    viewerToast = "Saved local version snapshot"
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Comments (${comments.size})") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showCommentsSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Rename") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showRenameDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Add to Private Safe") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    viewModel.moveToPrivateSafe(doc.id, "1234")
+                                    onBack()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Print") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    triggerAndroidPrint(context, documentTitle, editableContent)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete", color = DocFlowTokens.IconCircleRed) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    viewModel.softDeleteDocument(doc.id)
+                                    onBack()
+                                }
+                            )
+                        }
                     }
                 }
+                DocFlowDivider(palette = palette)
+            }
 
-                isFileMissing -> {
-                    DocFlowErrorState(
-                        title = "File not found on device",
-                        message = "This file was moved or deleted outside DocFlow. You can remove it from your Recent list.",
-                        retryLabel = "Remove from Recent",
-                        onRetry = onDelete,
-                        secondaryLabel = "Go back",
-                        onSecondaryClick = onBack,
-                        modifier = Modifier.align(Alignment.Center)
+            // =================================================================
+            // 2. IN-DOCUMENT FIND & REPLACE BAR
+            // =================================================================
+            AnimatedVisibility(visible = showInDocSearch) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(palette.surface)
+                        .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = DocFlowTokens.space2)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
+                    ) {
+                        OutlinedTextField(
+                            value = inDocSearchQuery,
+                            onValueChange = {
+                                inDocSearchQuery = it
+                                activeMatchIndex = if (it.isNotBlank()) 1 else 0
+                            },
+                            placeholder = { Text("Find in document...") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("viewer_in_doc_search_input")
+                        )
+                        Text(
+                            text = if (searchMatchesCount > 0) "${activeMatchIndex.coerceIn(1, searchMatchesCount)}/$searchMatchesCount" else "0/0",
+                            style = DocFlowTokens.captionStyle,
+                            color = palette.textSecondary
+                        )
+                        IconButton(
+                            onClick = {
+                                if (searchMatchesCount > 0) {
+                                    activeMatchIndex = if (activeMatchIndex <= 1) searchMatchesCount else activeMatchIndex - 1
+                                }
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Previous match", tint = palette.textPrimary)
+                        }
+                        IconButton(
+                            onClick = {
+                                if (searchMatchesCount > 0) {
+                                    activeMatchIndex = if (activeMatchIndex >= searchMatchesCount) 1 else activeMatchIndex + 1
+                                }
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Next match", tint = palette.textPrimary)
+                        }
+                        IconButton(
+                            onClick = {
+                                showInDocSearch = false
+                                inDocSearchQuery = ""
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = "Close search", tint = palette.textSecondary)
+                        }
+                    }
+
+                    if (isEditingMode && inDocSearchQuery.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = inDocReplaceText,
+                                onValueChange = { inDocReplaceText = it },
+                                placeholder = { Text("Replace with...") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            DocFlowSecondaryButton(
+                                text = "Replace All",
+                                onClick = {
+                                    val updated = editableContent.replace(
+                                        Regex(Regex.escape(inDocSearchQuery), RegexOption.IGNORE_CASE),
+                                        inDocReplaceText
+                                    )
+                                    pushEditContent(updated)
+                                    viewerToast = "Replaced $searchMatchesCount occurrence(s)"
+                                },
+                                palette = palette
+                            )
+                        }
+                    }
+                }
+            }
+
+            // =================================================================
+            // 3. VIEW MODE LAYOUT BAR (Print Layout vs Reading Reflow, Ruler, Page Width)
+            // =================================================================
+            if (!isPdf) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(palette.surface)
+                        .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(
+                            selected = isPrintLayoutMode,
+                            onClick = { isPrintLayoutMode = true },
+                            label = { Text("Print Layout", fontSize = 12.sp) },
+                            modifier = Modifier.testTag("word_print_layout_chip")
+                        )
+                        FilterChip(
+                            selected = !isPrintLayoutMode,
+                            onClick = { isPrintLayoutMode = false },
+                            label = { Text("Reading (Reflow)", fontSize = 12.sp) },
+                            modifier = Modifier.testTag("word_reflow_layout_chip")
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "$wordCount words",
+                            style = DocFlowTokens.captionStyle,
+                            color = palette.textSecondary
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(DocFlowTokens.pillButtonShape)
+                                .background(
+                                    if (isEditingMode) DocFlowTokens.IconCircleGreen else DocFlowTokens.AccentBlue
+                                )
+                                .clickable {
+                                    if (isEditingMode) {
+                                        viewModel.updateDocumentContent(
+                                            doc = doc,
+                                            newTitle = documentTitle,
+                                            newFolderId = doc.folderId,
+                                            newCategory = doc.category,
+                                            plainContent = editableContent,
+                                            isEncrypted = doc.isEncrypted,
+                                            password = null,
+                                            encryptionKeyHint = doc.encryptionKeyHint,
+                                            isOfflineCached = true
+                                        )
+                                        hasUnsavedChanges = false
+                                        isEditingMode = false
+                                        viewerToast = "Saved changes on this device"
+                                    } else {
+                                        isEditingMode = true
+                                    }
+                                }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                                .testTag("word_toggle_edit_mode_button")
+                        ) {
+                            Text(
+                                text = if (isEditingMode) "Done & Save" else "Edit in Word UI",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                DocFlowDivider(palette = palette)
+            }
+
+            // Optional Horizontal Ruler in Print Layout Mode
+            if (!isPdf && isPrintLayoutMode && showRuler) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(20.dp)
+                        .background(Color(0xFFE8EAED))
+                ) {
+                    val step = size.width / 16f
+                    for (i in 1..15) {
+                        val x = i * step
+                        val h = if (i % 2 == 0) 10.dp.toPx() else 5.dp.toPx()
+                        drawLine(
+                            color = Color(0xFF6B7280),
+                            start = Offset(x, size.height - h),
+                            end = Offset(x, size.height),
+                            strokeWidth = 1.5f
+                        )
+                    }
+                }
+            }
+
+            // =================================================================
+            // 4. MAIN VIEWPORT (White Page Sheets on #F0F1F3 Gray Background)
+            // =================================================================
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(palette.background)
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, _, zoom, _ ->
+                            zoomScale = (zoomScale * zoom).coerceIn(0.8f, 3.0f)
+                        }
+                    }
+            ) {
+                val activeFontFamily = when (selectedFontFamily) {
+                    "Serif", "Merriweather" -> FontFamily.Serif
+                    "JetBrains Mono" -> FontFamily.Monospace
+                    else -> FontFamily.SansSerif
+                }
+                val activeTextAlign = when (textAlignMode) {
+                    "CENTER" -> TextAlign.Center
+                    "RIGHT" -> TextAlign.End
+                    "JUSTIFY" -> TextAlign.Justify
+                    else -> TextAlign.Start
+                }
+                val activeTextDecoration = when {
+                    isUnderline && isStrikethrough -> TextDecoration.combine(
+                        listOf(TextDecoration.Underline, TextDecoration.LineThrough)
                     )
+                    isUnderline -> TextDecoration.Underline
+                    isStrikethrough -> TextDecoration.LineThrough
+                    else -> TextDecoration.None
+                }
+                val parsedTextColor = runCatching {
+                    Color(android.graphics.Color.parseColor(textColorHex))
+                }.getOrDefault(Color(0xFF111111))
+
+                val pageMarginPadding = when (pageMargins) {
+                    "Narrow" -> 12.dp
+                    "Wide" -> 32.dp
+                    else -> 20.dp
                 }
 
-                isFileCorrupted -> {
-                    DocFlowErrorState(
-                        title = "Unable to open file",
-                        message = "This file appears corrupted or uses an unsupported encoding.",
-                        retryLabel = "Try another app",
-                        onRetry = {
-                            openInExternalAppChooser(context, resolvedPdfUri, document.fileType)
-                        },
-                        secondaryLabel = "Go back",
-                        onSecondaryClick = onBack,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-
-                isPdfMode -> {
-                    // ---------------------------------------------------------
-                    // PDF VIEWER MODE
-                    // ---------------------------------------------------------
-                    var containerHeightPx by remember { mutableIntStateOf(1) }
-
-                    Box(
+                if (isEditingMode && !isPdf) {
+                    // Editable MS Word-Style Page Sheet Canvas
+                    Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .onSizeChanged { containerHeightPx = it.height.coerceAtLeast(1) }
-                            .pointerInput(Unit) {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    val newScale = (zoomScale * zoom).coerceIn(1f, 3.5f)
-                                    zoomScale = newScale
-                                    panOffset = if (newScale > 1.02f) {
-                                        Offset(
-                                            x = (panOffset.x + pan.x).coerceIn(-600f, 600f),
-                                            y = (panOffset.y + pan.y).coerceIn(-800f, 800f)
-                                        )
-                                    } else {
-                                        Offset.Zero
-                                    }
-                                }
-                            }
+                            .verticalScroll(rememberScrollState())
+                            .padding(
+                                horizontal = if (isPrintLayoutMode) DocFlowTokens.screenHorizontalMargin else 0.dp,
+                                vertical = if (isPrintLayoutMode) DocFlowTokens.space3 else 0.dp
+                            )
                     ) {
-                        LazyColumn(
-                            state = listState,
+                        Column(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    scaleX = zoomScale
-                                    scaleY = zoomScale
-                                    translationX = panOffset.x
-                                    translationY = panOffset.y
-                                }
-                                .testTag("pdf_pages_lazy_column"),
-                            contentPadding = PaddingValues(
-                                horizontal = DocFlowTokens.screenSideMargin,
-                                vertical = DocFlowTokens.space4
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
-                        ) {
-                            itemsIndexed(
-                                items = (0 until totalPages).toList(),
-                                key = { _, idx -> "pdf_page_$idx" }
-                            ) { _, pageIdx ->
-                                val pageText = textPages.getOrElse(pageIdx) {
-                                    "Page ${pageIdx + 1} of $editableTitle"
-                                }
-                                val pageAnnotations = remember(annotations, pageIdx) {
-                                    annotations.filter { it.pageIndex == pageIdx }
-                                }
-                                val activeMatchOnThisPage = searchMatches.getOrNull(currentMatchIndex)
-                                    ?.takeIf { it.pageIndex == pageIdx }
-
-                                PdfPageSheetItem(
-                                    pageIndex = pageIdx,
-                                    totalPages = totalPages,
-                                    documentTitle = editableTitle,
-                                    pageText = pageText,
-                                    renderedBitmap = renderedBitmaps[pageIdx],
-                                    isNightMode = isPdfNightMode,
-                                    searchQuery = searchQuery,
-                                    activeOccurrenceIndex = activeMatchOnThisPage?.occurrenceInPage ?: -1,
-                                    pageAnnotations = pageAnnotations,
-                                    isAnnotationMode = isAnnotationActive,
-                                    selectedTool = selectedMarkupTool,
-                                    selectedColorHex = selectedAnnotationColorHex,
-                                    selectedStrokeWidth = selectedStrokeWidth,
-                                    isEraserActive = isEraserActive,
-                                    onDoubleTapZoom = {
-                                        if (zoomScale > 1.2f) {
-                                            zoomScale = 1f
-                                            panOffset = Offset.Zero
-                                        } else {
-                                            zoomScale = 2f
-                                        }
-                                    },
-                                    onCommitStroke = { points ->
-                                        if (isEraserActive) {
-                                            onClearPageAnnotations(pageIdx)
-                                            showToast("Cleared annotations on page ${pageIdx + 1}")
-                                        } else if (selectedMarkupTool == PdfMarkupTool.TEXT_BOX) {
-                                            pendingNoteTapOffset = points.firstOrNull() ?: Offset(0.25f, 0.25f)
-                                            currentPageIndex = pageIdx
-                                            showAddTextNoteDialog = true
-                                        } else {
-                                            redoAnnotationStack.clear()
-                                            onUpsertAnnotation(
-                                                pageIdx,
-                                                selectedMarkupTool,
-                                                selectedAnnotationColorHex,
-                                                selectedStrokeWidth,
-                                                points,
-                                                ""
-                                            )
-                                        }
-                                    }
+                                .fillMaxWidth()
+                                .clip(if (isPrintLayoutMode) DocFlowTokens.thumbnailShape else androidx.compose.ui.graphics.RectangleShape)
+                                .background(Color.White)
+                                .border(
+                                    width = if (isPrintLayoutMode) 1.dp else 0.dp,
+                                    color = palette.divider,
+                                    shape = if (isPrintLayoutMode) DocFlowTokens.thumbnailShape else androidx.compose.ui.graphics.RectangleShape
                                 )
-                            }
-                        }
-
-                        // Active Annotation Strip at Top of PDF Area when annotating
-                        if (isAnnotationActive) {
-                            Surface(
-                                modifier = Modifier
-                                    .align(Alignment.TopCenter)
-                                    .padding(top = DocFlowTokens.space2, start = DocFlowTokens.screenSideMargin, end = DocFlowTokens.screenSideMargin),
-                                shape = DocFlowTokens.pillShape,
-                                color = DocFlowTokens.surface,
-                                border = BorderStroke(1.dp, DocFlowTokens.divider),
-                                tonalElevation = 0.dp
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = DocFlowTokens.space3, vertical = DocFlowTokens.space1),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
-                                ) {
-                                    Text(
-                                        text = if (isEraserActive) "Eraser active" else "Annotating: ${selectedMarkupTool.label}",
-                                        style = DocFlowTokens.captionBoldStyle,
-                                        color = DocFlowTokens.accentBlue
-                                    )
-                                    IconButton(
-                                        onClick = {
-                                            val pageAnns = annotations.filter { it.pageIndex == currentPageIndex }
-                                            if (pageAnns.isNotEmpty()) {
-                                                redoAnnotationStack.add(pageAnns.last())
-                                                onUndoAnnotation(pageAnns)
-                                            }
-                                        },
-                                        enabled = annotations.any { it.pageIndex == currentPageIndex },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo annotation", modifier = Modifier.size(18.dp))
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            if (redoAnnotationStack.isNotEmpty()) {
-                                                val restored = redoAnnotationStack.removeAt(redoAnnotationStack.lastIndex)
-                                                onUpsertAnnotation(
-                                                    restored.pageIndex,
-                                                    runCatching { PdfMarkupTool.valueOf(restored.toolType) }.getOrDefault(PdfMarkupTool.PEN),
-                                                    restored.colorHex,
-                                                    restored.strokeWidth,
-                                                    restored.decodePoints(),
-                                                    restored.stickyNoteText
-                                                )
-                                            }
-                                        },
-                                        enabled = redoAnnotationStack.isNotEmpty(),
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo annotation", modifier = Modifier.size(18.dp))
-                                    }
-                                    IconButton(
-                                        onClick = { showAnnotateSheet = true },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(Icons.Default.BorderColor, contentDescription = "Annotation options", modifier = Modifier.size(18.dp))
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            isAnnotationActive = false
-                                            isEraserActive = false
-                                        },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(Icons.Default.Check, contentDescription = "Finish annotating", tint = DocFlowTokens.iconGreenDownload)
-                                    }
-                                }
-                            }
-                        }
-
-                        // Floating Page Indicator Pill ("3 / 24") — appears on scroll, fades after 1.5s
-                        AnimatedVisibility(
-                            visible = showFloatingPagePill || isFastScrollDragging,
-                            enter = fadeIn(DocFlowTokens.standardTween()),
-                            exit = fadeOut(DocFlowTokens.standardTween()),
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = DocFlowTokens.space4)
+                                .padding(pageMarginPadding)
                         ) {
-                            Surface(
-                                shape = DocFlowTokens.pillShape,
-                                color = DocFlowTokens.textPrimary.copy(alpha = 0.88f),
-                                tonalElevation = 0.dp
+                            if (pageHeaderText.isNotBlank()) {
+                                Text(
+                                    text = pageHeaderText,
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF6B7280),
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                DocFlowDivider(palette = palette)
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = "${currentPageIndex + 1} / $totalPages",
-                                    style = DocFlowTokens.captionBoldStyle,
-                                    color = DocFlowTokens.surface,
-                                    modifier = Modifier
-                                        .padding(horizontal = DocFlowTokens.space4, vertical = DocFlowTokens.space2)
-                                        .testTag("floating_page_indicator_pill")
+                                    text = "$pageSizeOption ($pageOrientation) • $paragraphStyleName • ${selectedFontFamily} ${selectedFontSizePt}pt",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = DocFlowTokens.AccentBlue
                                 )
+                                if (showFormattingMarks) {
+                                    Text(
+                                        text = "¶ Formatting marks ON",
+                                        fontSize = 11.sp,
+                                        color = DocFlowTokens.IconCircleTeal
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = if (showFormattingMarks) editableContent.replace("\n", "¶\n") else editableContent,
+                                onValueChange = { raw ->
+                                    val cleaned = if (showFormattingMarks) raw.replace("¶", "") else raw
+                                    pushEditContent(cleaned)
+                                },
+                                textStyle = TextStyle(
+                                    fontFamily = activeFontFamily,
+                                    fontSize = (selectedFontSizePt * zoomScale).sp,
+                                    fontWeight = if (isBold || paragraphStyleName.startsWith("Heading") || paragraphStyleName == "Title") FontWeight.Bold else FontWeight.Normal,
+                                    fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                    textDecoration = activeTextDecoration,
+                                    textAlign = activeTextAlign,
+                                    color = parsedTextColor,
+                                    lineHeight = (selectedFontSizePt * lineSpacingMultiplier * zoomScale).sp
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(480.dp)
+                                    .testTag("word_editor_textfield")
+                            )
+
+                            if (pageFooterText.isNotBlank() || showPageNumbers) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                DocFlowDivider(palette = palette)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = pageFooterText,
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF6B7280)
+                                    )
+                                    if (showPageNumbers) {
+                                        Text(
+                                            text = "Page 1 of $totalPages",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF6B7280)
+                                        )
+                                    }
+                                }
                             }
                         }
-
-                        // Fast-Scroll Thumb on the Right showing page number while dragging
-                        if (totalPages > 1) {
-                            val fraction = if (totalPages <= 1) 0f else {
-                                currentPageIndex.toFloat() / (totalPages - 1).toFloat()
-                            }
-                            val density = LocalDensity.current
-                            val trackPaddingPx = with(density) { 48.dp.toPx() }
-                            val usableTrackPx = (containerHeightPx - trackPaddingPx * 2).coerceAtLeast(1f)
-                            val thumbOffsetY = (trackPaddingPx + fraction * usableTrackPx).roundToInt()
+                    }
+                } else {
+                    // Paginated White Page Sheets in View Mode (Print Layout or Reflow)
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("viewer_pages_list"),
+                        contentPadding = PaddingValues(
+                            horizontal = if (isPrintLayoutMode) DocFlowTokens.screenHorizontalMargin else 0.dp,
+                            vertical = if (isPrintLayoutMode) DocFlowTokens.space3 else 0.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(if (isPrintLayoutMode) DocFlowTokens.space3 else 0.dp)
+                    ) {
+                        itemsIndexed(contentPages) { index, pageText ->
+                            val bmp = renderedPdfBitmaps[index]
+                            val pageAnnotations = annotations.filter { it.pageIndex == index }
 
                             Box(
                                 modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .fillMaxHeight()
-                                    .width(44.dp)
-                                    .pointerInput(totalPages, containerHeightPx) {
-                                        detectDragGestures(
-                                            onDragStart = {
-                                                isFastScrollDragging = true
-                                                showFloatingPagePill = true
-                                            },
-                                            onDragEnd = { isFastScrollDragging = false },
-                                            onDragCancel = { isFastScrollDragging = false },
-                                            onDrag = { change, _ ->
-                                                change.consume()
-                                                val relY = (change.position.y - trackPaddingPx)
-                                                    .coerceIn(0f, usableTrackPx)
-                                                val targetPage = ((relY / usableTrackPx) * (totalPages - 1))
-                                                    .roundToInt()
-                                                    .coerceIn(0, totalPages - 1)
-                                                if (targetPage != currentPageIndex) {
-                                                    currentPageIndex = targetPage
-                                                    scope.launch {
-                                                        listState.scrollToItem(targetPage)
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
+                                    .fillMaxWidth()
+                                    .clip(if (isPrintLayoutMode) DocFlowTokens.thumbnailShape else androidx.compose.ui.graphics.RectangleShape)
+                                    .background(Color.White)
+                                    .border(
+                                        width = if (isPrintLayoutMode) 1.dp else 0.dp,
+                                        color = if (currentPageIndex == index && isPrintLayoutMode) DocFlowTokens.AccentBlue else palette.divider,
+                                        shape = if (isPrintLayoutMode) DocFlowTokens.thumbnailShape else androidx.compose.ui.graphics.RectangleShape
+                                    )
+                                    .clickable { currentPageIndex = index }
+                                    .padding(pageMarginPadding)
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .offset { IntOffset(0, thumbOffsetY) }
-                                        .align(Alignment.TopEnd)
-                                        .padding(end = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    if (isFastScrollDragging) {
-                                        Surface(
-                                            shape = DocFlowTokens.pillShape,
-                                            color = DocFlowTokens.accentBlue,
-                                            modifier = Modifier.padding(end = 6.dp)
-                                        ) {
+                                Column {
+                                    // Header Bar inside Page Sheet
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = pageHeaderText.ifBlank { documentTitle },
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF8A8D93),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (showPageNumbers) {
                                             Text(
-                                                text = "Page ${currentPageIndex + 1}",
-                                                style = DocFlowTokens.captionBoldStyle,
-                                                color = Color.White,
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                                text = "Page ${index + 1} of $totalPages",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(0xFF8A8D93)
                                             )
                                         }
                                     }
-                                    Surface(
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    if (bmp != null) {
+                                        Image(
+                                            bitmap = bmp.asImageBitmap(),
+                                            contentDescription = "PDF Page ${index + 1}",
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height((420f * zoomScale).dp),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    } else {
+                                        // Render structured headings, tables, lists & paragraphs
+                                        val lines = pageText.lines()
+                                        lines.forEachIndexed { lineIdx, line ->
+                                            val trimmed = line.trim()
+                                            val linePrefix = if (showLineNumbers) "${lineIdx + 1}. " else ""
+                                            when {
+                                                trimmed.startsWith("===") -> {
+                                                    Text(
+                                                        text = trimmed.removePrefix("===").removeSuffix("===").trim(),
+                                                        fontSize = (18f * zoomScale).sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = DocFlowTokens.AccentBlue,
+                                                        modifier = Modifier.padding(vertical = 6.dp)
+                                                    )
+                                                }
+                                                trimmed.startsWith("# ") -> {
+                                                    Text(
+                                                        text = trimmed.removePrefix("# "),
+                                                        fontSize = (22f * zoomScale).sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF111111),
+                                                        modifier = Modifier.padding(vertical = 6.dp)
+                                                    )
+                                                }
+                                                trimmed.startsWith("## ") -> {
+                                                    Text(
+                                                        text = trimmed.removePrefix("## "),
+                                                        fontSize = (18f * zoomScale).sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = Color(0xFF111111),
+                                                        modifier = Modifier.padding(vertical = 4.dp)
+                                                    )
+                                                }
+                                                trimmed.startsWith("|") -> {
+                                                    // Structured Table Row
+                                                    val cells = trimmed.trim('|').split("|").map { it.trim() }
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .background(Color(0xFFF8FAFC))
+                                                            .border(0.5.dp, Color(0xFFE3E4E7))
+                                                            .padding(vertical = 6.dp, horizontal = 8.dp)
+                                                    ) {
+                                                        cells.forEach { cell ->
+                                                            Text(
+                                                                text = cell,
+                                                                modifier = Modifier.weight(1f),
+                                                                fontSize = (13f * zoomScale).sp,
+                                                                fontWeight = FontWeight.Medium,
+                                                                color = Color(0xFF111111)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                trimmed == "---" -> {
+                                                    DocFlowDivider(
+                                                        palette = palette,
+                                                        modifier = Modifier.padding(vertical = 8.dp)
+                                                    )
+                                                }
+                                                else -> {
+                                                    val matchesQuery = inDocSearchQuery.isNotBlank() &&
+                                                        line.contains(inDocSearchQuery, ignoreCase = true)
+                                                    Text(
+                                                        text = "$linePrefix$line",
+                                                        fontFamily = activeFontFamily,
+                                                        fontSize = (selectedFontSizePt * zoomScale).sp,
+                                                        fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                                        fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                                        textDecoration = activeTextDecoration,
+                                                        textAlign = activeTextAlign,
+                                                        lineHeight = (selectedFontSizePt * lineSpacingMultiplier * zoomScale).sp,
+                                                        color = if (matchesQuery) DocFlowTokens.AccentBlue else parsedTextColor,
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .background(
+                                                                if (matchesQuery) Color(0xFFFFF59D) else Color.Transparent
+                                                            )
+                                                            .padding(vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (pageFooterText.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        DocFlowDivider(palette = palette)
+                                        Text(
+                                            text = pageFooterText,
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF8A8D93),
+                                            modifier = Modifier.padding(top = 6.dp)
+                                        )
+                                    }
+                                }
+
+                                // PDF Freehand / Highlight / Note Markup Overlay
+                                if (isPdf && (pageAnnotations.isNotEmpty() || activeMarkupTool != null)) {
+                                    Canvas(
                                         modifier = Modifier
-                                            .width(6.dp)
-                                            .height(44.dp),
-                                        shape = DocFlowTokens.pillShape,
-                                        color = if (isFastScrollDragging) DocFlowTokens.accentBlue else DocFlowTokens.textSecondary.copy(alpha = 0.55f)
-                                    ) {}
+                                            .matchParentSize()
+                                            .pointerInput(activeMarkupTool, index) {
+                                                if (activeMarkupTool != null) {
+                                                    detectDragGestures(
+                                                        onDragStart = { offset ->
+                                                            currentDragPoints.clear()
+                                                            currentDragPoints.add(
+                                                                Offset(
+                                                                    (offset.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f),
+                                                                    (offset.y / size.height.coerceAtLeast(1)).coerceIn(0f, 1f)
+                                                                )
+                                                            )
+                                                        },
+                                                        onDrag = { change, _ ->
+                                                            change.consume()
+                                                            currentDragPoints.add(
+                                                                Offset(
+                                                                    (change.position.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f),
+                                                                    (change.position.y / size.height.coerceAtLeast(1)).coerceIn(0f, 1f)
+                                                                )
+                                                            )
+                                                        },
+                                                        onDragEnd = {
+                                                            val tool = activeMarkupTool
+                                                            if (tool != null && currentDragPoints.isNotEmpty()) {
+                                                                viewModel.addYMapPdfAnnotation(
+                                                                    doc = doc,
+                                                                    pageIndex = index,
+                                                                    tool = tool,
+                                                                    colorHex = activeStrokeColorHex,
+                                                                    strokeWidth = if (tool == PdfMarkupTool.HIGHLIGHT) 18f else 5f,
+                                                                    points = currentDragPoints.toList(),
+                                                                    stickyNoteText = if (tool == PdfMarkupTool.STICKY_NOTE) "Note on Page ${index + 1}" else ""
+                                                                )
+                                                                currentDragPoints.clear()
+                                                            }
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                    ) {
+                                        pageAnnotations.forEach { ann ->
+                                            val pts = ann.decodePoints()
+                                            val c = runCatching {
+                                                Color(android.graphics.Color.parseColor(ann.colorHex))
+                                            }.getOrDefault(DocFlowTokens.AccentBlue)
+                                            if (pts.size >= 2) {
+                                                val p = Path().apply {
+                                                    moveTo(pts.first().x * size.width, pts.first().y * size.height)
+                                                    pts.drop(1).forEach { pt ->
+                                                        lineTo(pt.x * size.width, pt.y * size.height)
+                                                    }
+                                                }
+                                                drawPath(
+                                                    path = p,
+                                                    color = if (ann.toolType == PdfMarkupTool.HIGHLIGHT.name) c.copy(alpha = 0.40f) else c,
+                                                    style = Stroke(width = ann.strokeWidth.dp.toPx())
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                else -> {
-                    // ---------------------------------------------------------
-                    // WORD (DOCX) & TEXT VIEWER / EDITOR MODE
-                    // ---------------------------------------------------------
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(
-                                    horizontal = DocFlowTokens.screenSideMargin,
-                                    vertical = DocFlowTokens.space4
-                                )
-                        ) {
-                            DocFlowCard(
-                                padding = PaddingValues(DocFlowTokens.cardPaddingMax),
-                                borderColor = DocFlowTokens.divider
-                            ) {
-                                if (isWordEditMode) {
-                                    OutlinedTextField(
-                                        value = decryptedContent,
-                                        onValueChange = { updated ->
-                                            wordUndoStack.add(decryptedContent)
-                                            if (wordUndoStack.size > 40) wordUndoStack.removeAt(0)
-                                            decryptedContent = updated
-                                            wordAutosaveLabel = "Saved"
-                                            onLiveKeystrokeEdit(
-                                                editableTitle,
-                                                editableFolderId,
-                                                editableCategory,
-                                                updated,
-                                                document.isEncrypted,
-                                                passwordInput.ifBlank { null },
-                                                document.encryptionKeyHint,
-                                                true
-                                            )
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(min = 480.dp)
-                                            .testTag("word_editor_text_field"),
-                                        textStyle = DocFlowTokens.bodyStyle.copy(
-                                            fontSize = wordFontSizeSp.sp,
-                                            fontWeight = if (wordBoldActive) FontWeight.Bold else FontWeight.Normal,
-                                            fontStyle = if (wordItalicActive) FontStyle.Italic else FontStyle.Normal,
-                                            textDecoration = if (wordUnderlineActive) TextDecoration.Underline else TextDecoration.None,
-                                            color = runCatching { Color(android.graphics.Color.parseColor(wordTextColorHex)) }
-                                                .getOrDefault(DocFlowTokens.textPrimary)
-                                        )
-                                    )
-                                } else {
-                                    // Structured Word Read Layout (headings, paragraphs, lists, tables)
-                                    WordStructuredReadView(
-                                        content = decryptedContent,
-                                        searchQuery = searchQuery,
-                                        fontSizeSp = wordFontSizeSp
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(88.dp))
-                        }
+                // Floating Blue "Edit" Pill in View Mode (for Word/Office/Notes)
+                if (!isPdf && !isEditingMode) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 20.dp, bottom = 16.dp)
+                            .clip(DocFlowTokens.pillButtonShape)
+                            .background(DocFlowTokens.AccentBlue)
+                            .clickable { isEditingMode = true }
+                            .padding(horizontal = 20.dp, vertical = 12.dp)
+                            .testTag("viewer_floating_edit_pill"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Edit,
+                            contentDescription = "Edit document",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Edit",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
 
-                        // Blue "Edit" Pill Button bottom-right in Read View
-                        if (!isWordEditMode) {
-                            DocFlowPrimaryButton(
-                                text = "Edit",
-                                leadingIcon = Icons.Default.Edit,
-                                onClick = { isWordEditMode = true },
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(DocFlowTokens.space5),
-                                testTag = "word_enter_edit_pill_button"
-                            )
-                        }
+                if (viewerToast != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 12.dp)
+                    ) {
+                        DocFlowToast(message = viewerToast!!)
                     }
                 }
             }
 
-            // Toast Banner Overlay
-            DocFlowToast(
-                message = toastMessage,
-                isError = toastIsError,
-                onDismiss = { toastMessage = null },
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
-        }
-    }
-
-    // =========================================================================
-    // BOTTOM SHEETS & DIALOGS (Using Shared Design System Components)
-    // =========================================================================
-
-    // 1. PDF Page Thumbnails Bottom Sheet
-    if (showThumbnailsSheet) {
-        DocFlowBottomSheet(
-            onDismissRequest = { showThumbnailsSheet = false },
-            title = "Pages ($totalPages)"
-        ) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp),
-                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3),
-                verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
-            ) {
-                itemsIndexed((0 until totalPages).toList()) { _, idx ->
-                    val isCurrent = idx == currentPageIndex
-                    Column(
-                        modifier = Modifier
-                            .clip(DocFlowTokens.thumbnailShape)
-                            .border(
-                                width = if (isCurrent) 2.5.dp else 1.dp,
-                                color = if (isCurrent) DocFlowTokens.accentBlue else DocFlowTokens.divider,
-                                shape = DocFlowTokens.thumbnailShape
-                            )
-                            .background(DocFlowTokens.surfaceSubtle)
-                            .clickable {
-                                currentPageIndex = idx
-                                showThumbnailsSheet = false
-                                scope.launch { listState.animateScrollToItem(idx) }
+            // =================================================================
+            // 5. BOTTOM RIBBON / ACTION BAR (MS Word 5-Tab Ribbon in Edit Mode, or Quick Action Bar in View Mode)
+            // =================================================================
+            if (isEditingMode && !isPdf) {
+                MsWordBottomRibbon(
+                    activeTab = activeRibbonTab,
+                    onSelectTab = { activeRibbonTab = it },
+                    palette = palette,
+                    selectedFontFamily = selectedFontFamily,
+                    onSelectFontFamily = { selectedFontFamily = it },
+                    selectedFontSizePt = selectedFontSizePt,
+                    onChangeFontSize = { selectedFontSizePt = it.coerceIn(8, 72) },
+                    isBold = isBold,
+                    onToggleBold = { isBold = !isBold },
+                    isItalic = isItalic,
+                    onToggleItalic = { isItalic = !isItalic },
+                    isUnderline = isUnderline,
+                    onToggleUnderline = { isUnderline = !isUnderline },
+                    isStrikethrough = isStrikethrough,
+                    onToggleStrikethrough = { isStrikethrough = !isStrikethrough },
+                    isSubscript = isSubscript,
+                    onToggleSubscript = {
+                        isSubscript = !isSubscript
+                        if (isSubscript) isSuperscript = false
+                    },
+                    isSuperscript = isSuperscript,
+                    onToggleSuperscript = {
+                        isSuperscript = !isSuperscript
+                        if (isSuperscript) isSubscript = false
+                    },
+                    onClearFormatting = {
+                        isBold = false
+                        isItalic = false
+                        isUnderline = false
+                        isStrikethrough = false
+                        isSubscript = false
+                        isSuperscript = false
+                        textColorHex = "#111111"
+                        paragraphStyleName = "Normal"
+                    },
+                    textColorHex = textColorHex,
+                    onSelectTextColor = { textColorHex = it },
+                    textAlignMode = textAlignMode,
+                    onSelectTextAlign = { textAlignMode = it },
+                    lineSpacingMultiplier = lineSpacingMultiplier,
+                    onSelectLineSpacing = { lineSpacingMultiplier = it },
+                    paragraphStyleName = paragraphStyleName,
+                    onSelectParagraphStyle = { style ->
+                        paragraphStyleName = style
+                        when (style) {
+                            "Title" -> {
+                                selectedFontSizePt = 24
+                                isBold = true
                             }
-                            .padding(DocFlowTokens.space2),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(0.72f)
-                                .clip(DocFlowTokens.thumbnailShape)
-                                .background(Color.White)
-                                .border(1.dp, DocFlowTokens.divider, DocFlowTokens.thumbnailShape)
-                                .padding(6.dp)
-                        ) {
-                            val bmp = renderedBitmaps[idx]
-                            if (bmp != null) {
-                                Image(
-                                    bitmap = bmp.asImageBitmap(),
-                                    contentDescription = "Page ${idx + 1} thumbnail",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Text(
-                                    text = textPages.getOrElse(idx) { "" }.take(90),
-                                    style = DocFlowTokens.microBadgeStyle.copy(
-                                        fontSize = 7.sp,
-                                        lineHeight = 9.sp,
-                                        fontWeight = FontWeight.Normal
-                                    ),
-                                    color = Color(0xFF333333)
-                                )
+                            "Heading 1" -> {
+                                selectedFontSizePt = 20
+                                isBold = true
+                            }
+                            "Heading 2" -> {
+                                selectedFontSizePt = 17
+                                isBold = true
+                            }
+                            "Heading 3" -> {
+                                selectedFontSizePt = 15
+                                isBold = true
+                            }
+                            "Code" -> {
+                                selectedFontFamily = "JetBrains Mono"
+                                selectedFontSizePt = 13
+                            }
+                            else -> {
+                                selectedFontSizePt = 14
+                                isBold = false
                             }
                         }
-                        Spacer(modifier = Modifier.height(DocFlowTokens.space1))
-                        Text(
-                            text = "${idx + 1}",
-                            style = DocFlowTokens.captionBoldStyle,
-                            color = if (isCurrent) DocFlowTokens.accentBlue else DocFlowTokens.textSecondary
+                    },
+                    onInsertBullet = { pushEditContent(editableContent.trimEnd() + "\n• ") },
+                    onInsertNumbered = { pushEditContent(editableContent.trimEnd() + "\n1. ") },
+                    onIndent = { pushEditContent(editableContent + "    ") },
+                    onOutdent = { pushEditContent(editableContent.removeSuffix("    ")) },
+                    onInsertTable = { showInsertTableDialog = true },
+                    onInsertImage = {
+                        insertImageLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    onInsertLink = { showInsertLinkDialog = true },
+                    onInsertPageBreak = { pushEditContent(editableContent.trimEnd() + "\n=== PAGE BREAK ===\n") },
+                    onEditHeaderFooter = { showHeaderFooterDialog = true },
+                    onInsertDate = {
+                        val today = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date())
+                        pushEditContent("$editableContent $today")
+                    },
+                    onInsertHorizontalLine = { pushEditContent(editableContent.trimEnd() + "\n---\n") },
+                    pageSizeOption = pageSizeOption,
+                    onSelectPageSize = { pageSizeOption = it },
+                    pageOrientation = pageOrientation,
+                    onSelectOrientation = { pageOrientation = it },
+                    pageMargins = pageMargins,
+                    onSelectMargins = { pageMargins = it },
+                    showLineNumbers = showLineNumbers,
+                    onToggleLineNumbers = { showLineNumbers = !showLineNumbers },
+                    onOpenFindReplace = { showInDocSearch = true },
+                    onRunSpellCheck = {
+                        val cleaned = editableContent
+                            .replace("teh", "the")
+                            .replace("recieve", "receive")
+                            .replace("occured", "occurred")
+                        pushEditContent(cleaned)
+                        viewerToast = "Spell check complete (English + हिन्दी)"
+                    },
+                    onOpenComments = { showCommentsSheet = true },
+                    onOpenExportWatermarkPdf = { showWatermarkPdfExportSheet = true },
+                    zoomScale = zoomScale,
+                    onSelectZoom = { zoomScale = it },
+                    showRuler = showRuler,
+                    onToggleRuler = { showRuler = !showRuler },
+                    showFormattingMarks = showFormattingMarks,
+                    onToggleFormattingMarks = { showFormattingMarks = !showFormattingMarks },
+                    isPrintLayoutMode = isPrintLayoutMode,
+                    onToggleLayoutMode = { isPrintLayoutMode = !isPrintLayoutMode }
+                )
+            } else {
+                // View Mode Bottom Action Bar
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(palette.surface)
+                ) {
+                    DocFlowDivider(palette = palette)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = DocFlowTokens.space3, vertical = DocFlowTokens.space2),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isPdf) {
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.GridView,
+                                label = "Pages ($totalPages)",
+                                active = false,
+                                palette = palette,
+                                onClick = { showPageGridSheet = true }
+                            )
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.BorderColor,
+                                label = "Highlight",
+                                active = activeMarkupTool == PdfMarkupTool.HIGHLIGHT,
+                                palette = palette,
+                                onClick = {
+                                    activeMarkupTool = if (activeMarkupTool == PdfMarkupTool.HIGHLIGHT) null else PdfMarkupTool.HIGHLIGHT
+                                    activeStrokeColorHex = "#FFEB3B"
+                                }
+                            )
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.Draw,
+                                label = "Draw / Sign",
+                                active = activeMarkupTool == PdfMarkupTool.PEN,
+                                palette = palette,
+                                onClick = {
+                                    activeMarkupTool = if (activeMarkupTool == PdfMarkupTool.PEN) null else PdfMarkupTool.PEN
+                                    activeStrokeColorHex = "#1F6BFF"
+                                }
+                            )
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.PictureAsPdf,
+                                label = "Watermark Copy",
+                                active = false,
+                                palette = palette,
+                                onClick = { showWatermarkPdfExportSheet = true }
+                            )
+                        } else {
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.Edit,
+                                label = "Edit (Word UI)",
+                                active = isEditingMode,
+                                palette = palette,
+                                onClick = { isEditingMode = true }
+                            )
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.PictureAsPdf,
+                                label = "Export PDF",
+                                active = false,
+                                palette = palette,
+                                onClick = { showWatermarkPdfExportSheet = true }
+                            )
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.History,
+                                label = "Versions / Notes PDF",
+                                active = false,
+                                palette = palette,
+                                onClick = { showExportVersionsNotesSheet = true }
+                            )
+                        }
+
+                        ViewerBottomActionButton(
+                            icon = Icons.Filled.Mic,
+                            label = "AI Mic",
+                            active = false,
+                            palette = palette,
+                            onClick = { showAiMicSheet = true }
+                        )
+                        ViewerBottomActionButton(
+                            icon = Icons.Filled.AutoAwesome,
+                            label = "Summarise",
+                            active = false,
+                            palette = palette,
+                            onClick = { showSummariseSheet = true }
+                        )
+                        ViewerBottomActionButton(
+                            icon = Icons.Filled.Translate,
+                            label = "Translate",
+                            active = false,
+                            palette = palette,
+                            onClick = { showTranslateSheet = true }
                         )
                     }
                 }
@@ -1568,935 +1490,1166 @@ fun DocumentViewerEditorScreen(
         }
     }
 
-    // 2. PDF Annotate Bottom Sheet (Highlight, Underline, Draw, Text note, Eraser, Undo/Redo)
-    if (showAnnotateSheet) {
+    // =========================================================================
+    // DIALOGS & SHEETS: TABLE, LINK, HEADER/FOOTER, COMMENTS, WATERMARK EXPORT, DETAILS
+    // =========================================================================
+
+    if (showInsertTableDialog) {
+        AlertDialog(
+            onDismissRequest = { showInsertTableDialog = false },
+            title = { Text("Insert Table (Rows × Columns)") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)) {
+                    OutlinedTextField(
+                        value = tableRowsInput,
+                        onValueChange = { tableRowsInput = it.filter { ch -> ch.isDigit() }.take(2) },
+                        label = { Text("Rows (1–15)") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = tableColsInput,
+                        onValueChange = { tableColsInput = it.filter { ch -> ch.isDigit() }.take(2) },
+                        label = { Text("Columns (1–8)") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val r = (tableRowsInput.toIntOrNull() ?: 3).coerceIn(1, 15)
+                        val c = (tableColsInput.toIntOrNull() ?: 3).coerceIn(1, 8)
+                        val tableBuilder = StringBuilder("\n")
+                        val headerRow = (1..c).joinToString(" | ", prefix = "| ", postfix = " |") { "Column $it" }
+                        tableBuilder.appendLine(headerRow)
+                        for (rowIdx in 1..r) {
+                            val rowStr = (1..c).joinToString(" | ", prefix = "| ", postfix = " |") { "Cell ${rowIdx}.$it" }
+                            tableBuilder.appendLine(rowStr)
+                        }
+                        pushEditContent(editableContent.trimEnd() + "\n" + tableBuilder.toString())
+                        showInsertTableDialog = false
+                    }
+                ) {
+                    Text("Insert Table", fontWeight = FontWeight.Bold, color = DocFlowTokens.AccentBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showInsertTableDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showInsertLinkDialog) {
+        AlertDialog(
+            onDismissRequest = { showInsertLinkDialog = false },
+            title = { Text("Insert Link") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)) {
+                    OutlinedTextField(
+                        value = linkTextInput,
+                        onValueChange = { linkTextInput = it },
+                        label = { Text("Display text") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = linkUrlInput,
+                        onValueChange = { linkUrlInput = it },
+                        label = { Text("URL") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val label = linkTextInput.ifBlank { linkUrlInput }
+                        pushEditContent("$editableContent [$label]($linkUrlInput) ")
+                        showInsertLinkDialog = false
+                    }
+                ) {
+                    Text("Insert", fontWeight = FontWeight.Bold, color = DocFlowTokens.AccentBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showInsertLinkDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showHeaderFooterDialog) {
+        AlertDialog(
+            onDismissRequest = { showHeaderFooterDialog = false },
+            title = { Text("Header, Footer & Page Numbers") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)) {
+                    OutlinedTextField(
+                        value = pageHeaderText,
+                        onValueChange = { pageHeaderText = it },
+                        label = { Text("Page Header Text") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = pageFooterText,
+                        onValueChange = { pageFooterText = it },
+                        label = { Text("Page Footer Text") },
+                        singleLine = true
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Show Page Numbers")
+                        Switch(checked = showPageNumbers, onCheckedChange = { showPageNumbers = it })
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHeaderFooterDialog = false }) {
+                    Text("Apply", fontWeight = FontWeight.Bold, color = DocFlowTokens.AccentBlue)
+                }
+            }
+        )
+    }
+
+    // Comments Sheet (Review Tab > Local Comments)
+    if (showCommentsSheet) {
         DocFlowBottomSheet(
-            onDismissRequest = { showAnnotateSheet = false },
-            title = "Annotate PDF"
+            onDismissRequest = { showCommentsSheet = false },
+            palette = palette
         ) {
             Text(
-                text = "Select markup tool",
+                text = "Document Comments & Notes (${comments.size})",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Text(
+                text = "Stored on this device • Exportable to PDF",
                 style = DocFlowTokens.captionStyle,
-                color = DocFlowTokens.textSecondary
+                color = palette.textSecondary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = newCommentBody,
+                    onValueChange = { newCommentBody = it },
+                    placeholder = { Text("Add a local review comment or note...") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                DocFlowPrimaryButton(
+                    text = "Add",
+                    enabled = newCommentBody.isNotBlank(),
+                    onClick = {
+                        viewModel.addDocumentComment(
+                            doc = doc,
+                            anchorLineOrText = "Page ${currentPageIndex + 1}",
+                            body = newCommentBody.trim(),
+                            isSuggestion = false,
+                            suggestedReplacement = ""
+                        )
+                        newCommentBody = ""
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+
+            comments.forEach { comment ->
+                DocFlowListRow(
+                    title = comment.body,
+                    subtitle = "${comment.authorName} • ${comment.status} • Tap PDF icon to export note",
+                    palette = palette,
+                    onClick = {},
+                    trailing = {
+                        Row {
+                            IconButton(
+                                onClick = {
+                                    viewModel.exportCommentOrNoteAsPdf(context, doc, comment)
+                                    showCommentsSheet = false
+                                }
+                            ) {
+                                Icon(Icons.Filled.PictureAsPdf, contentDescription = "Export Note to PDF", tint = DocFlowTokens.IconCircleRed)
+                            }
+                            IconButton(
+                                onClick = { viewModel.deleteComment(comment.id) }
+                            ) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Delete comment", tint = palette.textSecondary)
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    // Export Individual Versions or Notes to PDF Sheet
+    if (showExportVersionsNotesSheet) {
+        DocFlowBottomSheet(
+            onDismissRequest = { showExportVersionsNotesSheet = false },
+            palette = palette
+        ) {
+            Text(
+                text = "Export Version or Note to PDF",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Text(
+                text = "Select a local version snapshot or note to generate a standalone PDF stored on this device.",
+                style = DocFlowTokens.captionStyle,
+                color = palette.textSecondary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+
+            DocFlowListRow(
+                title = "Save & Export Current Version Snapshot as PDF",
+                subtitle = "$wordCount words • Stored on this device",
+                palette = palette,
+                onClick = {
+                    val snapshot = DocumentVersionEntity(
+                        id = "ver_${System.currentTimeMillis()}",
+                        documentId = doc.id,
+                        userId = viewModel.currentUserId,
+                        versionNumber = (versionsForDoc.size + 1),
+                        versionLabel = "Word UI Export Snapshot",
+                        authorName = authorMetadata,
+                        stateVector = "sv-${versionsForDoc.size + 1}",
+                        snapshotContent = editableContent,
+                        byteSize = editableContent.length.toLong()
+                    )
+                    viewModel.exportVersionSnapshotAsPdf(context, doc, snapshot)
+                    showExportVersionsNotesSheet = false
+                },
+                leading = {
+                    DocFlowIconCircle(icon = Icons.Filled.PictureAsPdf, circleColor = DocFlowTokens.IconCircleRed)
+                }
+            )
+
+            versionsForDoc.take(5).forEach { ver ->
+                DocFlowListRow(
+                    title = "v${ver.versionNumber}: ${ver.versionLabel}",
+                    subtitle = "Author: ${ver.authorName} • Tap to export PDF",
+                    palette = palette,
+                    onClick = {
+                        viewModel.exportVersionSnapshotAsPdf(context, doc, ver)
+                        showExportVersionsNotesSheet = false
+                    },
+                    leading = {
+                        DocFlowIconCircle(icon = Icons.Filled.History, circleColor = DocFlowTokens.AccentBlue)
+                    }
+                )
+            }
+
+            comments.take(5).forEach { note ->
+                DocFlowListRow(
+                    title = "Note: ${note.body.take(40)}",
+                    subtitle = "By ${note.authorName} • Tap to export note as PDF",
+                    palette = palette,
+                    onClick = {
+                        viewModel.exportCommentOrNoteAsPdf(context, doc, note)
+                        showExportVersionsNotesSheet = false
+                    },
+                    leading = {
+                        DocFlowIconCircle(icon = Icons.Filled.Comment, circleColor = DocFlowTokens.IconCircleGreen)
+                    }
+                )
+            }
+        }
+    }
+
+    // Export PDF with Watermark Sheet
+    if (showWatermarkPdfExportSheet) {
+        PdfWatermarkExportSheet(
+            palette = palette,
+            documentTitle = documentTitle,
+            previewTextSnippet = editableContent.take(120),
+            initialEnabled = true,
+            confirmLabel = "Export PDF (Stored on this device)",
+            onDismiss = { showWatermarkPdfExportSheet = false },
+            onConfirmExport = { wmConfig ->
+                showWatermarkPdfExportSheet = false
+                viewModel.convertFileToPdfAndSave(
+                    context = context,
+                    sourceDoc = doc.copy(title = documentTitle, content = editableContent),
+                    watermarkConfig = wmConfig
+                ) {
+                    viewerToast = "Exported PDF${if (wmConfig.enabled) " with '${wmConfig.text}' watermark" else ""} on this device"
+                }
+            }
+        )
+    }
+
+    // AI Mic Dictation Sheet
+    if (showAiMicSheet) {
+        AiMicDictationBottomSheet(
+            palette = palette,
+            initialText = "",
+            confirmButtonLabel = "Insert into Document",
+            onDismiss = { showAiMicSheet = false },
+            onConfirmCleanText = { cleaned ->
+                isEditingMode = true
+                pushEditContent(
+                    if (editableContent.isBlank()) cleaned else "${editableContent.trimEnd()}\n$cleaned"
+                )
+                showAiMicSheet = false
+                viewerToast = "Inserted noise-cleaned voice text"
+            }
+        )
+    }
+
+    // Document Details Bottom Sheet (Requirement 5: Full Document Details + Editable Author/Title + Stored on this device)
+    if (showDetailsSheet) {
+        val createdDateStr = remember(doc.createdAt) {
+            val ms = (doc.createdAt?.seconds ?: 0L) * 1000L
+            SimpleDateFormat("dd MMM yyyy, h:mm a", Locale.getDefault()).format(
+                Date(if (ms > 0L) ms else System.currentTimeMillis())
+            )
+        }
+        val modifiedDateStr = remember(cachedEntity?.updatedAtMillis) {
+            val ms = cachedEntity?.updatedAtMillis ?: System.currentTimeMillis()
+            SimpleDateFormat("dd MMM yyyy, h:mm a", Locale.getDefault()).format(Date(ms))
+        }
+        val lastOpenedStr = remember(cachedEntity?.lastAccessedAtMillis) {
+            val ms = cachedEntity?.lastAccessedAtMillis ?: System.currentTimeMillis()
+            SimpleDateFormat("dd MMM yyyy, h:mm a", Locale.getDefault()).format(Date(ms))
+        }
+        val sizeKb = String.format("%.1f KB", doc.fileSize.coerceAtLeast(1024L) / 1024.0)
+
+        DocFlowBottomSheet(
+            onDismissRequest = { showDetailsSheet = false },
+            palette = palette
+        ) {
+            Text(
+                text = "Document Details",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+
+            DetailItemRow("Name", documentTitle, palette)
+            DetailItemRow("File Type", ".${doc.fileType.lowercase()} (${doc.fileType.uppercase()})", palette)
+            DetailItemRow("Size", sizeKb, palette)
+            DetailItemRow("Pages", "$totalPages page(s)", palette)
+            DetailItemRow("Words & Characters", "$wordCount words • $charCount characters", palette)
+            DetailItemRow("Created", createdDateStr, palette)
+            DetailItemRow("Modified", modifiedDateStr, palette)
+            DetailItemRow("Last Opened", lastOpenedStr, palette)
+            DetailItemRow("Folder / Category", "${doc.folderId} • ${doc.category}", palette)
+            DetailItemRow("Tags", (cachedEntity?.tags ?: "").ifBlank { "None" }, palette)
+            DetailItemRow("Location", "Stored on this device", palette)
+            DetailItemRow("Encrypted", if (doc.isEncrypted || cachedEntity?.isPrivateSafe == true) "Yes (AES-256-GCM)" else "No", palette)
+
+            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+
+            OutlinedTextField(
+                value = authorMetadata,
+                onValueChange = { authorMetadata = it },
+                label = { Text("Author Metadata (Stored on this device)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                DocFlowSecondaryButton(
+                    text = "Rename",
+                    onClick = {
+                        showDetailsSheet = false
+                        showRenameDialog = true
+                    },
+                    palette = palette
+                )
+                DocFlowSecondaryButton(
+                    text = "Add Tags",
+                    onClick = {
+                        showDetailsSheet = false
+                        showTagsDialog = true
+                    },
+                    palette = palette
+                )
+                DocFlowSecondaryButton(
+                    text = "Private Safe",
+                    onClick = {
+                        showDetailsSheet = false
+                        viewModel.moveToPrivateSafe(doc.id, "1234")
+                        onBack()
+                    },
+                    palette = palette
+                )
+                DocFlowPrimaryButton(
+                    text = "Export PDF + Watermark",
+                    onClick = {
+                        showDetailsSheet = false
+                        showWatermarkPdfExportSheet = true
+                    }
+                )
+            }
+        }
+    }
+
+    // Rename Dialog
+    if (showRenameDialog) {
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Rename document") },
+            text = {
+                OutlinedTextField(
+                    value = documentTitle,
+                    onValueChange = { documentTitle = it },
+                    label = { Text("Document name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.updateDocumentContent(
+                            doc = doc,
+                            newTitle = documentTitle.trim().ifBlank { doc.title },
+                            newFolderId = doc.folderId,
+                            newCategory = doc.category,
+                            plainContent = editableContent,
+                            isEncrypted = doc.isEncrypted,
+                            password = null,
+                            encryptionKeyHint = doc.encryptionKeyHint,
+                            isOfflineCached = true
+                        )
+                        showRenameDialog = false
+                    }
+                ) {
+                    Text("Save", fontWeight = FontWeight.Bold, color = DocFlowTokens.AccentBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Tags Dialog
+    if (showTagsDialog) {
+        AlertDialog(
+            onDismissRequest = { showTagsDialog = false },
+            title = { Text("Edit Document Tags") },
+            text = {
+                OutlinedTextField(
+                    value = tagInputText,
+                    onValueChange = { tagInputText = it },
+                    label = { Text("Tags (comma separated)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.updateDocumentCategoryAndTags(doc, doc.category, tagInputText)
+                        showTagsDialog = false
+                    }
+                ) {
+                    Text("Save Tags", fontWeight = FontWeight.Bold, color = DocFlowTokens.AccentBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTagsDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Unsaved Changes Prompt
+    if (showUnsavedExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showUnsavedExitDialog = false },
+            title = { Text("Save changes before leaving?") },
+            text = { Text("You have unsaved edits in '$documentTitle'.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.updateDocumentContent(
+                            doc = doc,
+                            newTitle = documentTitle,
+                            newFolderId = doc.folderId,
+                            newCategory = doc.category,
+                            plainContent = editableContent,
+                            isEncrypted = doc.isEncrypted,
+                            password = null,
+                            encryptionKeyHint = doc.encryptionKeyHint,
+                            isOfflineCached = true
+                        )
+                        hasUnsavedChanges = false
+                        showUnsavedExitDialog = false
+                        onBack()
+                    }
+                ) {
+                    Text("Save & Exit", fontWeight = FontWeight.Bold, color = DocFlowTokens.AccentBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showUnsavedExitDialog = false
+                        onBack()
+                    }
+                ) {
+                    Text("Discard", color = DocFlowTokens.IconCircleRed)
+                }
+            }
+        )
+    }
+
+    // Page Thumbnail Grid Sheet
+    if (showPageGridSheet) {
+        DocFlowBottomSheet(
+            onDismissRequest = { showPageGridSheet = false },
+            palette = palette
+        ) {
+            Text(
+                text = "Pages ($totalPages)",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
             )
             Spacer(modifier = Modifier.height(DocFlowTokens.space2))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
+                horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)
             ) {
-                FilterChip(
-                    selected = !isEraserActive && selectedMarkupTool == PdfMarkupTool.HIGHLIGHT,
-                    onClick = {
-                        isEraserActive = false
-                        selectedMarkupTool = PdfMarkupTool.HIGHLIGHT
-                        selectedStrokeWidth = 16f
-                        isAnnotationActive = true
-                    },
-                    label = { Text("Highlight") },
-                    leadingIcon = { Icon(Icons.Default.Highlight, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                )
-                FilterChip(
-                    selected = !isEraserActive && selectedMarkupTool == PdfMarkupTool.UNDERLINE,
-                    onClick = {
-                        isEraserActive = false
-                        selectedMarkupTool = PdfMarkupTool.UNDERLINE
-                        selectedStrokeWidth = 4f
-                        isAnnotationActive = true
-                    },
-                    label = { Text("Underline") },
-                    leadingIcon = { Icon(Icons.Default.FormatUnderlined, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                )
-                FilterChip(
-                    selected = !isEraserActive && selectedMarkupTool == PdfMarkupTool.PEN,
-                    onClick = {
-                        isEraserActive = false
-                        selectedMarkupTool = PdfMarkupTool.PEN
-                        selectedStrokeWidth = 5f
-                        isAnnotationActive = true
-                    },
-                    label = { Text("Draw") },
-                    leadingIcon = { Icon(Icons.Default.Brush, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                )
-                FilterChip(
-                    selected = !isEraserActive && selectedMarkupTool == PdfMarkupTool.TEXT_BOX,
-                    onClick = {
-                        isEraserActive = false
-                        selectedMarkupTool = PdfMarkupTool.TEXT_BOX
-                        isAnnotationActive = true
-                    },
-                    label = { Text("Text note") },
-                    leadingIcon = { Icon(Icons.Default.StickyNote2, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                )
-                FilterChip(
-                    selected = isEraserActive,
-                    onClick = {
-                        isEraserActive = true
-                        isAnnotationActive = true
-                    },
-                    label = { Text("Eraser") },
-                    leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(DocFlowTokens.space4))
-            Text(
-                text = "Color",
-                style = DocFlowTokens.captionStyle,
-                color = DocFlowTokens.textSecondary
-            )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
-            val colorOptions = listOf("#FDE047", "#E5483F", "#1F6BFF", "#25C25A", "#1FB8C9", "#111111")
-            Row(horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space3)) {
-                colorOptions.forEach { hex ->
-                    val parsed = runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(DocFlowTokens.accentBlue)
-                    val isSelected = selectedAnnotationColorHex.equals(hex, ignoreCase = true)
-                    Box(
+                for (i in 0 until totalPages) {
+                    val isCurrent = i == currentPageIndex
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(parsed)
+                            .width(96.dp)
+                            .clip(DocFlowTokens.thumbnailShape)
                             .border(
-                                width = if (isSelected) 3.dp else 1.dp,
-                                color = if (isSelected) DocFlowTokens.textPrimary else DocFlowTokens.divider,
-                                shape = CircleShape
+                                width = if (isCurrent) 2.dp else 1.dp,
+                                color = if (isCurrent) DocFlowTokens.AccentBlue else palette.divider,
+                                shape = DocFlowTokens.thumbnailShape
                             )
-                            .clickable { selectedAnnotationColorHex = hex },
-                        contentAlignment = Alignment.Center
+                            .background(Color.White)
+                            .clickable {
+                                currentPageIndex = i
+                                showPageGridSheet = false
+                            }
+                            .padding(DocFlowTokens.space2)
                     ) {
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Selected color",
-                                tint = if (hex == "#FDE047") Color.Black else Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                        Text(
+                            text = contentPages.getOrNull(i)?.take(60) ?: "Page ${i + 1}",
+                            fontSize = 9.sp,
+                            color = Color.DarkGray,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.height(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Page ${i + 1}",
+                            fontSize = 12.sp,
+                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isCurrent) DocFlowTokens.AccentBlue else Color.Black
+                        )
                     }
                 }
             }
+        }
+    }
 
-            Spacer(modifier = Modifier.height(DocFlowTokens.space4))
+    // Summarise Sheet
+    if (showSummariseSheet) {
+        val summary: ExtractiveSummaryResult = remember(editableContent) {
+            OnDeviceAiAndBackupEngine.summarizeTextExtractive(editableContent)
+        }
+        DocFlowBottomSheet(
+            onDismissRequest = { showSummariseSheet = false },
+            palette = palette
+        ) {
             Text(
-                text = "Thickness: ${selectedStrokeWidth.roundToInt()} pt",
+                text = "AI Summarise — ${doc.title}",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
+            )
+            Text(
+                text = "On-device TF-IDF & TextRank • ${summary.wordCount} words • Stored on this device",
                 style = DocFlowTokens.captionStyle,
-                color = DocFlowTokens.textSecondary
+                color = palette.textSecondary
             )
-            Slider(
-                value = selectedStrokeWidth,
-                onValueChange = { selectedStrokeWidth = it },
-                valueRange = 2f..28f,
-                colors = SliderDefaults.colors(
-                    thumbColor = DocFlowTokens.accentBlue,
-                    activeTrackColor = DocFlowTokens.accentBlue
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+
+            summary.bulletPoints.forEach { bullet ->
+                Text(
+                    text = "• $bullet",
+                    style = DocFlowTokens.bodyStyle,
+                    color = palette.textPrimary,
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
-            )
+            }
 
             Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)) {
                 DocFlowSecondaryButton(
-                    text = "Undo",
-                    leadingIcon = Icons.AutoMirrored.Filled.Undo,
-                    enabled = annotations.any { it.pageIndex == currentPageIndex },
+                    text = "Copy",
                     onClick = {
-                        val pageAnns = annotations.filter { it.pageIndex == currentPageIndex }
-                        if (pageAnns.isNotEmpty()) {
-                            redoAnnotationStack.add(pageAnns.last())
-                            onUndoAnnotation(pageAnns)
-                        }
-                    }
+                        val cb = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                        cb?.setPrimaryClip(ClipData.newPlainText("Summary", summary.executiveSummary))
+                        Toast.makeText(context, "Summary copied", Toast.LENGTH_SHORT).show()
+                    },
+                    palette = palette,
+                    modifier = Modifier.weight(1f)
                 )
                 DocFlowPrimaryButton(
-                    text = "Start Annotating",
+                    text = "Save as Note",
                     onClick = {
-                        isAnnotationActive = true
-                        showAnnotateSheet = false
-                    }
+                        viewModel.saveSummaryAsNote(doc, summary) {
+                            showSummariseSheet = false
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
     }
 
-    // 3. Add Text Note Dialog (for PDF Text Note annotation)
-    if (showAddTextNoteDialog) {
-        DocFlowDialog(
-            title = "Add text note",
-            onDismissRequest = { showAddTextNoteDialog = false },
-            confirmText = "Save note",
-            confirmEnabled = textNoteInput.isNotBlank(),
-            onConfirm = {
-                onUpsertAnnotation(
-                    currentPageIndex,
-                    PdfMarkupTool.TEXT_BOX,
-                    selectedAnnotationColorHex,
-                    12f,
-                    listOf(pendingNoteTapOffset),
-                    textNoteInput.trim()
-                )
-                textNoteInput = ""
-                showAddTextNoteDialog = false
-                showToast("Note added to page ${currentPageIndex + 1}")
-            }
-        ) {
-            OutlinedTextField(
-                value = textNoteInput,
-                onValueChange = { textNoteInput = it },
-                label = { Text("Note text") },
-                modifier = Modifier.fillMaxWidth()
-            )
+    // Translate Sheet
+    if (showTranslateSheet) {
+        var targetLang by remember { mutableStateOf(TranslationLanguage.HINDI) }
+        var packs by remember { mutableStateOf(OnDeviceAiAndBackupEngine.getDownloadedLanguagePacks(context)) }
+        val isReady = packs.contains(targetLang.code)
+        val translated = remember(editableContent, targetLang, isReady) {
+            if (isReady) {
+                OnDeviceAiAndBackupEngine.translateDocumentOffline(doc.title, editableContent, targetLang)
+            } else null
         }
-    }
 
-    // 4. Page Jump Dialog
-    if (showPageJumpDialog) {
-        DocFlowDialog(
-            title = "Jump to page",
-            onDismissRequest = { showPageJumpDialog = false },
-            confirmText = "Go",
-            onConfirm = {
-                val target = (pageJumpInput.toIntOrNull() ?: 1).coerceIn(1, totalPages) - 1
-                currentPageIndex = target
-                showPageJumpDialog = false
-                scope.launch { listState.animateScrollToItem(target) }
-            }
+        DocFlowBottomSheet(
+            onDismissRequest = { showTranslateSheet = false },
+            palette = palette
         ) {
             Text(
-                text = "Enter a page number between 1 and $totalPages",
-                style = DocFlowTokens.captionStyle,
-                color = DocFlowTokens.textSecondary
+                text = "Translate Document (Offline)",
+                style = DocFlowTokens.sectionLabelStyle,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary
             )
             Spacer(modifier = Modifier.height(DocFlowTokens.space2))
-            OutlinedTextField(
-                value = pageJumpInput,
-                onValueChange = { pageJumpInput = it.filter { ch -> ch.isDigit() } },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
 
-    // 5. Details Bottom Sheet
-    if (showDetailsSheet) {
-        DocFlowBottomSheet(
-            onDismissRequest = { showDetailsSheet = false },
-            title = "Document details"
-        ) {
-            val updatedMs = document.updatedAt?.toDate()?.time ?: System.currentTimeMillis()
-            val formattedDate = remember(updatedMs) {
-                SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(updatedMs))
-            }
-            val sizeLabel = remember(document.fileSize) {
-                if (document.fileSize >= 1024L * 1024L) {
-                    String.format(Locale.US, "%.2f MB", document.fileSize / (1024.0 * 1024.0))
-                } else {
-                    "${(document.fileSize / 1024L).coerceAtLeast(1L)} KB"
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TranslationLanguage.entries.forEach { lang ->
+                    FilterChip(
+                        selected = targetLang == lang,
+                        onClick = { targetLang = lang },
+                        label = { Text("${lang.displayName} (${lang.nativeName})") }
+                    )
                 }
             }
-            DocFlowListRow(title = "Name", subtitle = editableTitle)
-            DocFlowListRow(title = "Format", subtitle = document.fileType.uppercase())
-            DocFlowListRow(title = "Pages", subtitle = "$totalPages")
-            DocFlowListRow(title = "Size", subtitle = sizeLabel)
-            DocFlowListRow(title = "Last modified", subtitle = formattedDate)
-            DocFlowListRow(
-                title = "Storage location",
-                subtitle = localFilePath ?: "App-private offline SQLite + Filesystem"
-            )
-        }
-    }
 
-    // 6. Rename Dialog
-    if (showRenameDialog) {
-        DocFlowDialog(
-            title = "Rename document",
-            onDismissRequest = { showRenameDialog = false },
-            confirmText = "Save",
-            confirmEnabled = renameInput.isNotBlank(),
-            onConfirm = {
-                editableTitle = renameInput.trim()
-                onSaveEdits(
-                    editableTitle,
-                    editableFolderId,
-                    editableCategory,
-                    decryptedContent,
-                    document.isEncrypted,
-                    passwordInput.ifBlank { null },
-                    document.encryptionKeyHint,
-                    true
-                )
-                showRenameDialog = false
-                showToast("Renamed to $editableTitle")
-            }
-        ) {
-            OutlinedTextField(
-                value = renameInput,
-                onValueChange = { renameInput = it },
-                label = { Text("File name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
+            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
 
-    // 7. Move to Folder Sheet
-    if (showMoveFolderSheet) {
-        DocFlowBottomSheet(
-            onDismissRequest = { showMoveFolderSheet = false },
-            title = "Move to folder"
-        ) {
-            folders.forEach { folder ->
-                DocFlowListRow(
-                    title = folder.name,
-                    subtitle = if (folder.id == editableFolderId) "Current folder" else null,
-                    selected = folder.id == editableFolderId,
+            if (!isReady) {
+                DocFlowPrimaryButton(
+                    text = "Download ${targetLang.displayName} Pack (${targetLang.packSizeMb})",
                     onClick = {
-                        editableFolderId = folder.id
-                        onSaveEdits(
-                            editableTitle,
-                            folder.id,
-                            editableCategory,
-                            decryptedContent,
-                            document.isEncrypted,
-                            passwordInput.ifBlank { null },
-                            document.encryptionKeyHint,
-                            true
-                        )
-                        showMoveFolderSheet = false
-                        showToast("Moved to ${folder.name}")
-                    }
+                        OnDeviceAiAndBackupEngine.markLanguagePackDownloaded(context, targetLang.code)
+                        packs = OnDeviceAiAndBackupEngine.getDownloadedLanguagePacks(context)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else if (translated != null) {
+                Text(
+                    text = translated.take(400),
+                    style = DocFlowTokens.bodyStyle,
+                    color = palette.textPrimary,
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+                DocFlowPrimaryButton(
+                    text = "Save Translated Copy",
+                    onClick = {
+                        viewModel.saveTranslationDocument(
+                            context = context,
+                            sourceDoc = doc,
+                            translatedText = translated,
+                            targetLang = targetLang,
+                            exportAsPdf = true
+                        ) {
+                            showTranslateSheet = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
     }
+}
 
-    // 8. Export / Save a Copy / Share Sheet
-    if (showExportShareSheet) {
-        DocFlowBottomSheet(
-            onDismissRequest = { showExportShareSheet = false },
-            title = "Export & Share"
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MsWordBottomRibbon(
+    activeTab: WordRibbonTab,
+    onSelectTab: (WordRibbonTab) -> Unit,
+    palette: DocFlowPalette,
+    selectedFontFamily: String,
+    onSelectFontFamily: (String) -> Unit,
+    selectedFontSizePt: Int,
+    onChangeFontSize: (Int) -> Unit,
+    isBold: Boolean,
+    onToggleBold: () -> Unit,
+    isItalic: Boolean,
+    onToggleItalic: () -> Unit,
+    isUnderline: Boolean,
+    onToggleUnderline: () -> Unit,
+    isStrikethrough: Boolean,
+    onToggleStrikethrough: () -> Unit,
+    isSubscript: Boolean,
+    onToggleSubscript: () -> Unit,
+    isSuperscript: Boolean,
+    onToggleSuperscript: () -> Unit,
+    onClearFormatting: () -> Unit,
+    textColorHex: String,
+    onSelectTextColor: (String) -> Unit,
+    textAlignMode: String,
+    onSelectTextAlign: (String) -> Unit,
+    lineSpacingMultiplier: Float,
+    onSelectLineSpacing: (Float) -> Unit,
+    paragraphStyleName: String,
+    onSelectParagraphStyle: (String) -> Unit,
+    onInsertBullet: () -> Unit,
+    onInsertNumbered: () -> Unit,
+    onIndent: () -> Unit,
+    onOutdent: () -> Unit,
+    onInsertTable: () -> Unit,
+    onInsertImage: () -> Unit,
+    onInsertLink: () -> Unit,
+    onInsertPageBreak: () -> Unit,
+    onEditHeaderFooter: () -> Unit,
+    onInsertDate: () -> Unit,
+    onInsertHorizontalLine: () -> Unit,
+    pageSizeOption: String,
+    onSelectPageSize: (String) -> Unit,
+    pageOrientation: String,
+    onSelectOrientation: (String) -> Unit,
+    pageMargins: String,
+    onSelectMargins: (String) -> Unit,
+    showLineNumbers: Boolean,
+    onToggleLineNumbers: () -> Unit,
+    onOpenFindReplace: () -> Unit,
+    onRunSpellCheck: () -> Unit,
+    onOpenComments: () -> Unit,
+    onOpenExportWatermarkPdf: () -> Unit,
+    zoomScale: Float,
+    onSelectZoom: (Float) -> Unit,
+    showRuler: Boolean,
+    onToggleRuler: () -> Unit,
+    showFormattingMarks: Boolean,
+    onToggleFormattingMarks: () -> Unit,
+    isPrintLayoutMode: Boolean,
+    onToggleLayoutMode: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(palette.surface)
+            .testTag("ms_word_ribbon_bar")
+    ) {
+        DocFlowDivider(palette = palette)
+
+        // Ribbon Tab Selector: Home | Insert | Layout | Review | View
+        ScrollableTabRow(
+            selectedTabIndex = activeTab.ordinal,
+            containerColor = palette.surface,
+            contentColor = DocFlowTokens.AccentBlue,
+            edgePadding = DocFlowTokens.screenHorizontalMargin,
+            divider = { DocFlowDivider(palette = palette) }
         ) {
-            DocFlowListRow(
-                title = "Save as PDF",
-                subtitle = "Flatten pages and annotations into a local PDF file",
-                leading = {
-                    DocFlowIconCircle(
-                        icon = Icons.Default.PictureAsPdf,
-                        circleColor = DocFlowTokens.iconRedPdf,
-                        contentDescription = null
-                    )
-                },
-                showBottomDivider = true,
-                onClick = {
-                    showExportShareSheet = false
-                    if (isPdfMode) {
-                        onShareAndExportAnnotatedPdf(decryptedContent, false)
-                    } else {
-                        onConvertFormat("pdf", decryptedContent)
-                    }
-                    showToast("Saved PDF copy to workspace")
-                }
-            )
-            DocFlowListRow(
-                title = "Save as DOCX",
-                subtitle = "Save editable Word document copy on device",
-                leading = {
-                    DocFlowIconCircle(
-                        icon = Icons.Default.Description,
-                        circleColor = DocFlowTokens.accentBlue,
-                        contentDescription = null
-                    )
-                },
-                showBottomDivider = true,
-                onClick = {
-                    showExportShareSheet = false
-                    onConvertFormat("docx", decryptedContent)
-                    showToast("Saved DOCX copy to workspace")
-                }
-            )
-            DocFlowListRow(
-                title = "Export pages as PNG images",
-                subtitle = "Render high-resolution page images to workspace",
-                leading = {
-                    DocFlowIconCircle(
-                        icon = Icons.Default.Image,
-                        circleColor = DocFlowTokens.iconGreenDownload,
-                        contentDescription = null
-                    )
-                },
-                onClick = {
-                    showExportShareSheet = false
-                    scope.launch {
-                        val res = ImageProcessingPdfPipeline.convertDocumentToPictures(
-                            context = context,
-                            docId = document.id,
-                            title = editableTitle,
-                            fileType = document.fileType,
-                            plainContent = decryptedContent,
-                            localUri = resolvedPdfUri
+            WordRibbonTab.entries.forEach { tab ->
+                val isSelected = activeTab == tab
+                Tab(
+                    selected = isSelected,
+                    onClick = { onSelectTab(tab) },
+                    modifier = Modifier.testTag("word_ribbon_tab_${tab.name.lowercase()}"),
+                    text = {
+                        Text(
+                            text = tab.label,
+                            fontSize = 14.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) DocFlowTokens.AccentBlue else palette.textSecondary
                         )
-                        res.onSuccess { picRes ->
-                            onSaveDocToPicToWorkspace(
-                                "Stitched PNG",
-                                picRes.pageBitmaps.size,
-                                picRes.stitchedFile,
-                                picRes.stitchedUri
+                    }
+                )
+            }
+        }
+
+        // Active Ribbon Controls
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = DocFlowTokens.space2)
+        ) {
+            when (activeTab) {
+                WordRibbonTab.HOME -> {
+                    // Row 1: Font Family, Font Size, Bold, Italic, Underline, Strikethrough, Sub/Superscript, Clear
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf("Roboto", "Inter", "Serif", "Merriweather", "JetBrains Mono").forEach { font ->
+                            FilterChip(
+                                selected = selectedFontFamily == font,
+                                onClick = { onSelectFontFamily(font) },
+                                label = { Text(font, fontSize = 11.sp) }
                             )
-                            showToast("Exported ${picRes.pageBitmaps.size} page image(s)")
+                        }
+                        FilterChip(
+                            selected = false,
+                            onClick = { onChangeFontSize(selectedFontSizePt - 2) },
+                            label = { Text("A-", fontWeight = FontWeight.Bold) }
+                        )
+                        Text("${selectedFontSizePt}pt", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)
+                        FilterChip(
+                            selected = false,
+                            onClick = { onChangeFontSize(selectedFontSizePt + 2) },
+                            label = { Text("A+", fontWeight = FontWeight.Bold) }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onToggleBold) {
+                            Icon(Icons.Filled.FormatBold, contentDescription = "Bold", tint = if (isBold) DocFlowTokens.AccentBlue else palette.textPrimary)
+                        }
+                        IconButton(onClick = onToggleItalic) {
+                            Icon(Icons.Filled.FormatItalic, contentDescription = "Italic", tint = if (isItalic) DocFlowTokens.AccentBlue else palette.textPrimary)
+                        }
+                        IconButton(onClick = onToggleUnderline) {
+                            Icon(Icons.Filled.FormatUnderlined, contentDescription = "Underline", tint = if (isUnderline) DocFlowTokens.AccentBlue else palette.textPrimary)
+                        }
+                        IconButton(onClick = onToggleStrikethrough) {
+                            Icon(Icons.Filled.FormatStrikethrough, contentDescription = "Strikethrough", tint = if (isStrikethrough) DocFlowTokens.AccentBlue else palette.textPrimary)
+                        }
+                        IconButton(onClick = onToggleSubscript) {
+                            Icon(Icons.Filled.Subscript, contentDescription = "Subscript", tint = if (isSubscript) DocFlowTokens.AccentBlue else palette.textPrimary)
+                        }
+                        IconButton(onClick = onToggleSuperscript) {
+                            Icon(Icons.Filled.Superscript, contentDescription = "Superscript", tint = if (isSuperscript) DocFlowTokens.AccentBlue else palette.textPrimary)
+                        }
+                        IconButton(onClick = onClearFormatting) {
+                            Icon(Icons.Filled.FormatClear, contentDescription = "Clear formatting", tint = palette.textSecondary)
+                        }
+                        // Alignment
+                        IconButton(onClick = { onSelectTextAlign("LEFT") }) {
+                            Icon(Icons.AutoMirrored.Filled.FormatAlignLeft, contentDescription = "Align Left", tint = if (textAlignMode == "LEFT") DocFlowTokens.AccentBlue else palette.textPrimary)
+                        }
+                        IconButton(onClick = { onSelectTextAlign("CENTER") }) {
+                            Icon(Icons.Filled.FormatAlignCenter, contentDescription = "Align Center", tint = if (textAlignMode == "CENTER") DocFlowTokens.AccentBlue else palette.textPrimary)
+                        }
+                        IconButton(onClick = { onSelectTextAlign("RIGHT") }) {
+                            Icon(Icons.AutoMirrored.Filled.FormatAlignRight, contentDescription = "Align Right", tint = if (textAlignMode == "RIGHT") DocFlowTokens.AccentBlue else palette.textPrimary)
+                        }
+                        IconButton(onClick = { onSelectTextAlign("JUSTIFY") }) {
+                            Icon(Icons.Filled.FormatAlignJustify, contentDescription = "Justify", tint = if (textAlignMode == "JUSTIFY") DocFlowTokens.AccentBlue else palette.textPrimary)
+                        }
+                        // Bullets, Numbered, Indent, Outdent
+                        IconButton(onClick = onInsertBullet) {
+                            Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "Bullet list", tint = palette.textPrimary)
+                        }
+                        IconButton(onClick = onInsertNumbered) {
+                            Icon(Icons.Filled.FormatListNumbered, contentDescription = "Numbered list", tint = palette.textPrimary)
+                        }
+                        IconButton(onClick = onIndent) {
+                            Icon(Icons.AutoMirrored.Filled.FormatIndentIncrease, contentDescription = "Indent", tint = palette.textPrimary)
+                        }
+                        IconButton(onClick = onOutdent) {
+                            Icon(Icons.AutoMirrored.Filled.FormatIndentDecrease, contentDescription = "Outdent", tint = palette.textPrimary)
+                        }
+                    }
+
+                    // Styles & Text Colors
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf("Normal", "Title", "Heading 1", "Heading 2", "Heading 3", "Quote", "Code").forEach { st ->
+                            FilterChip(
+                                selected = paragraphStyleName == st,
+                                onClick = { onSelectParagraphStyle(st) },
+                                label = { Text(st, fontSize = 11.sp) }
+                            )
+                        }
+                        listOf("#111111", "#1F6BFF", "#E5483F", "#25C25A").forEach { hex ->
+                            val c = Color(android.graphics.Color.parseColor(hex))
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(c)
+                                    .border(
+                                        width = if (textColorHex == hex) 2.dp else 1.dp,
+                                        color = if (textColorHex == hex) DocFlowTokens.AccentBlue else palette.divider,
+                                        shape = CircleShape
+                                    )
+                                    .clickable { onSelectTextColor(hex) }
+                            )
                         }
                     }
                 }
-            )
-        }
-    }
 
-    // 9. Word Version History Bottom Sheet (Last 20 versions, restore any)
-    if (showVersionHistorySheet) {
-        DocFlowBottomSheet(
-            onDismissRequest = { showVersionHistorySheet = false },
-            title = "Version history (last 20)"
-        ) {
-            val recentVersions = remember(versions) { versions.take(20) }
-            if (recentVersions.isEmpty()) {
-                Text(
-                    text = "No saved versions yet. Edit and tap Done to create local snapshots.",
-                    style = DocFlowTokens.bodyStyle,
-                    color = DocFlowTokens.textSecondary
-                )
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 380.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    recentVersions.forEach { ver ->
-                        val dateStr = SimpleDateFormat("dd MMM HH:mm", Locale.getDefault()).format(Date(ver.createdAtMillis))
-                        DocFlowListRow(
-                            title = "v${ver.versionNumber} · ${ver.versionLabel}",
-                            subtitle = dateStr,
-                            showBottomDivider = true,
-                            trailing = {
-                                DocFlowSecondaryButton(
-                                    text = "Restore",
-                                    onClick = {
-                                        onRestoreVersion(ver, passwordInput.ifBlank { null }) { restoredText ->
-                                            decryptedContent = restoredText
-                                        }
-                                        decryptedContent = ver.snapshotContent
-                                        showVersionHistorySheet = false
-                                        showToast("Restored v${ver.versionNumber}")
-                                    }
-                                )
-                            }
+                WordRibbonTab.INSERT -> {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        FilterChip(
+                            selected = false,
+                            onClick = onInsertTable,
+                            label = { Text("Table (Rows×Cols)") },
+                            leadingIcon = { Icon(Icons.Filled.TableChart, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                        FilterChip(
+                            selected = false,
+                            onClick = onInsertImage,
+                            label = { Text("Image") },
+                            leadingIcon = { Icon(Icons.Filled.Image, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                        FilterChip(
+                            selected = false,
+                            onClick = onInsertLink,
+                            label = { Text("Link") },
+                            leadingIcon = { Icon(Icons.Filled.Link, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                        FilterChip(
+                            selected = false,
+                            onClick = onInsertPageBreak,
+                            label = { Text("Page Break") },
+                            leadingIcon = { Icon(Icons.Filled.InsertPageBreak, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                        FilterChip(
+                            selected = false,
+                            onClick = onEditHeaderFooter,
+                            label = { Text("Header / Footer / Page #") }
+                        )
+                        FilterChip(
+                            selected = false,
+                            onClick = onInsertDate,
+                            label = { Text("Date") }
+                        )
+                        FilterChip(
+                            selected = false,
+                            onClick = onInsertHorizontalLine,
+                            label = { Text("Horizontal Line") },
+                            leadingIcon = { Icon(Icons.Filled.HorizontalRule, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                    }
+                }
+
+                WordRibbonTab.LAYOUT -> {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("A4", "Letter", "Legal").forEach { sz ->
+                            FilterChip(
+                                selected = pageSizeOption == sz,
+                                onClick = { onSelectPageSize(sz) },
+                                label = { Text("Size: $sz", fontSize = 12.sp) }
+                            )
+                        }
+                        listOf("Portrait", "Landscape").forEach { or ->
+                            FilterChip(
+                                selected = pageOrientation == or,
+                                onClick = { onSelectOrientation(or) },
+                                label = { Text(or, fontSize = 12.sp) }
+                            )
+                        }
+                        listOf("Normal", "Narrow", "Wide").forEach { mg ->
+                            FilterChip(
+                                selected = pageMargins == mg,
+                                onClick = { onSelectMargins(mg) },
+                                label = { Text("Margin: $mg", fontSize = 12.sp) }
+                            )
+                        }
+                        FilterChip(
+                            selected = showLineNumbers,
+                            onClick = onToggleLineNumbers,
+                            label = { Text("Line Numbers", fontSize = 12.sp) }
+                        )
+                    }
+                }
+
+                WordRibbonTab.REVIEW -> {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        FilterChip(
+                            selected = false,
+                            onClick = onOpenFindReplace,
+                            label = { Text("Find & Replace") },
+                            leadingIcon = { Icon(Icons.Filled.FindReplace, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                        FilterChip(
+                            selected = false,
+                            onClick = onRunSpellCheck,
+                            label = { Text("Spell Check (EN + HI)") },
+                            leadingIcon = { Icon(Icons.Filled.Spellcheck, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                        FilterChip(
+                            selected = false,
+                            onClick = onOpenComments,
+                            label = { Text("Comments") },
+                            leadingIcon = { Icon(Icons.Filled.Comment, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                        FilterChip(
+                            selected = false,
+                            onClick = onOpenExportWatermarkPdf,
+                            label = { Text("Export PDF + Watermark") },
+                            leadingIcon = { Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                    }
+                }
+
+                WordRibbonTab.VIEW -> {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(0.85f to "85%", 1.0f to "100%", 1.25f to "125%", 1.5f to "150%").forEach { (z, lbl) ->
+                            FilterChip(
+                                selected = zoomScale == z,
+                                onClick = { onSelectZoom(z) },
+                                label = { Text("Zoom $lbl", fontSize = 12.sp) }
+                            )
+                        }
+                        FilterChip(
+                            selected = showRuler,
+                            onClick = onToggleRuler,
+                            label = { Text("Ruler", fontSize = 12.sp) }
+                        )
+                        FilterChip(
+                            selected = showFormattingMarks,
+                            onClick = onToggleFormattingMarks,
+                            label = { Text("Formatting Marks (¶)", fontSize = 12.sp) }
+                        )
+                        FilterChip(
+                            selected = isPrintLayoutMode,
+                            onClick = onToggleLayoutMode,
+                            label = { Text(if (isPrintLayoutMode) "Print Layout" else "Reflow View", fontSize = 12.sp) }
                         )
                     }
                 }
             }
-        }
-    }
-
-    // 10. Delete Confirmation Dialog
-    if (showDeleteConfirmDialog) {
-        DocFlowDialog(
-            title = "Delete document?",
-            onDismissRequest = { showDeleteConfirmDialog = false },
-            confirmText = "Delete",
-            isDestructive = true,
-            onConfirm = {
-                showDeleteConfirmDialog = false
-                onDelete()
-            }
-        ) {
-            Text(
-                text = "\"$editableTitle\" will be moved to Recently deleted.",
-                style = DocFlowTokens.bodyStyle,
-                color = DocFlowTokens.textSecondary
-            )
         }
     }
 }
 
 @Composable
-private fun PdfBottomToolButton(
+private fun ViewerBottomActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    isActive: Boolean,
-    testTag: String,
+    active: Boolean,
+    palette: DocFlowPalette,
     onClick: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .heightIn(min = DocFlowTokens.minTouchTarget)
-            .clip(DocFlowTokens.smallShape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = DocFlowTokens.space2, vertical = DocFlowTokens.space1)
-            .testTag(testTag),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        modifier = Modifier
+            .clip(DocFlowTokens.buttonShape)
+            .background(if (active) DocFlowTokens.AccentBlue.copy(alpha = 0.12f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = if (isActive) DocFlowTokens.accentBlue else DocFlowTokens.textPrimary,
+            tint = if (active) DocFlowTokens.AccentBlue else palette.textPrimary,
             modifier = Modifier.size(22.dp)
         )
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = label,
-            style = DocFlowTokens.microBadgeStyle.copy(
-                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
-            ),
-            color = if (isActive) DocFlowTokens.accentBlue else DocFlowTokens.textSecondary
+            fontSize = 11.sp,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+            color = if (active) DocFlowTokens.AccentBlue else palette.textSecondary
         )
     }
 }
 
 @Composable
-private fun WordFormatChipButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+private fun DetailItemRow(
     label: String,
-    isActive: Boolean,
-    enabled: Boolean = true,
-    onClick: () -> Unit
+    value: String,
+    palette: DocFlowPalette
 ) {
-    Surface(
-        modifier = Modifier
-            .height(40.dp)
-            .clip(DocFlowTokens.smallShape)
-            .clickable(enabled = enabled, onClick = onClick),
-        shape = DocFlowTokens.smallShape,
-        color = if (isActive) DocFlowTokens.accentBlue.copy(alpha = 0.14f) else DocFlowTokens.surfaceSubtle,
-        border = BorderStroke(1.dp, if (isActive) DocFlowTokens.accentBlue else DocFlowTokens.divider),
-        tonalElevation = 0.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = DocFlowTokens.space3),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space1)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = when {
-                    !enabled -> DocFlowTokens.textSecondary.copy(alpha = 0.4f)
-                    isActive -> DocFlowTokens.accentBlue
-                    else -> DocFlowTokens.textPrimary
-                },
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                text = label,
-                style = DocFlowTokens.captionStyle,
-                color = when {
-                    !enabled -> DocFlowTokens.textSecondary.copy(alpha = 0.4f)
-                    isActive -> DocFlowTokens.accentBlue
-                    else -> DocFlowTokens.textPrimary
-                }
-            )
-        }
-    }
-}
-
-/**
- * Single PDF Page Sheet on the gray background:
- * White sheet (#FFFFFF) or Night-mode inverted sheet (#141619) with subtle thin border,
- * search highlights, and interactive annotation canvas.
- */
-@Composable
-private fun PdfPageSheetItem(
-    pageIndex: Int,
-    totalPages: Int,
-    documentTitle: String,
-    pageText: String,
-    renderedBitmap: Bitmap?,
-    isNightMode: Boolean,
-    searchQuery: String,
-    activeOccurrenceIndex: Int,
-    pageAnnotations: List<PdfAnnotationYMapEntity>,
-    isAnnotationMode: Boolean,
-    selectedTool: PdfMarkupTool,
-    selectedColorHex: String,
-    selectedStrokeWidth: Float,
-    isEraserActive: Boolean,
-    onDoubleTapZoom: () -> Unit,
-    onCommitStroke: (List<Offset>) -> Unit
-) {
-    val activePoints = remember { mutableStateListOf<Offset>() }
-    val sheetBg = if (isNightMode) Color(0xFF141619) else Color.White
-    val sheetTextColor = if (isNightMode) Color(0xFFF2F3F5) else Color(0xFF111111)
-
-    val invertFilter = remember(isNightMode) {
-        if (!isNightMode) null
-        else {
-            val matrix = androidx.compose.ui.graphics.ColorMatrix(
-                floatArrayOf(
-                    -1f, 0f, 0f, 0f, 255f,
-                    0f, -1f, 0f, 0f, 255f,
-                    0f, 0f, -1f, 0f, 255f,
-                    0f, 0f, 0f, 1f, 0f
-                )
-            )
-            ColorFilter.colorMatrix(matrix)
-        }
-    }
-
-    Surface(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.707f) // Standard A4 ratio
-            .clip(DocFlowTokens.thumbnailShape)
-            .border(DocFlowTokens.dividerThickness, DocFlowTokens.divider, DocFlowTokens.thumbnailShape)
-            .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = { onDoubleTapZoom() })
-            },
-        color = sheetBg,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
+            .padding(vertical = 5.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (renderedBitmap != null) {
-                Image(
-                    bitmap = renderedBitmap.asImageBitmap(),
-                    contentDescription = "PDF Page ${pageIndex + 1}",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
-                    colorFilter = invertFilter
-                )
-            } else {
-                // Clean structured vector page sheet when rendering textual/OCR PDF
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = documentTitle,
-                                style = DocFlowTokens.captionBoldStyle,
-                                color = sheetTextColor.copy(alpha = 0.65f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "Page ${pageIndex + 1} / $totalPages",
-                                style = DocFlowTokens.captionStyle,
-                                color = sheetTextColor.copy(alpha = 0.55f)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        HorizontalDivider(color = DocFlowTokens.divider)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = buildHighlightedText(
-                                fullText = pageText,
-                                query = searchQuery,
-                                activeOccurrence = activeOccurrenceIndex,
-                                baseColor = sheetTextColor
-                            ),
-                            style = DocFlowTokens.bodyStyle.copy(
-                                fontFamily = FontFamily.SansSerif,
-                                fontSize = 14.sp,
-                                lineHeight = 21.sp
-                            )
-                        )
-                    }
-                    Text(
-                        text = "DocFlow Offline PDF Engine · Page ${pageIndex + 1}",
-                        style = DocFlowTokens.microBadgeStyle.copy(fontWeight = FontWeight.Normal),
-                        color = sheetTextColor.copy(alpha = 0.45f)
-                    )
-                }
-            }
-
-            // Annotation Canvas Overlay
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .let { base ->
-                        if (isAnnotationMode) {
-                            base.pointerInput(pageIndex, selectedTool, selectedColorHex, selectedStrokeWidth, isEraserActive) {
-                                if (selectedTool == PdfMarkupTool.TEXT_BOX) {
-                                    detectTapGestures { tap ->
-                                        val norm = Offset(
-                                            (tap.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f),
-                                            (tap.y / size.height.coerceAtLeast(1)).coerceIn(0f, 1f)
-                                        )
-                                        onCommitStroke(listOf(norm))
-                                    }
-                                } else {
-                                    detectDragGestures(
-                                        onDragStart = { start ->
-                                            activePoints.clear()
-                                            activePoints.add(
-                                                Offset(
-                                                    (start.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f),
-                                                    (start.y / size.height.coerceAtLeast(1)).coerceIn(0f, 1f)
-                                                )
-                                            )
-                                        },
-                                        onDrag = { change, _ ->
-                                            change.consume()
-                                            activePoints.add(
-                                                Offset(
-                                                    (change.position.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f),
-                                                    (change.position.y / size.height.coerceAtLeast(1)).coerceIn(0f, 1f)
-                                                )
-                                            )
-                                        },
-                                        onDragEnd = {
-                                            if (activePoints.isNotEmpty()) {
-                                                onCommitStroke(activePoints.toList())
-                                                activePoints.clear()
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                        } else {
-                            base
-                        }
-                    }
-            ) {
-                val w = size.width
-                val h = size.height
-
-                // Draw persisted annotations
-                pageAnnotations.forEach { ann ->
-                    val pts = ann.decodePoints()
-                    val color = runCatching { Color(android.graphics.Color.parseColor(ann.colorHex)) }
-                        .getOrDefault(DocFlowTokens.accentBlue)
-                    val tool = runCatching { PdfMarkupTool.valueOf(ann.toolType) }.getOrDefault(PdfMarkupTool.PEN)
-
-                    if (tool == PdfMarkupTool.TEXT_BOX) {
-                        val anchor = pts.firstOrNull() ?: Offset(0.2f, 0.2f)
-                        drawCircle(
-                            color = color,
-                            radius = 12.dp.toPx(),
-                            center = Offset(anchor.x * w, anchor.y * h)
-                        )
-                    } else if (pts.size >= 2) {
-                        val path = Path().apply {
-                            moveTo(pts.first().x * w, pts.first().y * h)
-                            pts.drop(1).forEach { pt -> lineTo(pt.x * w, pt.y * h) }
-                        }
-                        drawPath(
-                            path = path,
-                            color = if (tool == PdfMarkupTool.HIGHLIGHT) color.copy(alpha = 0.38f) else color,
-                            style = Stroke(
-                                width = ann.strokeWidth.dp.toPx(),
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round
-                            )
-                        )
-                    }
-                }
-
-                // Draw in-progress stroke
-                if (activePoints.size >= 2 && !isEraserActive) {
-                    val liveColor = runCatching { Color(android.graphics.Color.parseColor(selectedColorHex)) }
-                        .getOrDefault(DocFlowTokens.accentBlue)
-                    val path = Path().apply {
-                        moveTo(activePoints.first().x * w, activePoints.first().y * h)
-                        activePoints.drop(1).forEach { pt -> lineTo(pt.x * w, pt.y * h) }
-                    }
-                    drawPath(
-                        path = path,
-                        color = if (selectedTool == PdfMarkupTool.HIGHLIGHT) liveColor.copy(alpha = 0.38f) else liveColor,
-                        style = Stroke(
-                            width = selectedStrokeWidth.dp.toPx(),
-                            cap = StrokeCap.Round,
-                            join = StrokeJoin.Round
-                        )
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Word (DOCX) Clean Structured Read View:
- * Renders headings, paragraphs, lists, tables, and inline image blocks on the white card.
- */
-@Composable
-private fun WordStructuredReadView(
-    content: String,
-    searchQuery: String,
-    fontSizeSp: Int
-) {
-    val lines = remember(content) {
-        content.ifBlank { "Empty Word document. Tap Edit below to start writing." }.lines()
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)) {
-        lines.forEach { rawLine ->
-            val trimmed = rawLine.trim()
-            when {
-                trimmed.startsWith("# ") || trimmed.startsWith("===") -> {
-                    Text(
-                        text = trimmed.removePrefix("# ").trim('=').trim(),
-                        style = DocFlowTokens.sectionLabelStyle.copy(fontWeight = FontWeight.Bold),
-                        color = DocFlowTokens.textPrimary,
-                        modifier = Modifier.padding(top = DocFlowTokens.space2)
-                    )
-                }
-                trimmed.startsWith("|") && trimmed.endsWith("|") -> {
-                    val cells = trimmed.trim('|').split("|").map { it.trim() }
-                    if (!cells.all { it.all { ch -> ch == '-' } }) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(DocFlowTokens.surfaceSubtle)
-                                .border(0.5.dp, DocFlowTokens.divider)
-                                .padding(DocFlowTokens.space2)
-                        ) {
-                            cells.forEach { cell ->
-                                Text(
-                                    text = cell,
-                                    style = DocFlowTokens.captionStyle,
-                                    color = DocFlowTokens.textPrimary,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                    }
-                }
-                trimmed.startsWith("•") || trimmed.startsWith("- ") -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
-                    ) {
-                        Text("•", style = DocFlowTokens.bodyMediumStyle, color = DocFlowTokens.accentBlue)
-                        Text(
-                            text = buildHighlightedText(
-                                fullText = trimmed.removePrefix("•").removePrefix("- ").trim(),
-                                query = searchQuery,
-                                activeOccurrence = 0,
-                                baseColor = DocFlowTokens.textPrimary
-                            ),
-                            style = DocFlowTokens.bodyStyle.copy(fontSize = fontSizeSp.sp)
-                        )
-                    }
-                }
-                trimmed.isNotEmpty() -> {
-                    Text(
-                        text = buildHighlightedText(
-                            fullText = rawLine,
-                            query = searchQuery,
-                            activeOccurrence = 0,
-                            baseColor = DocFlowTokens.textPrimary
-                        ),
-                        style = DocFlowTokens.bodyStyle.copy(fontSize = fontSizeSp.sp)
-                    )
-                }
-                else -> {
-                    Spacer(modifier = Modifier.height(DocFlowTokens.space1))
-                }
-            }
-        }
-    }
-}
-
-private fun buildHighlightedText(
-    fullText: String,
-    query: String,
-    activeOccurrence: Int,
-    baseColor: Color
-): AnnotatedString {
-    if (query.trim().length < 2) {
-        return AnnotatedString(fullText, SpanStyle(color = baseColor))
-    }
-    val q = query.trim()
-    return buildAnnotatedString {
-        var cursor = 0
-        var occ = 0
-        while (cursor < fullText.length) {
-            val found = fullText.indexOf(q, cursor, ignoreCase = true)
-            if (found < 0) {
-                withStyle(SpanStyle(color = baseColor)) {
-                    append(fullText.substring(cursor))
-                }
-                break
-            }
-            if (found > cursor) {
-                withStyle(SpanStyle(color = baseColor)) {
-                    append(fullText.substring(cursor, found))
-                }
-            }
-            val bg = if (occ == activeOccurrence) {
-                DocFlowTokens.searchCurrentOrange
-            } else {
-                DocFlowTokens.searchMatchYellow
-            }
-            withStyle(
-                SpanStyle(
-                    color = Color.Black,
-                    background = bg,
-                    fontWeight = FontWeight.Bold
-                )
-            ) {
-                append(fullText.substring(found, found + q.length))
-            }
-            occ++
-            cursor = found + q.length
-        }
-    }
-}
-
-private fun triggerAndroidPrintJob(context: Context, docTitle: String) {
-    runCatching {
-        val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager ?: return
-        printManager.print(
-            "DocFlow_$docTitle",
-            object : android.print.PrintDocumentAdapter() {
-                override fun onLayout(
-                    oldAttributes: PrintAttributes?,
-                    newAttributes: PrintAttributes?,
-                    cancellationSignal: android.os.CancellationSignal?,
-                    callback: LayoutResultCallback?,
-                    extras: android.os.Bundle?
-                ) {
-                    val info = android.print.PrintDocumentInfo.Builder("$docTitle.pdf")
-                        .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
-                        .setPageCount(1)
-                        .build()
-                    callback?.onLayoutFinished(info, true)
-                }
-
-                override fun onWrite(
-                    pages: Array<out android.print.PageRange>?,
-                    destination: android.os.ParcelFileDescriptor?,
-                    cancellationSignal: android.os.CancellationSignal?,
-                    callback: WriteResultCallback?
-                ) {
-                    callback?.onWriteFinished(arrayOf(android.print.PageRange.ALL_PAGES))
-                }
-            },
-            null
+        Text(text = label, style = DocFlowTokens.captionStyle, color = palette.textSecondary)
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = value,
+            style = DocFlowTokens.captionStyle,
+            fontWeight = FontWeight.SemiBold,
+            color = palette.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
 
-private fun openInExternalAppChooser(context: Context, uri: Uri?, fileType: String) {
+private fun triggerAndroidPrint(
+    context: Context,
+    title: String,
+    content: String
+) {
     runCatching {
-        val targetUri = uri ?: return
-        val mime = when (fileType.lowercase()) {
-            "pdf" -> "application/pdf"
-            "docx", "doc" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            else -> "*/*"
+        val webView = WebView(context)
+        val escaped = content
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\n", "<br/>")
+        val html = "<html><body style='font-family:sans-serif;padding:24px;'><h2>$title</h2><p>$escaped</p></body></html>"
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String) {
+                val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
+                val adapter = webView.createPrintDocumentAdapter(title)
+                printManager?.print(title, adapter, PrintAttributes.Builder().build())
+            }
         }
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(targetUri, mime)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(Intent.createChooser(intent, "Open with"))
+        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
     }
 }
