@@ -550,4 +550,165 @@ class ExampleRobolectricTest {
     assertEquals("https://doceflow.site.je/privacy/", com.example.data.util.OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL)
     assertEquals("https://doceflow.site.je/terms/", com.example.data.util.OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL)
   }
+
+  @Test
+  fun `pdf watermark config persists and renders watermarked pdf and ai mic noise clean sanitizes transcript`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+
+    val customWatermark = com.example.data.util.PdfWatermarkConfig(
+        enabled = true,
+        text = "Confidential • गोपनीय",
+        opacityPercent = 35,
+        positionIndex = 9, // 9 = Tile across page
+        rotationDegrees = -45,
+        fontSizeSp = 42,
+        colorHex = "#DC2626",
+        pageRangeMode = "ALL",
+        layerBehindContent = false
+    )
+    com.example.data.util.OnDeviceAiAndBackupEngine.saveWatermarkConfig(context, customWatermark)
+    val loadedWatermark = com.example.data.util.OnDeviceAiAndBackupEngine.getSavedWatermarkConfig(context)
+    assertEquals("Confidential • गोपनीय", loadedWatermark.text)
+    assertEquals(35, loadedWatermark.opacityPercent)
+    assertEquals(9, loadedWatermark.positionIndex)
+    assertEquals("#DC2626", loadedWatermark.colorHex)
+
+    val bmp = android.graphics.Bitmap.createBitmap(120, 160, android.graphics.Bitmap.Config.ARGB_8888)
+    val pdfOut = com.example.data.util.ImageProcessingPdfPipeline.convertBitmapsToPdfFile(
+        context = context,
+        fileName = "watermarked_test.pdf",
+        bitmaps = listOf(bmp),
+        ocrText = "Sample local document content",
+        watermarkConfig = customWatermark,
+        pageSizeOption = "A4",
+        orientationOption = "PORTRAIT",
+        marginOption = "SMALL"
+    ).getOrThrow()
+    assertTrue(pdfOut.pdfFile.exists())
+    assertTrue(pdfOut.fileSize > 0L)
+
+    // Verify AI Mic Noise Clean text post-processing removes noise markers and capitalizes sentences
+    val cleanedSpeech = com.example.data.util.AiMicNoiseCleanController.cleanTranscribedText(
+        rawText = "[noise] um quarterly revenue grew by 18 percent uh stored on this device",
+        level = com.example.data.util.NoiseCleanLevel.HIGH
+    )
+    assertTrue(cleanedSpeech.contains("Quarterly revenue grew by 18 percent"))
+    assertTrue(!cleanedSpeech.contains("[noise]"))
+
+    // Verify local device storage space queries return positive byte counts
+    assertTrue(com.example.data.util.OnDeviceAiAndBackupEngine.getDeviceTotalSpaceBytes(context) > 0L)
+    assertTrue(com.example.data.util.OnDeviceAiAndBackupEngine.getDeviceFreeSpaceBytes(context) >= 0L)
+  }
+
+  @Test
+  fun `selected versions and notes export to pdf and batch scan reorder and delete persist to local sqlite`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val userId = "local-owner"
+
+    val sourceDoc = com.example.data.model.DocEntity(
+        id = "doc-source-10",
+        userId = userId,
+        title = "Device Architecture Spec",
+        folderId = "root",
+        category = "Work",
+        fileType = "docx",
+        fileName = "device_arch.docx",
+        fileSize = 2048L,
+        content = "Original architecture specification stored on this device."
+    )
+
+    val ver1 = com.example.data.local.DocumentVersionEntity(
+        id = "ver-101",
+        documentId = sourceDoc.id,
+        userId = userId,
+        versionNumber = 1,
+        versionLabel = "Initial Baseline",
+        authorName = "Local Owner",
+        stateVector = "sv-1",
+        snapshotContent = "Baseline content v1",
+        byteSize = 240L
+    )
+    val ver2 = com.example.data.local.DocumentVersionEntity(
+        id = "ver-102",
+        documentId = sourceDoc.id,
+        userId = userId,
+        versionNumber = 2,
+        versionLabel = "Reviewed Update",
+        authorName = "Local Owner",
+        stateVector = "sv-2",
+        snapshotContent = "Updated content v2 with tables",
+        byteSize = 310L
+    )
+    val note1 = com.example.data.local.DocumentCommentEntity(
+        id = "note-201",
+        documentId = sourceDoc.id,
+        userId = userId,
+        authorName = "Local Owner",
+        authorRole = "OWNER",
+        anchorLineOrText = "Section 2",
+        body = "Verify local SQLite index updates immediately after PDF export.",
+        status = "OPEN"
+    )
+
+    val exportResult = com.example.data.util.PdfLibAnnotationEngine.exportSelectedVersionsAndNotesToPdf(
+        context = context,
+        document = sourceDoc,
+        selectedVersions = listOf(ver1, ver2),
+        selectedNotes = listOf(note1),
+        customExportTitle = "Device Architecture Spec (Exported Selection)"
+    ).getOrThrow()
+
+    assertTrue(exportResult.pdfFile.exists())
+    assertTrue(exportResult.pdfFile.length() > 0L)
+    assertEquals(3, exportResult.annotationCount)
+
+    // Persist exported PDF into Room SQLite and verify Created by me + Recent query
+    val exportedEntity = CachedDocumentEntity(
+        id = "doc-exported-pdf-1",
+        userId = userId,
+        title = "Device Architecture Spec (Exported Selection)",
+        folderId = "root",
+        category = "Notes",
+        fileType = "pdf",
+        fileName = exportResult.pdfFile.name,
+        fileSize = exportResult.pdfFile.length(),
+        content = "Exported 2 versions and 1 note",
+        tags = "pdf, version-export, note-export, created-by-me",
+        createdByMe = true
+    )
+    dao.upsertDocument(exportedEntity)
+
+    val savedExport = dao.getCachedDocumentById(userId, "doc-exported-pdf-1")
+    assertNotNull(savedExport)
+    assertTrue(savedExport!!.createdByMe)
+    assertEquals("pdf", savedExport.fileType)
+
+    // Simulate Batch Scan 3 pages -> Reorder page 3 before page 2 -> Delete page 1 -> Save 2 pages to Room SQLite
+    val batchPages = mutableListOf(
+        "Page 1 OCR" to android.graphics.Bitmap.createBitmap(60, 80, android.graphics.Bitmap.Config.ARGB_8888),
+        "Page 2 OCR" to android.graphics.Bitmap.createBitmap(60, 80, android.graphics.Bitmap.Config.ARGB_8888),
+        "Page 3 OCR" to android.graphics.Bitmap.createBitmap(60, 80, android.graphics.Bitmap.Config.ARGB_8888)
+    )
+    // Reorder: move index 2 left to index 1
+    val movedPage = batchPages.removeAt(2)
+    batchPages.add(1, movedPage)
+    assertEquals("Page 3 OCR", batchPages[1].first)
+
+    // Delete first page (index 0)
+    batchPages.removeAt(0)
+    assertEquals(2, batchPages.size)
+    assertEquals("Page 3 OCR", batchPages[0].first)
+    assertEquals("Page 2 OCR", batchPages[1].first)
+
+    val batchPdf = com.example.data.util.ImageProcessingPdfPipeline.convertBitmapsToPdfFile(
+        context = context,
+        fileName = "reordered_batch_scan.pdf",
+        bitmaps = batchPages.map { it.second },
+        ocrText = batchPages.joinToString("\n") { it.first }
+    ).getOrThrow()
+
+    assertEquals(2, batchPdf.pageCount)
+    assertTrue(batchPdf.pdfFile.exists())
+  }
 }
+

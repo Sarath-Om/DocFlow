@@ -189,6 +189,79 @@ object PdfLibAnnotationEngine {
         }
     }
 
+    /**
+     * Exports a user-selected subset of individual document versions and/or notes into a single
+     * structured PDF file stored on the device.
+     */
+    suspend fun exportSelectedVersionsAndNotesToPdf(
+        context: Context,
+        document: DocEntity,
+        selectedVersions: List<DocumentVersionEntity>,
+        selectedNotes: List<DocumentCommentEntity>,
+        customExportTitle: String = ""
+    ): Result<AnnotatedPdfExportResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            val nowStr = SimpleDateFormat("MMM dd, yyyy HH:mm:ss", Locale.US).format(Date())
+            val totalItems = (selectedVersions.size + selectedNotes.size).coerceAtLeast(1)
+            val resolvedTitle = customExportTitle.trim().ifBlank {
+                "${document.title} (Exported Selection)"
+            }
+
+            val structuredText = buildString {
+                appendLine("=== DOCFLOW LOCAL PDF EXPORT: $resolvedTitle ===")
+                appendLine("Source Document: ${document.title} (${document.fileName})")
+                appendLine("Storage Location: Stored on this device")
+                appendLine("Export Timestamp: $nowStr")
+                appendLine("Selected Versions: ${selectedVersions.size}   |   Selected Notes: ${selectedNotes.size}")
+                appendLine()
+
+                if (selectedVersions.isNotEmpty()) {
+                    appendLine("=== SELECTED DOCUMENT VERSIONS (${selectedVersions.size}) ===")
+                    selectedVersions.forEachIndexed { idx, ver ->
+                        val verDate = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.US).format(Date(ver.createdAtMillis))
+                        appendLine("Version ${idx + 1}: v${ver.versionNumber} — ${ver.versionLabel}")
+                        appendLine("Author: ${ver.authorName}   |   Saved: $verDate   |   Size: ${ver.byteSize} bytes")
+                        appendLine("Snapshot Content:")
+                        appendLine(ver.snapshotContent.ifBlank { "(Empty Version Snapshot)" })
+                        appendLine()
+                    }
+                }
+
+                if (selectedNotes.isNotEmpty()) {
+                    appendLine("=== SELECTED DOCUMENT NOTES & COMMENTS (${selectedNotes.size}) ===")
+                    selectedNotes.forEachIndexed { idx, note ->
+                        val noteDate = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.US).format(Date(note.createdAtMillis))
+                        appendLine("Note ${idx + 1}: [${note.status}] By ${note.authorName} (${note.authorRole}) • $noteDate")
+                        if (note.anchorLineOrText.isNotBlank()) {
+                            appendLine("Anchor: \"${note.anchorLineOrText}\"")
+                        }
+                        appendLine(note.body)
+                        if (note.isSuggestion && note.suggestedReplacement.isNotBlank()) {
+                            appendLine("+ Suggested Replacement: ${note.suggestedReplacement}")
+                        }
+                        appendLine()
+                    }
+                }
+            }
+
+            val cleanBase = resolvedTitle.lowercase(Locale.US)
+                .replace(Regex("[^a-z0-9]+"), "_")
+                .trim('_')
+                .ifBlank { "docflow_export" }
+            val fileName = "${cleanBase}_${System.currentTimeMillis() % 100000}.pdf"
+
+            renderStructuredExportToPdf(
+                context = context,
+                outputFileName = fileName,
+                headerBrand = "DOCFLOW LOCAL EXPORT • ${selectedVersions.size} VERSION(S) & ${selectedNotes.size} NOTE(S)",
+                headerTitle = resolvedTitle,
+                headerMeta = "STORED ON THIS DEVICE   |   EXPORTED: $nowStr",
+                bodyContent = structuredText,
+                annotationCount = totalItems
+            )
+        }
+    }
+
     private fun renderStructuredExportToPdf(
         context: Context,
         outputFileName: String,

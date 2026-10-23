@@ -57,6 +57,8 @@ import androidx.compose.material.icons.filled.Slideshow
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -1108,6 +1110,56 @@ fun ToolsScreen(
             if (activeDoc == null) allVersions else allVersions.filter { it.documentId == activeDoc.id }
         }
 
+        val effectiveVersions = remember(versionsForActiveDoc, activeDoc?.id, activeDoc?.content) {
+            if (versionsForActiveDoc.isNotEmpty()) {
+                versionsForActiveDoc
+            } else if (activeDoc != null) {
+                listOf(
+                    DocumentVersionEntity(
+                        id = "ver_baseline_${activeDoc.id}",
+                        documentId = activeDoc.id,
+                        userId = viewModel.currentUserId,
+                        versionNumber = 1,
+                        versionLabel = "Current Local Version",
+                        authorName = "Local Owner",
+                        stateVector = "sv-1",
+                        snapshotContent = activeDoc.content,
+                        byteSize = activeDoc.fileSize
+                    )
+                )
+            } else emptyList()
+        }
+
+        val effectiveNotes = remember(commentsForActiveDoc, activeDoc?.id, activeDoc?.content) {
+            if (commentsForActiveDoc.isNotEmpty()) {
+                commentsForActiveDoc
+            } else if (activeDoc != null) {
+                listOf(
+                    DocumentCommentEntity(
+                        id = "note_summary_${activeDoc.id}",
+                        documentId = activeDoc.id,
+                        userId = viewModel.currentUserId,
+                        authorName = "Local Owner",
+                        authorRole = "OWNER",
+                        anchorLineOrText = activeDoc.title,
+                        body = activeDoc.content.take(400).ifBlank { "Local note for ${activeDoc.title}" },
+                        status = "OPEN"
+                    )
+                )
+            } else emptyList()
+        }
+
+        val selectedVersionIds = remember(activeDoc?.id) {
+            mutableStateListOf<String>().apply {
+                effectiveVersions.firstOrNull()?.let { add(it.id) }
+            }
+        }
+        val selectedNoteIds = remember(activeDoc?.id) { mutableStateListOf<String>() }
+        var customExportPdfTitle by remember(activeDoc?.id) {
+            mutableStateOf(activeDoc?.let { "${it.title} (Exported PDF)" } ?: "Exported Selection")
+        }
+        var quickNoteDraft by remember { mutableStateOf("") }
+
         ModalBottomSheet(
             onDismissRequest = { showExportVersionsNotesSheet = false },
             containerColor = palette.surface,
@@ -1151,22 +1203,65 @@ fun ToolsScreen(
 
                 Spacer(modifier = Modifier.height(DocFlowTokens.space2))
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = exportTabMode == 0,
-                        onClick = { exportTabMode = 0 },
-                        label = { Text("Document Versions (${versionsForActiveDoc.size})") },
-                        modifier = Modifier.testTag("export_pdf_tab_versions")
+                if (activeDoc != null) {
+                    OutlinedTextField(
+                        value = customExportPdfTitle,
+                        onValueChange = { customExportPdfTitle = it },
+                        label = { Text("Output PDF Title (Stored on this device)") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_pdf_custom_title_input")
                     )
-                    FilterChip(
-                        selected = exportTabMode == 1,
-                        onClick = { exportTabMode = 1 },
-                        label = { Text("Document Notes (${commentsForActiveDoc.size})") },
-                        modifier = Modifier.testTag("export_pdf_tab_notes")
-                    )
+                    Spacer(modifier = Modifier.height(DocFlowTokens.space2))
                 }
 
-                Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = exportTabMode == 0,
+                            onClick = { exportTabMode = 0 },
+                            label = { Text("Versions (${effectiveVersions.size})") },
+                            modifier = Modifier.testTag("export_pdf_tab_versions")
+                        )
+                        FilterChip(
+                            selected = exportTabMode == 1,
+                            onClick = { exportTabMode = 1 },
+                            label = { Text("Notes (${effectiveNotes.size})") },
+                            modifier = Modifier.testTag("export_pdf_tab_notes")
+                        )
+                    }
+                    if (activeDoc != null) {
+                        TextButton(
+                            onClick = {
+                                if (exportTabMode == 0) {
+                                    if (selectedVersionIds.size == effectiveVersions.size) {
+                                        selectedVersionIds.clear()
+                                    } else {
+                                        selectedVersionIds.clear()
+                                        selectedVersionIds.addAll(effectiveVersions.map { it.id })
+                                    }
+                                } else {
+                                    if (selectedNoteIds.size == effectiveNotes.size) {
+                                        selectedNoteIds.clear()
+                                    } else {
+                                        selectedNoteIds.clear()
+                                        selectedNoteIds.addAll(effectiveNotes.map { it.id })
+                                    }
+                                }
+                            },
+                            modifier = Modifier.testTag("export_pdf_select_all_button")
+                        ) {
+                            Text("Select All", color = DocFlowTokens.AccentBlue)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(DocFlowTokens.space1))
 
                 if (activeDoc == null) {
                     DocFlowEmptyState(
@@ -1176,99 +1271,196 @@ fun ToolsScreen(
                         palette = palette
                     )
                 } else if (exportTabMode == 0) {
-                    if (versionsForActiveDoc.isEmpty()) {
-                        // Offer exporting current baseline version snapshot
+                    effectiveVersions.forEachIndexed { idx, ver ->
+                        val isChecked = selectedVersionIds.contains(ver.id)
                         DocFlowListRow(
-                            title = "${activeDoc.title} — Current Version (v1)",
-                            subtitle = "Export current document version snapshot to PDF",
+                            title = "v${ver.versionNumber}: ${ver.versionLabel}",
+                            subtitle = "Author: ${ver.authorName} • ${ver.byteSize} bytes • Stored on this device",
                             palette = palette,
+                            modifier = Modifier.testTag("export_version_row_$idx"),
                             onClick = {
-                                val snapshotVer = DocumentVersionEntity(
-                                    id = "ver_${System.currentTimeMillis()}",
-                                    documentId = activeDoc.id,
-                                    userId = viewModel.currentUserId,
-                                    versionNumber = 1,
-                                    versionLabel = "Current Local Version",
-                                    authorName = "Local Owner",
-                                    stateVector = "sv-1",
-                                    snapshotContent = activeDoc.content,
-                                    byteSize = activeDoc.fileSize
-                                )
-                                viewModel.exportVersionSnapshotAsPdf(context, activeDoc, snapshotVer)
-                                showExportVersionsNotesSheet = false
+                                if (isChecked) selectedVersionIds.remove(ver.id)
+                                else selectedVersionIds.add(ver.id)
                             },
                             leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Filled.PictureAsPdf,
-                                    circleColor = DocFlowTokens.IconCircleRed
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { checked ->
+                                        if (checked) {
+                                            if (!selectedVersionIds.contains(ver.id)) selectedVersionIds.add(ver.id)
+                                        } else {
+                                            selectedVersionIds.remove(ver.id)
+                                        }
+                                    },
+                                    colors = CheckboxDefaults.colors(checkedColor = DocFlowTokens.AccentBlue),
+                                    modifier = Modifier.testTag("export_version_checkbox_$idx")
                                 )
+                            },
+                            trailing = {
+                                TextButton(
+                                    onClick = {
+                                        viewModel.exportSelectedVersionsAndNotesAsPdf(
+                                            context = context,
+                                            doc = activeDoc,
+                                            selectedVersions = listOf(ver),
+                                            selectedNotes = emptyList(),
+                                            customTitle = "${activeDoc.title} — v${ver.versionNumber} (${ver.versionLabel})",
+                                            onExported = { createdId, outTitle, summary ->
+                                                showExportVersionsNotesSheet = false
+                                                conversionSuccess = ConversionSuccessState(
+                                                    createdDocId = createdId,
+                                                    outputTitle = outTitle,
+                                                    outputFormat = "PDF",
+                                                    summaryDetail = summary
+                                                )
+                                            }
+                                        )
+                                    }
+                                ) {
+                                    Text("Export", color = DocFlowTokens.AccentBlue)
+                                }
                             }
                         )
-                    } else {
-                        versionsForActiveDoc.forEach { ver ->
-                            DocFlowListRow(
-                                title = "v${ver.versionNumber}: ${ver.versionLabel}",
-                                subtitle = "Author: ${ver.authorName} • Tap to generate PDF",
-                                palette = palette,
-                                onClick = {
-                                    viewModel.exportVersionSnapshotAsPdf(context, activeDoc, ver)
-                                    showExportVersionsNotesSheet = false
-                                },
-                                leading = {
-                                    DocFlowIconCircle(
-                                        icon = Icons.Filled.History,
-                                        circleColor = DocFlowTokens.AccentBlue
-                                    )
-                                }
-                            )
-                        }
                     }
+
+                    Spacer(modifier = Modifier.height(DocFlowTokens.space1))
+                    DocFlowSecondaryButton(
+                        text = "+ Save Current Snapshot as New Version",
+                        onClick = {
+                            viewModel.saveNewVersionSnapshot(
+                                doc = activeDoc,
+                                plainContent = activeDoc.content,
+                                versionLabel = "Snapshot v${effectiveVersions.size + 1}"
+                            )
+                        },
+                        palette = palette,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_pdf_create_snapshot_button")
+                    )
                 } else {
-                    if (commentsForActiveDoc.isEmpty()) {
+                    effectiveNotes.forEachIndexed { idx, comment ->
+                        val isChecked = selectedNoteIds.contains(comment.id)
                         DocFlowListRow(
-                            title = "Export Summary Note for '${activeDoc.title}'",
-                            subtitle = "Generate a standalone PDF note from this document's local notes",
+                            title = comment.body.take(48),
+                            subtitle = "By ${comment.authorName} • Anchor: ${comment.anchorLineOrText}",
                             palette = palette,
+                            modifier = Modifier.testTag("export_note_row_$idx"),
                             onClick = {
-                                val adhocNote = DocumentCommentEntity(
-                                    id = "note_${System.currentTimeMillis()}",
-                                    documentId = activeDoc.id,
-                                    userId = viewModel.currentUserId,
-                                    authorName = "Local Owner",
-                                    authorRole = "OWNER",
-                                    anchorLineOrText = activeDoc.title,
-                                    body = activeDoc.content.take(400),
-                                    status = "OPEN"
-                                )
-                                viewModel.exportCommentOrNoteAsPdf(context, activeDoc, adhocNote)
-                                showExportVersionsNotesSheet = false
+                                if (isChecked) selectedNoteIds.remove(comment.id)
+                                else selectedNoteIds.add(comment.id)
                             },
                             leading = {
-                                DocFlowIconCircle(
-                                    icon = Icons.Filled.PictureAsPdf,
-                                    circleColor = DocFlowTokens.IconCircleGreen
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { checked ->
+                                        if (checked) {
+                                            if (!selectedNoteIds.contains(comment.id)) selectedNoteIds.add(comment.id)
+                                        } else {
+                                            selectedNoteIds.remove(comment.id)
+                                        }
+                                    },
+                                    colors = CheckboxDefaults.colors(checkedColor = DocFlowTokens.AccentBlue),
+                                    modifier = Modifier.testTag("export_note_checkbox_$idx")
                                 )
+                            },
+                            trailing = {
+                                TextButton(
+                                    onClick = {
+                                        viewModel.exportSelectedVersionsAndNotesAsPdf(
+                                            context = context,
+                                            doc = activeDoc,
+                                            selectedVersions = emptyList(),
+                                            selectedNotes = listOf(comment),
+                                            customTitle = "${activeDoc.title} — Note (${comment.authorName})",
+                                            onExported = { createdId, outTitle, summary ->
+                                                showExportVersionsNotesSheet = false
+                                                conversionSuccess = ConversionSuccessState(
+                                                    createdDocId = createdId,
+                                                    outputTitle = outTitle,
+                                                    outputFormat = "PDF",
+                                                    summaryDetail = summary
+                                                )
+                                            }
+                                        )
+                                    }
+                                ) {
+                                    Text("Export", color = DocFlowTokens.AccentBlue)
+                                }
                             }
                         )
-                    } else {
-                        commentsForActiveDoc.forEach { comment ->
-                            DocFlowListRow(
-                                title = comment.body.take(48),
-                                subtitle = "By ${comment.authorName} • Anchor: ${comment.anchorLineOrText}",
-                                palette = palette,
-                                onClick = {
-                                    viewModel.exportCommentOrNoteAsPdf(context, activeDoc, comment)
+                    }
+
+                    Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = quickNoteDraft,
+                            onValueChange = { quickNoteDraft = it },
+                            label = { Text("Add quick note to export") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("export_pdf_quick_note_input")
+                        )
+                        DocFlowSecondaryButton(
+                            text = "Add Note",
+                            onClick = {
+                                if (quickNoteDraft.isNotBlank()) {
+                                    viewModel.addDocumentComment(
+                                        doc = activeDoc,
+                                        anchorLineOrText = activeDoc.title,
+                                        body = quickNoteDraft.trim(),
+                                        isSuggestion = false,
+                                        suggestedReplacement = ""
+                                    )
+                                    quickNoteDraft = ""
+                                }
+                            },
+                            palette = palette,
+                            modifier = Modifier.testTag("export_pdf_add_note_button")
+                        )
+                    }
+                }
+
+                if (activeDoc != null) {
+                    val chosenVersions = effectiveVersions.filter { selectedVersionIds.contains(it.id) }
+                    val chosenNotes = effectiveNotes.filter { selectedNoteIds.contains(it.id) }
+                    val totalSelected = chosenVersions.size + chosenNotes.size
+
+                    Spacer(modifier = Modifier.height(DocFlowTokens.space3))
+                    DocFlowPrimaryButton(
+                        text = if (totalSelected > 0) {
+                            "Generate PDF ($totalSelected selected)"
+                        } else {
+                            "Select Version or Note to Export"
+                        },
+                        enabled = totalSelected > 0,
+                        onClick = {
+                            viewModel.exportSelectedVersionsAndNotesAsPdf(
+                                context = context,
+                                doc = activeDoc,
+                                selectedVersions = chosenVersions,
+                                selectedNotes = chosenNotes,
+                                customTitle = customExportPdfTitle,
+                                onExported = { createdId, outTitle, summary ->
                                     showExportVersionsNotesSheet = false
-                                },
-                                leading = {
-                                    DocFlowIconCircle(
-                                        icon = Icons.Filled.Description,
-                                        circleColor = DocFlowTokens.IconCircleGreen
+                                    conversionSuccess = ConversionSuccessState(
+                                        createdDocId = createdId,
+                                        outputTitle = outTitle,
+                                        outputFormat = "PDF",
+                                        summaryDetail = summary
                                     )
                                 }
                             )
-                        }
-                    }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_pdf_generate_selected_button")
+                    )
                 }
                 Spacer(modifier = Modifier.height(DocFlowTokens.space4))
             }

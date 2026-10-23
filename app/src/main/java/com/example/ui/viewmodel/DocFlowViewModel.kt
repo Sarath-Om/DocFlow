@@ -2723,7 +2723,8 @@ class DocFlowViewModel(
                     pageCount = 1L,
                     localPdfPath = resultObj.pdfFile.absolutePath,
                     generatedPdfUri = resultObj.shareUri,
-                    customTags = "pdf, version-export, v${version.versionNumber}, snapshot"
+                    customTags = "pdf, version-export, v${version.versionNumber}, snapshot, created-by-me",
+                    createdByMe = true
                 )
                 recordSyncLog(
                     docId = doc.id,
@@ -2787,7 +2788,8 @@ class DocFlowViewModel(
                     pageCount = 1L,
                     localPdfPath = resultObj.pdfFile.absolutePath,
                     generatedPdfUri = resultObj.shareUri,
-                    customTags = "pdf, note-export, comment, ${comment.status.lowercase()}"
+                    customTags = "pdf, note-export, comment, ${comment.status.lowercase()}, created-by-me",
+                    createdByMe = true
                 )
                 recordSyncLog(
                     docId = doc.id,
@@ -2846,7 +2848,8 @@ class DocFlowViewModel(
                     pageCount = 1L,
                     localPdfPath = resultObj.pdfFile.absolutePath,
                     generatedPdfUri = resultObj.shareUri,
-                    customTags = "pdf, notes-report, comments"
+                    customTags = "pdf, notes-report, comments, created-by-me",
+                    createdByMe = true
                 )
                 _statusBannerMessage.value = "Exported ${resultObj.annotationCount} note(s) as PDF (${resultObj.pdfFile.name})"
                 PdfLibAnnotationEngine.launchSystemShareSheet(
@@ -2855,6 +2858,89 @@ class DocFlowViewModel(
                     plainContent = reportText,
                     exportedPdfResult = resultObj
                 )
+            }
+        }
+    }
+
+    /**
+     * Exports user-selected individual document versions and/or notes to a PDF file stored on the device,
+     * indexes the result in the Room SQLite database + FTS4 table, and invokes [onExported] with the created document ID.
+     */
+    fun exportSelectedVersionsAndNotesAsPdf(
+        context: Context,
+        doc: DocEntity,
+        selectedVersions: List<DocumentVersionEntity>,
+        selectedNotes: List<DocumentCommentEntity>,
+        customTitle: String = "",
+        launchShareSheet: Boolean = false,
+        onExported: (createdDocId: String, title: String, summary: String) -> Unit = { _, _, _ -> }
+    ) {
+        if (selectedVersions.isEmpty() && selectedNotes.isEmpty()) return
+        viewModelScope.launch {
+            val exportRes = PdfLibAnnotationEngine.exportSelectedVersionsAndNotesToPdf(
+                context = context,
+                document = doc,
+                selectedVersions = selectedVersions,
+                selectedNotes = selectedNotes,
+                customExportTitle = customTitle
+            )
+            val resultObj = exportRes.getOrNull()
+            if (resultObj != null) {
+                val resolvedTitle = customTitle.trim().ifBlank {
+                    when {
+                        selectedVersions.size == 1 && selectedNotes.isEmpty() ->
+                            "${doc.title} — v${selectedVersions.first().versionNumber} (${selectedVersions.first().versionLabel})"
+                        selectedVersions.isEmpty() && selectedNotes.size == 1 ->
+                            "${doc.title} — Note (${selectedNotes.first().authorName})"
+                        else ->
+                            "${doc.title} (${selectedVersions.size} ver, ${selectedNotes.size} notes)"
+                    }
+                }
+                val combinedPlain = buildString {
+                    selectedVersions.forEach { v ->
+                        appendLine("=== v${v.versionNumber}: ${v.versionLabel} (${v.authorName}) ===")
+                        appendLine(v.snapshotContent)
+                        appendLine()
+                    }
+                    selectedNotes.forEach { n ->
+                        appendLine("=== Note by ${n.authorName} [${n.status}] ===")
+                        appendLine(n.body)
+                        appendLine()
+                    }
+                }.trim()
+                val pageEst = (selectedVersions.size + selectedNotes.size).toLong().coerceAtLeast(1L)
+                createOrScanDocument(
+                    title = resolvedTitle,
+                    folderId = doc.folderId,
+                    category = doc.category.ifBlank { "Notes" },
+                    fileType = "pdf",
+                    fileName = resultObj.pdfFile.name,
+                    plainContent = combinedPlain,
+                    isEncrypted = false,
+                    password = "",
+                    encryptionKeyHint = null,
+                    isOfflineCached = true,
+                    pageCount = pageEst,
+                    localPdfPath = resultObj.pdfFile.absolutePath,
+                    generatedPdfUri = resultObj.shareUri,
+                    customTags = "pdf, version-export, note-export, created-by-me",
+                    createdByMe = true,
+                    onCreated = { createdId ->
+                        val summary = "Generated PDF from ${selectedVersions.size} version(s) and ${selectedNotes.size} note(s) • Stored on this device"
+                        _statusBannerMessage.value = "$summary (${resultObj.pdfFile.name})"
+                        onExported(createdId, resolvedTitle, summary)
+                        if (launchShareSheet) {
+                            PdfLibAnnotationEngine.launchSystemShareSheet(
+                                context = context,
+                                document = doc,
+                                plainContent = combinedPlain,
+                                exportedPdfResult = resultObj
+                            )
+                        }
+                    }
+                )
+            } else {
+                _statusBannerMessage.value = "Failed to export selected versions/notes to PDF: ${exportRes.exceptionOrNull()?.localizedMessage}"
             }
         }
     }

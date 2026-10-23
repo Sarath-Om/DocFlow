@@ -273,10 +273,15 @@ class AiMicNoiseCleanController(
 
             // Remove common background noise artifacts & filler hesitations when High or Studio Clean is enabled
             if (level != NoiseCleanLevel.STANDARD) {
-                text = text.replace(
-                    Regex("\\b(um+|uh+|erm+|ah+|hmm+|\\[noise\\]|\\[background\\]|\\[static\\])\\b", RegexOption.IGNORE_CASE),
-                    " "
-                )
+                text = text
+                    .replace(
+                        Regex("(\\[noise\\]|\\[background\\]|\\[static\\]|\\[cough\\])", RegexOption.IGNORE_CASE),
+                        " "
+                    )
+                    .replace(
+                        Regex("\\b(um+|uh+|erm+|ah+|hmm+)\\b", RegexOption.IGNORE_CASE),
+                        " "
+                    )
             }
 
             // Convert spoken punctuation into clean document symbols
