@@ -107,6 +107,7 @@ import com.example.ui.components.DocFlowEmptyState
 import com.example.ui.components.DocFlowHeaderAction
 import com.example.ui.components.DocFlowIconCircle
 import com.example.ui.components.DocFlowListRow
+import com.example.ui.components.DocFlowNewDocumentDialog
 import com.example.ui.components.DocFlowPrimaryButton
 import com.example.ui.components.DocFlowProgressBar
 import com.example.ui.components.DocFlowScreenHeader
@@ -453,8 +454,8 @@ fun ToolsScreen(
                 contentPadding = PaddingValues(vertical = DocFlowTokens.space1)
             ) {
                 DocFlowListRow(
-                    title = "Create Doc, PPT & XLS (Open in Word UI)",
-                    subtitle = "Author Word (.docx), PowerPoint (.pptx), or Excel (.xlsx) on this device",
+                    title = "New document",
+                    subtitle = "Create Word (.docx), PowerPoint (.pptx), or Excel (.xlsx) • Stored on this device",
                     palette = palette,
                     onClick = {
                         createOfficeFormat = "docx"
@@ -649,7 +650,7 @@ fun ToolsScreen(
                                 )
                                 Text(
                                     text = "Page ${index + 1}",
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = palette.textPrimary
                                 )
@@ -1596,80 +1597,53 @@ fun ToolsScreen(
         )
     }
 
-    // Create Word / PPT / XLS Dialog
+    var pendingNewDocAiMicCallback by remember { mutableStateOf<((String) -> Unit)?>(null) }
+
+    // "New document" Dialog (Section 2A: solid surface, 28dp radius, 3 equal-width chips, empty body = 0 words)
     if (showCreateOfficeDialog) {
-        AlertDialog(
-            onDismissRequest = { showCreateOfficeDialog = false },
-            title = { Text("Create Doc / PPT / XLS", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("docx" to "Word (.docx)", "pptx" to "PPT (.pptx)", "xlsx" to "Excel (.xlsx)").forEach { (ext, label) ->
-                            FilterChip(
-                                selected = createOfficeFormat == ext,
-                                onClick = { createOfficeFormat = ext },
-                                label = { Text(label, fontSize = 12.sp) }
-                            )
-                        }
-                    }
-                    OutlinedTextField(
-                        value = createOfficeTitle,
-                        onValueChange = { createOfficeTitle = it },
-                        label = { Text("Document Title") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = createOfficeBody,
-                        onValueChange = { createOfficeBody = it },
-                        label = { Text("Initial Content") },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+        DocFlowNewDocumentDialog(
+            palette = palette,
+            existingTitles = documents.map { it.title },
+            initialFormat = createOfficeFormat,
+            onDismiss = { showCreateOfficeDialog = false },
+            onOpenAiMic = { callback ->
+                pendingNewDocAiMicCallback = callback
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val ext = createOfficeFormat.lowercase()
-                        val title = createOfficeTitle.trim().ifBlank {
-                            when (ext) {
-                                "pptx" -> "New Presentation"
-                                "xlsx" -> "New Spreadsheet"
-                                else -> "New Word Document"
-                            }
-                        }
-                        val cleanName = title.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
-                            .ifBlank { "office_doc" } + ".$ext"
-                        val body = createOfficeBody.ifBlank { title }
-                        viewModel.createOrScanDocument(
-                            title = title,
-                            folderId = "root",
-                            category = "Work",
-                            fileType = ext,
-                            fileName = cleanName,
-                            plainContent = body,
-                            isEncrypted = false,
-                            password = "",
-                            encryptionKeyHint = null,
-                            isOfflineCached = true,
-                            pageCount = 1L,
-                            customTags = "created-by-me, $ext",
-                            createdByMe = true,
-                            onCreated = { createdId ->
-                                showCreateOfficeDialog = false
-                                onOpenDocument(createdId)
-                            }
-                        )
+            onCreateDocument = { uniqueTitle, ext, initialContent ->
+                val cleanName = uniqueTitle.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+                    .ifBlank { "untitled" } + ".$ext"
+                viewModel.createOrScanDocument(
+                    title = uniqueTitle,
+                    folderId = "root",
+                    category = "Work",
+                    fileType = ext,
+                    fileName = cleanName,
+                    plainContent = initialContent,
+                    isEncrypted = false,
+                    password = "",
+                    encryptionKeyHint = null,
+                    isOfflineCached = true,
+                    pageCount = 1L,
+                    customTags = "created-by-me, $ext",
+                    createdByMe = true,
+                    onCreated = { createdId ->
+                        showCreateOfficeDialog = false
+                        onOpenDocument(createdId)
                     }
-                ) {
-                    Text("Create & Open", fontWeight = FontWeight.Bold, color = DocFlowTokens.AccentBlue)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateOfficeDialog = false }) {
-                    Text("Cancel")
-                }
+                )
+            }
+        )
+    }
+
+    pendingNewDocAiMicCallback?.let { micCallback ->
+        AiMicDictationBottomSheet(
+            palette = palette,
+            initialText = "",
+            confirmButtonLabel = "Insert Text",
+            onDismiss = { pendingNewDocAiMicCallback = null },
+            onConfirmCleanText = { dictated ->
+                micCallback(dictated)
+                pendingNewDocAiMicCallback = null
             }
         )
     }

@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.CachedDocumentEntity
+import com.example.data.util.DocFlowLegalConstants
 import com.example.data.util.OnDeviceAiAndBackupEngine
 import com.example.data.util.TranslationLanguage
 import com.example.ui.components.DocFlowBottomSheet
@@ -77,6 +78,7 @@ import com.example.ui.components.DocFlowDialog
 import com.example.ui.components.DocFlowDivider
 import com.example.ui.components.DocFlowEmptyState
 import com.example.ui.components.DocFlowIconCircle
+import com.example.ui.components.DocFlowInAppLegalViewerDialog
 import com.example.ui.components.DocFlowListRow
 import com.example.ui.components.DocFlowPrimaryButton
 import com.example.ui.components.DocFlowProgressBar
@@ -692,30 +694,20 @@ fun SettingsScreen(
                         modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin)
                     )
 
-                    // Row 2: Privacy Policy Link (https://doceflow.site.je/privacy/)
+                    // Row 2: Privacy Policy Link (opens in-app with chevron)
                     DocFlowListRow(
                         title = "Privacy Policy",
-                        subtitle = OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL,
+                        subtitle = DocFlowLegalConstants.PRIVACY_POLICY_URL,
                         palette = palette,
+                        showChevron = true,
                         onClick = {
-                            openExternalUrl(
-                                url = OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL,
-                                onFallback = { showPrivacyOfflineFallbackSheet = true }
-                            )
+                            showPrivacyOfflineFallbackSheet = true
                         },
                         modifier = Modifier.testTag("settings_row_privacy_policy"),
                         leading = {
                             DocFlowIconCircle(
                                 icon = Icons.Filled.Policy,
                                 circleColor = DocFlowTokens.IconCircleGreen
-                            )
-                        },
-                        trailing = {
-                            Icon(
-                                imageVector = Icons.Filled.OpenInNew,
-                                contentDescription = "Open Privacy Policy",
-                                tint = palette.textSecondary,
-                                modifier = Modifier.size(20.dp)
                             )
                         }
                     )
@@ -725,30 +717,20 @@ fun SettingsScreen(
                         modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin)
                     )
 
-                    // Row 3: Terms of Service Link (https://doceflow.site.je/terms/)
+                    // Row 3: Terms of Service Link (opens in-app with chevron)
                     DocFlowListRow(
                         title = "Terms of Service",
-                        subtitle = OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL,
+                        subtitle = DocFlowLegalConstants.TERMS_OF_SERVICE_URL,
                         palette = palette,
+                        showChevron = true,
                         onClick = {
-                            openExternalUrl(
-                                url = OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL,
-                                onFallback = { showTermsOfflineFallbackSheet = true }
-                            )
+                            showTermsOfflineFallbackSheet = true
                         },
                         modifier = Modifier.testTag("settings_row_terms_of_service"),
                         leading = {
                             DocFlowIconCircle(
                                 icon = Icons.Filled.Gavel,
                                 circleColor = DocFlowTokens.IconCircleTeal
-                            )
-                        },
-                        trailing = {
-                            Icon(
-                                imageVector = Icons.Filled.OpenInNew,
-                                contentDescription = "Open Terms of Service",
-                                tint = palette.textSecondary,
-                                modifier = Modifier.size(20.dp)
                             )
                         }
                     )
@@ -1199,69 +1181,19 @@ fun SettingsScreen(
     // SHEET 6: PRIVACY POLICY & TERMS OF SERVICE OFFLINE READERS
     // =========================================================================
     if (showPrivacyOfflineFallbackSheet) {
-        DocFlowBottomSheet(
-            onDismissRequest = { showPrivacyOfflineFallbackSheet = false },
-            palette = palette
-        ) {
-            Text(
-                text = "Privacy Policy",
-                style = DocFlowTokens.sectionLabelStyle,
-                fontWeight = FontWeight.Bold,
-                color = palette.textPrimary
-            )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space1))
-            Text(
-                text = OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL,
-                color = DocFlowTokens.AccentBlue,
-                style = DocFlowTokens.captionStyle,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-            Text(
-                text = "DocFlow processes and stores all documents, scans, OCR text, summaries, translations, and AES-256-GCM Private Safe vaults strictly on your device. No personal files or analytics are uploaded to external servers.",
-                style = DocFlowTokens.bodyStyle,
-                color = palette.textPrimary
-            )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space4))
-            DocFlowPrimaryButton(
-                text = "Close",
-                onClick = { showPrivacyOfflineFallbackSheet = false },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        DocFlowInAppLegalViewerDialog(
+            url = DocFlowLegalConstants.PRIVACY_POLICY_URL,
+            palette = palette,
+            onDismiss = { showPrivacyOfflineFallbackSheet = false }
+        )
     }
 
     if (showTermsOfflineFallbackSheet) {
-        DocFlowBottomSheet(
-            onDismissRequest = { showTermsOfflineFallbackSheet = false },
-            palette = palette
-        ) {
-            Text(
-                text = "Terms of Service",
-                style = DocFlowTokens.sectionLabelStyle,
-                fontWeight = FontWeight.Bold,
-                color = palette.textPrimary
-            )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space1))
-            Text(
-                text = OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL,
-                color = DocFlowTokens.AccentBlue,
-                style = DocFlowTokens.captionStyle,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space3))
-            Text(
-                text = "By using DocFlow, you retain 100% ownership and custody of your local documents stored on this device. Remember your Private Safe PIN, as AES-256-GCM encryption keys are derived locally on your device.",
-                style = DocFlowTokens.bodyStyle,
-                color = palette.textPrimary
-            )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space4))
-            DocFlowPrimaryButton(
-                text = "Close",
-                onClick = { showTermsOfflineFallbackSheet = false },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        DocFlowInAppLegalViewerDialog(
+            url = DocFlowLegalConstants.TERMS_OF_SERVICE_URL,
+            palette = palette,
+            onDismiss = { showTermsOfflineFallbackSheet = false }
+        )
     }
 
     if (showLicensesSheet) {

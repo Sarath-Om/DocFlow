@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,22 +14,23 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.EnhancedEncryption
 import androidx.compose.material.icons.filled.OfflinePin
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,9 +59,16 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import com.example.R
-import com.example.ui.components.CrystalGlassBackground
-import com.example.ui.components.CrystalGlassCard
+import com.example.data.util.DocFlowLegalConstants
+import com.example.data.util.OnDeviceAiAndBackupEngine
 import com.example.ui.components.DocFlowBrandLogo
+import com.example.ui.components.DocFlowCard
+import com.example.ui.components.DocFlowInAppLegalViewerDialog
+import com.example.ui.components.DocFlowLegalConsentCaption
+import com.example.ui.components.DocFlowPrimaryButton
+import com.example.ui.components.DocFlowSecondaryButton
+import com.example.ui.theme.DocFlowPalette
+import com.example.ui.theme.DocFlowTokens
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -75,6 +85,7 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 
 @Composable
 fun AuthScreen(
+    palette: DocFlowPalette = DocFlowTokens.palette(false),
     onSignInSuccess: () -> Unit
 ) {
     val context = LocalContext.current
@@ -83,187 +94,219 @@ fun AuthScreen(
 
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var workspaceOwnerInput by rememberSaveable { mutableStateOf("") }
+    var activeLegalViewerUrl by rememberSaveable { mutableStateOf<String?>(null) }
 
-    CrystalGlassBackground {
-        Box(
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(palette.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(20.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        DocFlowCard(
+            palette = palette,
             modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
         ) {
-            CrystalGlassCard(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                cornerRadius = 30.dp
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(
+                DocFlowBrandLogo(
+                    iconSize = 68.dp,
+                    showWordmark = false
+                )
+
+                DocFlowBrandLogo(
+                    iconSize = 0.dp,
+                    showWordmark = true,
+                    wordmarkSize = 28.sp
+                )
+
+                Text(
+                    text = "Local-first document scanner, converter, Word editor, and note workspace • Stored on this device.",
+                    style = DocFlowTokens.bodyStyle,
+                    color = palette.textSecondary,
+                    textAlign = TextAlign.Center
+                )
+
+                OutlinedTextField(
+                    value = workspaceOwnerInput,
+                    onValueChange = { workspaceOwnerInput = it },
+                    label = { Text("Your name or email (optional)", fontSize = 13.sp) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = DocFlowTokens.AccentBlue
+                        )
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 26.dp, vertical = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                        .heightIn(min = 56.dp)
+                        .testTag("login_workspace_owner_input")
+                )
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    DocFlowBrandLogo(
-                        iconSize = 78.dp,
-                        showWordmark = false
+                    FlatFeatureRow(
+                        icon = Icons.Default.DocumentScanner,
+                        title = "CameraX Batch Scanner & PDF Conversions",
+                        subtitle = "Image to PDF, PDF to Word, Word to PDF — stored on this device",
+                        palette = palette
                     )
-
-                    DocFlowBrandLogo(
-                        iconSize = 0.dp,
-                        showWordmark = true,
-                        wordmarkSize = 32.sp
+                    FlatFeatureRow(
+                        icon = Icons.Default.OfflinePin,
+                        title = "Local SQLite & FTS4 Instant Search",
+                        subtitle = "Search documents, versions, and notes offline",
+                        palette = palette
                     )
-
-                    Text(
-                        text = "Apple Crystal Glass Document Workspace • Open PDFs & Word (.docx), scan physical pages with CameraX, search via Room FTS4, and sync encrypted across all devices.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
+                    FlatFeatureRow(
+                        icon = Icons.Default.EnhancedEncryption,
+                        title = "Private Safe & Client-Side Note Links",
+                        subtitle = "AES-256-GCM encrypted notes & local biometric lock",
+                        palette = palette
                     )
+                }
 
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                if (errorMessage != null) {
+                    Surface(
+                        color = DocFlowTokens.IconCircleRed.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        CrystalFeaturePill(
-                            icon = Icons.Default.DocumentScanner,
-                            title = "CameraX Physical Scanner & PDF Pipeline",
-                            subtitle = "Magic Color, B&W Contrast & instant multi-page PDF export"
+                        Text(
+                            text = errorMessage ?: "",
+                            fontSize = 13.sp,
+                            color = DocFlowTokens.IconCircleRed,
+                            modifier = Modifier.padding(12.dp),
+                            textAlign = TextAlign.Center
                         )
-                        CrystalFeaturePill(
-                            icon = Icons.Default.OfflinePin,
-                            title = "Room FTS4 Search & Offline Cache",
-                            subtitle = "Instant full-text search by title, content preview, or tags"
-                        )
-                        CrystalFeaturePill(
-                            icon = Icons.Default.EnhancedEncryption,
-                            title = "AES-256 Encryption & Live Cloud Sync",
-                            subtitle = "Zero-trust per-user security with real-time device sync"
-                        )
-                    }
-
-                    if (errorMessage != null) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f),
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = errorMessage ?: "",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.padding(12.dp),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Button(
-                        onClick = {
-                            val activity = context.findActivity()
-                            if (activity == null) {
-                                errorMessage = "Unable to access Activity context for Sign-In."
-                                return@Button
-                            }
-                            isLoading = true
-                            errorMessage = null
-                            coroutineScope.launch {
-                                val result = signInWithGoogle(activity, webClientId)
-                                isLoading = false
-                                if (result.isSuccess) {
-                                    onSignInSuccess()
-                                } else {
-                                    val ex = result.exceptionOrNull()
-                                    if (ex !is GetCredentialCancellationException) {
-                                        errorMessage = ex?.localizedMessage ?: "Sign-in failed. Please try again."
-                                    }
-                                }
-                            }
-                        },
-                        enabled = !isLoading,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .testTag("google_sign_in_button"),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF0066FF),
-                            contentColor = Color.White
-                        )
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                strokeWidth = 2.5.dp,
-                                color = Color.White
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("Connecting to DocFlow Cloud...", fontWeight = FontWeight.Bold)
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.CloudSync,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Continue with Google",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
                     }
                 }
+
+                DocFlowPrimaryButton(
+                    text = if (isLoading) "Signing in..." else "Continue on This Device",
+                    enabled = !isLoading,
+                    onClick = {
+                        OnDeviceAiAndBackupEngine.acceptCurrentLegalPolicy(context)
+                        onSignInSuccess()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("continue_local_device_button")
+                )
+
+                DocFlowSecondaryButton(
+                    text = "Sign in with Google",
+                    enabled = !isLoading,
+                    palette = palette,
+                    onClick = {
+                        val activity = context.findActivity()
+                        if (activity == null) {
+                            errorMessage = "Unable to access Activity context for Sign-In."
+                            return@DocFlowSecondaryButton
+                        }
+                        isLoading = true
+                        errorMessage = null
+                        coroutineScope.launch {
+                            val result = signInWithGoogle(activity, webClientId)
+                            isLoading = false
+                            if (result.isSuccess) {
+                                OnDeviceAiAndBackupEngine.acceptCurrentLegalPolicy(context)
+                                onSignInSuccess()
+                            } else {
+                                val ex = result.exceptionOrNull()
+                                if (ex !is GetCredentialCancellationException) {
+                                    errorMessage = ex?.localizedMessage ?: "Sign-in failed. Please try again."
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("google_sign_in_button")
+                )
+
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.5.dp,
+                        color = DocFlowTokens.AccentBlue
+                    )
+                }
+
+                // Under the primary button: centered caption (12-13sp, secondary text color)
+                // "By continuing, you agree to our Terms of Service and Privacy Policy."
+                DocFlowLegalConsentCaption(
+                    palette = palette,
+                    onOpenTerms = { activeLegalViewerUrl = DocFlowLegalConstants.TERMS_OF_SERVICE_URL },
+                    onOpenPrivacy = { activeLegalViewerUrl = DocFlowLegalConstants.PRIVACY_POLICY_URL }
+                )
             }
         }
+    }
+
+    activeLegalViewerUrl?.let { url ->
+        DocFlowInAppLegalViewerDialog(
+            url = url,
+            palette = palette,
+            onDismiss = { activeLegalViewerUrl = null }
+        )
     }
 }
 
 @Composable
-private fun CrystalFeaturePill(
+private fun FlatFeatureRow(
     icon: ImageVector,
     title: String,
-    subtitle: String
+    subtitle: String,
+    palette: DocFlowPalette
 ) {
-    CrystalGlassCard(
-        modifier = Modifier.fillMaxWidth(),
-        cornerRadius = 16.dp
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(palette.background, RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Surface(
+            color = DocFlowTokens.SelectedRowTintLight,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.size(40.dp)
         ) {
-            Surface(
-                color = Color(0xFF0066FF).copy(alpha = 0.16f),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.size(40.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = Color(0xFF007BFF),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = DocFlowTokens.AccentBlue,
+                    modifier = Modifier.size(20.dp)
                 )
             }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = palette.textPrimary
+            )
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                color = palette.textSecondary
+            )
         }
     }
 }
@@ -301,6 +344,6 @@ private suspend fun signInWithGoogle(
         val firebaseCredential = GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
         FirebaseAuth.getInstance().signInWithCredential(firebaseCredential).await()
     } else {
-        throw IllegalStateException("Unexpected credential type: ${credential.type}")
+        throw IllegalStateException("Received unexpected credential type: ${credential.type}")
     }
 }

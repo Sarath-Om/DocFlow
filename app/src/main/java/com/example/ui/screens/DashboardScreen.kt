@@ -82,6 +82,8 @@ import androidx.compose.ui.unit.sp
 import com.example.data.local.CachedDocumentEntity
 import com.example.data.model.DocEntity
 import com.example.data.model.FolderEntity
+import com.example.data.util.DocFlowLegalConstants
+import com.example.data.util.OnDeviceAiAndBackupEngine
 import com.example.ui.components.AiMicDictationBottomSheet
 import com.example.ui.components.DocFlowCard
 import com.example.ui.components.DocFlowDateGroupHeader
@@ -91,7 +93,10 @@ import com.example.ui.components.DocFlowFab
 import com.example.ui.components.DocFlowFilterTabs
 import com.example.ui.components.DocFlowHeaderAction
 import com.example.ui.components.DocFlowIconCircle
+import com.example.ui.components.DocFlowInAppLegalViewerDialog
+import com.example.ui.components.DocFlowLegalConsentCaption
 import com.example.ui.components.DocFlowListRow
+import com.example.ui.components.DocFlowNewDocumentDialog
 import com.example.ui.components.DocFlowPrimaryButton
 import com.example.ui.components.DocFlowScreenHeader
 import com.example.ui.components.DocFlowSecondaryButton
@@ -554,152 +559,43 @@ fun DashboardScreen(
         }
     }
 
-    // Create Document Dialog (Supports Word .docx, PPT .pptx, Excel .xlsx, Note .txt, PDF .pdf + AI Mic Noise Clean)
+    var pendingAiMicCallback by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    var activeLegalViewerUrl by remember { mutableStateOf<String?>(null) }
+
+    // "New document" Dialog (Section 2A: solid surface, 28dp radius, 3 equal-width chips, empty body = 0 words)
     if (showCreateDocDialog) {
-        val formatOptions = listOf(
-            "docx" to "Word (.docx)",
-            "pptx" to "PPT (.pptx)",
-            "xlsx" to "Excel (.xlsx)",
-            "txt" to "Note (.txt)",
-            "pdf" to "PDF (.pdf)"
-        )
-        AlertDialog(
-            onDismissRequest = { showCreateDocDialog = false },
-            title = {
-                Text(
-                    text = "Create Document (Open in Word UI)",
-                    style = DocFlowTokens.sectionLabelStyle,
-                    fontWeight = FontWeight.Bold
+        DocFlowNewDocumentDialog(
+            palette = palette,
+            existingTitles = documents.map { it.title },
+            initialFormat = createFormat,
+            onDismiss = { showCreateDocDialog = false },
+            onOpenAiMic = { callback ->
+                pendingAiMicCallback = callback
+                showAiMicForCreate = true
+            },
+            onCreateDocument = { uniqueTitle, ext, initialContent ->
+                val cleanName = uniqueTitle.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+                    .ifBlank { "untitled" } + ".$ext"
+                // Empty body MUST create an empty document (0 words); never prefill with title
+                viewModel.createOrScanDocument(
+                    title = uniqueTitle,
+                    folderId = "root",
+                    category = "Work",
+                    fileType = ext,
+                    fileName = cleanName,
+                    plainContent = initialContent,
+                    isEncrypted = false,
+                    password = "",
+                    encryptionKeyHint = null,
+                    isOfflineCached = true,
+                    pageCount = 1L,
+                    customTags = "created-by-me, $ext",
+                    createdByMe = true,
+                    onCreated = { createdId ->
+                        showCreateDocDialog = false
+                        onOpenDocument(createdId)
+                    }
                 )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)) {
-                    Text(
-                        text = "Select format • Stored on this device",
-                        style = DocFlowTokens.captionStyle,
-                        color = palette.textSecondary
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(DocFlowTokens.space2)
-                    ) {
-                        formatOptions.forEach { (ext, label) ->
-                            FilterChip(
-                                selected = createFormat == ext,
-                                onClick = { createFormat = ext },
-                                label = { Text(label, fontSize = 12.sp) },
-                                modifier = Modifier.testTag("create_format_chip_$ext")
-                            )
-                        }
-                    }
-                    OutlinedTextField(
-                        value = newDocTitle,
-                        onValueChange = { newDocTitle = it },
-                        label = { Text("Document title") },
-                        singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("create_doc_title_input")
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Initial Content (Optional)",
-                            style = DocFlowTokens.captionStyle,
-                            color = palette.textSecondary
-                        )
-                        Row(
-                            modifier = Modifier
-                                .clip(DocFlowTokens.pillButtonShape)
-                                .background(DocFlowTokens.IconCircleTeal.copy(alpha = 0.14f))
-                                .clickable { showAiMicForCreate = true }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                                .testTag("create_doc_ai_mic_button"),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.GraphicEq,
-                                contentDescription = "AI Mic Noise Clean",
-                                tint = DocFlowTokens.IconCircleTeal,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "AI Mic (Noise Clean)",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = DocFlowTokens.IconCircleTeal
-                            )
-                        }
-                    }
-                    OutlinedTextField(
-                        value = newDocBody,
-                        onValueChange = { newDocBody = it },
-                        label = { Text("Type or use AI Mic voice-to-text...") },
-                        minLines = 4,
-                        maxLines = 8,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("create_doc_body_input")
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val title = newDocTitle.trim().ifBlank {
-                            when (createFormat) {
-                                "pptx" -> "Untitled Presentation"
-                                "xlsx" -> "Untitled Spreadsheet"
-                                "txt" -> "Untitled Note"
-                                "pdf" -> "Untitled PDF"
-                                else -> "Untitled Word Document"
-                            }
-                        }
-                        val ext = createFormat.lowercase()
-                        val cleanName = title.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
-                            .ifBlank { "document" } + ".$ext"
-                        val bodyContent = newDocBody.ifBlank {
-                            when (ext) {
-                                "pptx" -> "=== SLIDE 1: $title ===\n• Key presentation point\n• Stored on this device"
-                                "xlsx" -> "=== SHEET 1: $title ===\n| Item | Value | Notes |\n| Row 1 | 100 | Active |"
-                                else -> title
-                            }
-                        }
-                        viewModel.createOrScanDocument(
-                            title = title,
-                            folderId = "root",
-                            category = "Work",
-                            fileType = ext,
-                            fileName = cleanName,
-                            plainContent = bodyContent,
-                            isEncrypted = false,
-                            password = "",
-                            encryptionKeyHint = null,
-                            isOfflineCached = true,
-                            pageCount = 1L,
-                            customTags = "created-by-me, $ext",
-                            createdByMe = true,
-                            onCreated = { createdId ->
-                                showCreateDocDialog = false
-                                onOpenDocument(createdId)
-                            }
-                        )
-                    },
-                    modifier = Modifier.testTag("create_doc_confirm_button")
-                ) {
-                    Text("Create & Open in Word UI", fontWeight = FontWeight.Bold, color = DocFlowTokens.AccentBlue)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateDocDialog = false }) {
-                    Text("Cancel")
-                }
             }
         )
     }
@@ -707,16 +603,25 @@ fun DashboardScreen(
     if (showAiMicForCreate) {
         AiMicDictationBottomSheet(
             palette = palette,
-            initialText = newDocBody,
-            confirmButtonLabel = "Use Clean Text",
-            onDismiss = { showAiMicForCreate = false },
+            initialText = "",
+            confirmButtonLabel = "Insert Text",
+            onDismiss = {
+                showAiMicForCreate = false
+                pendingAiMicCallback = null
+            },
             onConfirmCleanText = { cleaned ->
-                newDocBody = cleaned
-                if (newDocTitle.isBlank()) {
-                    newDocTitle = cleaned.lines().firstOrNull()?.take(36)?.trim() ?: "Voice Dictation Note"
-                }
+                pendingAiMicCallback?.invoke(cleaned)
+                pendingAiMicCallback = null
                 showAiMicForCreate = false
             }
+        )
+    }
+
+    activeLegalViewerUrl?.let { url ->
+        DocFlowInAppLegalViewerDialog(
+            url = url,
+            palette = palette,
+            onDismiss = { activeLegalViewerUrl = null }
         )
     }
 

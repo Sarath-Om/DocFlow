@@ -546,9 +546,28 @@ class ExampleRobolectricTest {
     assertTrue(com.example.data.util.OnDeviceAiAndBackupEngine.verifyPrivateSafePin(context, "5678"))
     com.example.data.util.OnDeviceAiAndBackupEngine.clearPrivateSafePin(context)
 
-    // Verify Privacy Policy and Terms of Service links
-    assertEquals("https://doceflow.site.je/privacy/", com.example.data.util.OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL)
-    assertEquals("https://doceflow.site.je/terms/", com.example.data.util.OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL)
+    // Verify Privacy Policy and Terms of Service links from single source of truth
+    assertEquals("https://docflow.free.je/privacy/", com.example.data.util.DocFlowLegalConstants.PRIVACY_POLICY_URL)
+    assertEquals("https://docflow.free.je/terms/", com.example.data.util.DocFlowLegalConstants.TERMS_OF_SERVICE_URL)
+    assertEquals(
+        com.example.data.util.DocFlowLegalConstants.PRIVACY_POLICY_URL,
+        com.example.data.util.OnDeviceAiAndBackupEngine.PRIVACY_POLICY_URL
+    )
+    assertEquals(
+        com.example.data.util.DocFlowLegalConstants.TERMS_OF_SERVICE_URL,
+        com.example.data.util.OnDeviceAiAndBackupEngine.TERMS_OF_SERVICE_URL
+    )
+    assertTrue(com.example.data.util.DocFlowLegalConstants.isAllowListedLegalUrl("https://docflow.free.je/privacy/"))
+    assertTrue(com.example.data.util.DocFlowLegalConstants.isAllowListedLegalUrl("https://docflow.free.je/terms/"))
+    assertTrue(!com.example.data.util.DocFlowLegalConstants.isAllowListedLegalUrl("https://evil.example.com/privacy"))
+
+    // Verify legal policy version acceptance persistence
+    com.example.data.util.OnDeviceAiAndBackupEngine.acceptCurrentLegalPolicy(context)
+    assertTrue(com.example.data.util.OnDeviceAiAndBackupEngine.hasAcceptedCurrentLegalPolicy(context))
+    assertEquals(
+        com.example.data.util.DocFlowLegalConstants.LEGAL_POLICY_VERSION,
+        com.example.data.util.OnDeviceAiAndBackupEngine.getAcceptedLegalVersion(context)
+    )
   }
 
   @Test
@@ -709,6 +728,89 @@ class ExampleRobolectricTest {
 
     assertEquals(2, batchPdf.pageCount)
     assertTrue(batchPdf.pdfFile.exists())
+  }
+
+  @Test
+  fun `note share link engine encodes and decodes #v1 payload with password expiry tamper and 6000 char guard`() {
+    val nowMs = System.currentTimeMillis()
+
+    // 1. Unencrypted link round-trip
+    val openLinkRes = com.example.data.util.NoteShareLinkEngine.generateShareLink(
+        title = "Sprint Architecture Notes",
+        body = "# Decisions\n- [x] Use Deflate + Base64URL\n- [ ] Add QR code sheet",
+        createdAtMillis = nowMs,
+        expiryOption = com.example.data.util.NoteLinkExpiryOption.SEVEN_DAYS,
+        password = ""
+    )
+    assertTrue(openLinkRes is com.example.data.util.NoteLinkGenerationResult.Success)
+    val openSuccess = openLinkRes as com.example.data.util.NoteLinkGenerationResult.Success
+    assertTrue(openSuccess.url.startsWith("https://docflow.free.je/n/#v1."))
+    assertTrue(!openSuccess.record.hasPassword)
+
+    val decodedOpen = com.example.data.util.NoteShareLinkEngine.decodeShareLink(
+        urlOrFragment = openSuccess.url,
+        password = "",
+        nowMillis = nowMs + 1000L
+    )
+    assertTrue(decodedOpen is com.example.data.util.NoteLinkDecodeResult.Success)
+    val openPayload = (decodedOpen as com.example.data.util.NoteLinkDecodeResult.Success).payload
+    assertEquals("Sprint Architecture Notes", openPayload.title)
+    assertTrue(openPayload.body.contains("Use Deflate + Base64URL"))
+
+    // 2. Password-protected AES-256-GCM + PBKDF2 link round-trip + wrong password check
+    val encLinkRes = com.example.data.util.NoteShareLinkEngine.generateShareLink(
+        title = "Board Compensation Memo",
+        body = "Confidential board notes stored inside #v1 fragment.",
+        createdAtMillis = nowMs,
+        expiryOption = com.example.data.util.NoteLinkExpiryOption.THIRTY_DAYS,
+        password = "correct-horse-battery"
+    )
+    assertTrue(encLinkRes is com.example.data.util.NoteLinkGenerationResult.Success)
+    val encUrl = (encLinkRes as com.example.data.util.NoteLinkGenerationResult.Success).url
+
+    // Missing password returns PasswordRequired
+    val missingPwd = com.example.data.util.NoteShareLinkEngine.decodeShareLink(encUrl, password = "", nowMillis = nowMs)
+    assertTrue(missingPwd is com.example.data.util.NoteLinkDecodeResult.PasswordRequired)
+
+    // Wrong password returns WrongPassword
+    val wrongPwd = com.example.data.util.NoteShareLinkEngine.decodeShareLink(encUrl, password = "wrong-password", nowMillis = nowMs)
+    assertTrue(wrongPwd is com.example.data.util.NoteLinkDecodeResult.WrongPassword)
+
+    // Correct password unlocks note
+    val rightPwd = com.example.data.util.NoteShareLinkEngine.decodeShareLink(encUrl, password = "correct-horse-battery", nowMillis = nowMs)
+    assertTrue(rightPwd is com.example.data.util.NoteLinkDecodeResult.Success)
+    assertEquals("Board Compensation Memo", (rightPwd as com.example.data.util.NoteLinkDecodeResult.Success).payload.title)
+
+    // 3. Expired link check
+    val expiredDecode = com.example.data.util.NoteShareLinkEngine.decodeShareLink(
+        urlOrFragment = openSuccess.url,
+        password = "",
+        nowMillis = nowMs + 9L * 24L * 60L * 60L * 1000L // 9 days later (> 7 days)
+    )
+    assertTrue(expiredDecode is com.example.data.util.NoteLinkDecodeResult.Expired)
+
+    // 4. Tampered / corrupted link check
+    val tamperedDecode = com.example.data.util.NoteShareLinkEngine.decodeShareLink(
+        urlOrFragment = "https://docflow.free.je/n/#v1.corrupted_payload_$$$",
+        password = "",
+        nowMillis = nowMs
+    )
+    assertTrue(tamperedDecode is com.example.data.util.NoteLinkDecodeResult.Invalid)
+
+    // 5. > 6,000 char URL guard check (incompressible random data)
+    val rng = java.util.Random(42L)
+    val hugeRandomBody = buildString(12000) {
+      val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()"
+      repeat(9500) { append(alphabet[rng.nextInt(alphabet.length)]) }
+    }
+    val tooLongRes = com.example.data.util.NoteShareLinkEngine.generateShareLink(
+        title = "Huge Uncompressible Note",
+        body = hugeRandomBody,
+        createdAtMillis = nowMs,
+        expiryOption = com.example.data.util.NoteLinkExpiryOption.NEVER,
+        password = ""
+    )
+    assertTrue(tooLongRes is com.example.data.util.NoteLinkGenerationResult.TooLarge)
   }
 }
 

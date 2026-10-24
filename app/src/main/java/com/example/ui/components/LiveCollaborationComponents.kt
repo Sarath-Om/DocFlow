@@ -393,7 +393,7 @@ fun LiveCollaborationHeaderBar(
                             ) {
                                 Text(
                                     text = collab.name.take(2).uppercase(),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                                     fontWeight = FontWeight.ExtraBold,
                                     color = Color.White
                                 )

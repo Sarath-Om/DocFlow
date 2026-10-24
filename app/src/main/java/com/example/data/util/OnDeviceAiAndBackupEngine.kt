@@ -66,9 +66,14 @@ object OnDeviceAiAndBackupEngine {
     private const val KEY_WATERMARK_SIZE = "watermark_size"
     private const val KEY_WATERMARK_COLOR = "watermark_color"
     private const val KEY_WATERMARK_BEHIND = "watermark_behind"
+    private const val KEY_ACCEPTED_LEGAL_VERSION = "accepted_legal_policy_version"
+    private const val KEY_ACCEPTED_LEGAL_TIMESTAMP = "accepted_legal_policy_timestamp"
+    private const val KEY_SHARED_NOTE_LINKS = "local_shared_note_links_json"
+    private const val KEY_AI_MIC_LANG = "ai_mic_language_code"
+    private const val KEY_AI_MIC_NOISE_SUPPRESS = "ai_mic_noise_suppress"
 
-    const val PRIVACY_POLICY_URL = "https://doceflow.site.je/privacy/"
-    const val TERMS_OF_SERVICE_URL = "https://doceflow.site.je/terms/"
+    const val PRIVACY_POLICY_URL = DocFlowLegalConstants.PRIVACY_POLICY_URL
+    const val TERMS_OF_SERVICE_URL = DocFlowLegalConstants.TERMS_OF_SERVICE_URL
     const val APP_VERSION_NAME = "1.0.0"
     const val APP_VERSION_BUILD = 100
 
@@ -630,5 +635,113 @@ object OnDeviceAiAndBackupEngine {
             .putString(KEY_WATERMARK_COLOR, config.colorHex)
             .putBoolean(KEY_WATERMARK_BEHIND, config.layerBehindContent)
             .apply()
+    }
+
+    // =========================================================================
+    // Legal Policy Acceptance Version & Date Persistence
+    // =========================================================================
+
+    fun getAcceptedLegalVersion(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_ACCEPTED_LEGAL_VERSION, "") ?: ""
+    }
+
+    fun getAcceptedLegalTimestamp(context: Context): Long {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getLong(KEY_ACCEPTED_LEGAL_TIMESTAMP, 0L)
+    }
+
+    fun hasAcceptedCurrentLegalPolicy(context: Context): Boolean {
+        return getAcceptedLegalVersion(context) == DocFlowLegalConstants.LEGAL_POLICY_VERSION
+    }
+
+    fun acceptCurrentLegalPolicy(context: Context, version: String = DocFlowLegalConstants.LEGAL_POLICY_VERSION) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString(KEY_ACCEPTED_LEGAL_VERSION, version)
+            .putLong(KEY_ACCEPTED_LEGAL_TIMESTAMP, System.currentTimeMillis())
+            .apply()
+    }
+
+    // =========================================================================
+    // AI Mic Language & Noise Suppression Preferences
+    // =========================================================================
+
+    fun getAiMicLanguageCode(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_AI_MIC_LANG, "en-US") ?: "en-US"
+    }
+
+    fun saveAiMicLanguageCode(context: Context, code: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_AI_MIC_LANG, code).apply()
+    }
+
+    fun isAiMicNoiseSuppressionEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_AI_MIC_NOISE_SUPPRESS, true)
+    }
+
+    fun setAiMicNoiseSuppressionEnabled(context: Context, enabled: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_AI_MIC_NOISE_SUPPRESS, enabled).apply()
+    }
+
+    // =========================================================================
+    // Local-Only "My Shared Links" History
+    // =========================================================================
+
+    fun getSavedSharedLinks(context: Context): List<SharedNoteLinkRecord> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val raw = prefs.getString(KEY_SHARED_NOTE_LINKS, "[]") ?: "[]"
+        return runCatching {
+            val arr = org.json.JSONArray(raw)
+            val list = mutableListOf<SharedNoteLinkRecord>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val exp = if (obj.has("expiresAtMillis") && !obj.isNull("expiresAtMillis")) {
+                    obj.optLong("expiresAtMillis", 0L).takeIf { it > 0L }
+                } else null
+                list.add(
+                    SharedNoteLinkRecord(
+                        id = obj.optString("id", "link_$i"),
+                        noteTitle = obj.optString("noteTitle", "Shared Note"),
+                        shareUrl = obj.optString("shareUrl", ""),
+                        createdAtMillis = obj.optLong("createdAtMillis", 0L),
+                        expiresAtMillis = exp,
+                        hasPassword = obj.optBoolean("hasPassword", false)
+                    )
+                )
+            }
+            list
+        }.getOrDefault(emptyList())
+    }
+
+    fun saveSharedLinkRecord(context: Context, record: SharedNoteLinkRecord) {
+        val current = getSavedSharedLinks(context).filterNot { it.id == record.id }.toMutableList()
+        current.add(0, record)
+        writeSharedLinksList(context, current)
+    }
+
+    fun removeSharedLinkRecord(context: Context, linkId: String) {
+        val updated = getSavedSharedLinks(context).filterNot { it.id == linkId }
+        writeSharedLinksList(context, updated)
+    }
+
+    private fun writeSharedLinksList(context: Context, list: List<SharedNoteLinkRecord>) {
+        val arr = org.json.JSONArray()
+        list.take(50).forEach { rec ->
+            val obj = org.json.JSONObject().apply {
+                put("id", rec.id)
+                put("noteTitle", rec.noteTitle)
+                put("shareUrl", rec.shareUrl)
+                put("createdAtMillis", rec.createdAtMillis)
+                if (rec.expiresAtMillis != null) put("expiresAtMillis", rec.expiresAtMillis)
+                put("hasPassword", rec.hasPassword)
+            }
+            arr.put(obj)
+        }
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_SHARED_NOTE_LINKS, arr.toString()).apply()
     }
 }

@@ -1,16 +1,18 @@
 package com.example.ui.components
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,21 +20,29 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.outlined.VolumeOff
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,65 +52,126 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.data.util.AiMicNoiseCleanController
 import com.example.data.util.AiMicTelemetry
 import com.example.data.util.NoiseCleanLevel
+import com.example.data.util.OnDeviceAiAndBackupEngine
 import com.example.ui.theme.DocFlowPalette
 import com.example.ui.theme.DocFlowTokens
+import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalLayoutApi::class)
+enum class AiMicUiState {
+    IDLE,
+    ASKING_PERMISSION,
+    LISTENING,
+    PROCESSING,
+    PERMISSION_DENIED,
+    ERROR
+}
+
 @Composable
 fun AiMicDictationBottomSheet(
     palette: DocFlowPalette,
     initialText: String = "",
-    confirmButtonLabel: String = "Insert Clean Text",
+    confirmButtonLabel: String = "Insert Text",
     onDismiss: () -> Unit,
     onConfirmCleanText: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     var transcriptText by remember { mutableStateOf(initialText) }
-    var isRecording by remember { mutableStateOf(false) }
-    var selectedLanguage by remember { mutableStateOf("en-US") }
-    var selectedNoiseLevel by remember { mutableStateOf(NoiseCleanLevel.HIGH) }
+    var livePartialText by remember { mutableStateOf("") }
+    val dictationHistory = remember { mutableStateListOf<String>() }
+
+    var micState by remember { mutableStateOf(AiMicUiState.IDLE) }
+    var selectedLanguage by remember {
+        mutableStateOf(OnDeviceAiAndBackupEngine.getAiMicLanguageCode(context))
+    }
+    var noiseCleanEnabled by remember {
+        mutableStateOf(OnDeviceAiAndBackupEngine.isAiMicNoiseSuppressionEnabled(context))
+    }
+    var elapsedSeconds by remember { mutableIntStateOf(0) }
     var telemetry by remember { mutableStateOf(AiMicTelemetry()) }
     var statusNotice by remember {
-        mutableStateOf("Hardware DSP Noise Suppressor + Spectral Gate ready • Stored on this device")
+        mutableStateOf("Ready to dictate on this device (English, Hindi, Hinglish)")
     }
+
+    val activeNoiseLevel = if (noiseCleanEnabled) NoiseCleanLevel.HIGH else NoiseCleanLevel.STANDARD
 
     val controller = remember(context) {
         AiMicNoiseCleanController(
             context = context,
             onPartialTranscript = { partial ->
                 if (partial.isNotBlank()) {
-                    transcriptText = partial
+                    livePartialText = partial
                 }
             },
             onFinalTranscript = { finalClean ->
-                isRecording = false
+                livePartialText = ""
+                micState = AiMicUiState.IDLE
                 if (finalClean.isNotBlank()) {
-                    transcriptText = if (transcriptText.isBlank()) {
-                        finalClean
+                    val cleanedChunk = if (noiseCleanEnabled) {
+                        AiMicNoiseCleanController.cleanTranscribedText(finalClean, NoiseCleanLevel.HIGH)
                     } else {
-                        "${transcriptText.trim()} $finalClean"
+                        finalClean.trim()
                     }
-                    statusNotice = "Noise-cleaned voice converted to text (-${selectedNoiseLevel.attenuationDb} dB ambient noise removed)"
+                    dictationHistory.add(transcriptText)
+                    transcriptText = if (transcriptText.isBlank()) {
+                        cleanedChunk
+                    } else {
+                        "${transcriptText.trim()} $cleanedChunk"
+                    }
+                    statusNotice = "Dictation added • Tap Undo to remove last phrase"
+                } else {
+                    statusNotice = "No speech detected. Tap the microphone to try again."
                 }
             },
             onTelemetryUpdate = { updated ->
                 telemetry = updated
             },
             onErrorState = { message ->
-                isRecording = false
+                livePartialText = ""
+                micState = AiMicUiState.ERROR
                 statusNotice = message
             }
         )
     }
 
-    DisposableEffect(Unit) {
+    // Timer while listening
+    LaunchedEffect(micState) {
+        if (micState == AiMicUiState.LISTENING) {
+            elapsedSeconds = 0
+            while (micState == AiMicUiState.LISTENING) {
+                delay(1000L)
+                elapsedSeconds++
+            }
+        }
+    }
+
+    // Stop listening immediately when screen locks or app is backgrounded
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                if (micState == AiMicUiState.LISTENING) {
+                    controller.stopListening()
+                    livePartialText = ""
+                    micState = AiMicUiState.IDLE
+                    statusNotice = "Microphone stopped because the screen locked or app moved to background."
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             controller.stopListening()
         }
     }
@@ -109,12 +180,13 @@ fun AiMicDictationBottomSheet(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            isRecording = true
-            statusNotice = "Listening with ${selectedNoiseLevel.label}..."
-            controller.startListening(selectedLanguage, selectedNoiseLevel)
+            micState = AiMicUiState.LISTENING
+            statusNotice = "Listening..."
+            val recognizerLocale = if (selectedLanguage == "hinglish") "en-IN" else selectedLanguage
+            controller.startListening(recognizerLocale, activeNoiseLevel)
         } else {
-            isRecording = false
-            statusNotice = "Microphone permission declined. You can still type or use keyboard voice dictation below with Noise Clean."
+            micState = AiMicUiState.PERMISSION_DENIED
+            statusNotice = "Microphone permission is required for voice dictation."
         }
     }
 
@@ -125,6 +197,7 @@ fun AiMicDictationBottomSheet(
         },
         palette = palette
     ) {
+        // Header Row (Microphone indicator shown ONLY while listening)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -134,22 +207,66 @@ fun AiMicDictationBottomSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                DocFlowIconCircle(
-                    icon = Icons.Filled.GraphicEq,
-                    circleColor = DocFlowTokens.IconCircleTeal,
-                    size = 44.dp
-                )
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (micState == AiMicUiState.LISTENING) DocFlowTokens.IconCircleRed.copy(alpha = 0.15f)
+                            else DocFlowTokens.SelectedRowTintLight
+                        )
+                        .border(
+                            width = if (micState == AiMicUiState.LISTENING) 2.dp else 1.dp,
+                            color = if (micState == AiMicUiState.LISTENING) DocFlowTokens.IconCircleRed else DocFlowTokens.AccentBlue,
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (micState == AiMicUiState.LISTENING) Icons.Filled.GraphicEq else Icons.Filled.Mic,
+                        contentDescription = "AI Mic",
+                        tint = if (micState == AiMicUiState.LISTENING) DocFlowTokens.IconCircleRed else DocFlowTokens.AccentBlue,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
                 Column {
                     Text(
-                        text = "AI Mic • Sound to Text",
+                        text = "AI Mic",
                         style = DocFlowTokens.sectionLabelStyle,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = palette.textPrimary
                     )
                     Text(
-                        text = "On-device Noise Clean • English & हिन्दी • Stored on this device",
-                        style = DocFlowTokens.captionStyle,
-                        color = palette.textSecondary
+                        text = if (micState == AiMicUiState.LISTENING) {
+                            val mins = elapsedSeconds / 60
+                            val secs = elapsedSeconds % 60
+                            "Listening • %02d:%02d".format(mins, secs)
+                        } else {
+                            "On-device voice dictation • Stored on this device"
+                        },
+                        fontSize = 13.sp,
+                        color = if (micState == AiMicUiState.LISTENING) DocFlowTokens.IconCircleRed else palette.textSecondary
+                    )
+                }
+            }
+
+            if (dictationHistory.isNotEmpty()) {
+                IconButton(
+                    onClick = {
+                        val previous = dictationHistory.removeAt(dictationHistory.lastIndex)
+                        transcriptText = previous
+                        statusNotice = "Undid last dictation phrase"
+                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .testTag("ai_mic_undo_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Undo,
+                        contentDescription = "Undo last dictation",
+                        tint = DocFlowTokens.AccentBlue,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -157,7 +274,7 @@ fun AiMicDictationBottomSheet(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // DSP Telemetry Banner
+        // Live Waveform & Status Banner when listening or error
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -167,131 +284,234 @@ fun AiMicDictationBottomSheet(
                 .padding(12.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isRecording) "LIVE MIC • NOISE GATE ACTIVE" else "DSP AUDIO CLEANER READY",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isRecording) DocFlowTokens.IconCircleGreen else DocFlowTokens.AccentBlue
-                    )
-                    Text(
-                        text = "-${selectedNoiseLevel.attenuationDb} dB Noise Suppression • ${telemetry.voiceClarityPercent}% Clarity",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = palette.textSecondary
-                    )
+                if (micState == AiMicUiState.LISTENING) {
+                    // Live waveform indicator bars
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val heights = listOf(10.dp, 18.dp, 24.dp, 14.dp, 22.dp, 12.dp, 20.dp, 16.dp)
+                            heights.forEachIndexed { idx, baseH ->
+                                val activeH = if ((elapsedSeconds + idx) % 2 == 0) baseH else (baseH / 2).coerceAtLeast(6.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .width(4.dp)
+                                        .height(activeH)
+                                        .clip(CircleShape)
+                                        .background(DocFlowTokens.AccentBlue)
+                                )
+                            }
+                        }
+                        Text(
+                            text = "%02d:%02d".format(elapsedSeconds / 60, elapsedSeconds % 60),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DocFlowTokens.IconCircleRed
+                        )
+                    }
                 }
                 Text(
                     text = statusNotice,
-                    style = DocFlowTokens.captionStyle,
-                    color = palette.textPrimary
+                    fontSize = 13.sp,
+                    color = if (micState == AiMicUiState.ERROR || micState == AiMicUiState.PERMISSION_DENIED)
+                        DocFlowTokens.IconCircleRed
+                    else palette.textPrimary
                 )
+                if (livePartialText.isNotBlank()) {
+                    Text(
+                        text = livePartialText,
+                        fontSize = 14.sp,
+                        fontStyle = FontStyle.Italic,
+                        color = palette.textSecondary,
+                        modifier = Modifier.testTag("ai_mic_live_partial_text")
+                    )
+                }
+            }
+        }
+
+        // Permission Denied Banner with "Open settings" button
+        if (micState == AiMicUiState.PERMISSION_DENIED) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(DocFlowTokens.IconCircleRed.copy(alpha = 0.1f))
+                    .border(1.dp, DocFlowTokens.IconCircleRed, RoundedCornerShape(14.dp))
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Microphone access is turned off",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = palette.textPrimary
+                    )
+                    Text(
+                        text = "Enable Microphone permission in Android Settings to use voice dictation.",
+                        fontSize = 12.sp,
+                        color = palette.textSecondary
+                    )
+                }
+                TextButton(
+                    onClick = {
+                        runCatching {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        }
+                    },
+                    modifier = Modifier.testTag("ai_mic_open_settings_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = null,
+                        tint = DocFlowTokens.AccentBlue,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Open settings", fontSize = 13.sp, color = DocFlowTokens.AccentBlue)
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Language & Noise Clean Level Chips
+        // Languages: English, Hindi, Hinglish (single-line chips, remembered locally)
         Text(
-            text = "Voice Language & Noise Suppression",
-            style = DocFlowTokens.captionStyle,
+            text = "Dictation language",
+            fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             color = palette.textSecondary
         )
         Spacer(modifier = Modifier.height(6.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            FilterChip(
-                selected = selectedLanguage == "en-US",
-                onClick = { selectedLanguage = "en-US" },
-                label = { Text("English (Offline)") },
-                modifier = Modifier.testTag("ai_mic_lang_en")
+            val languages = listOf(
+                Triple("en-US", "English", "ai_mic_lang_en"),
+                Triple("hi-IN", "Hindi (हिन्दी)", "ai_mic_lang_hi"),
+                Triple("hinglish", "Hinglish", "ai_mic_lang_hinglish")
             )
-            FilterChip(
-                selected = selectedLanguage == "hi-IN",
-                onClick = { selectedLanguage = "hi-IN" },
-                label = { Text("हिन्दी (Hindi Offline)") },
-                modifier = Modifier.testTag("ai_mic_lang_hi")
-            )
-            NoiseCleanLevel.entries.forEach { level ->
+            languages.forEach { (code, label, tag) ->
                 FilterChip(
-                    selected = selectedNoiseLevel == level,
+                    selected = selectedLanguage == code,
                     onClick = {
-                        selectedNoiseLevel = level
-                        transcriptText = AiMicNoiseCleanController.cleanTranscribedText(transcriptText, level)
+                        selectedLanguage = code
+                        OnDeviceAiAndBackupEngine.saveAiMicLanguageCode(context, code)
                     },
-                    label = { Text(level.label, fontSize = 12.sp) },
-                    modifier = Modifier.testTag("ai_mic_level_${level.name.lowercase()}")
+                    label = {
+                        Text(
+                            text = label,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    modifier = Modifier.testTag(tag)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Main Record / Stop & Noise Clean Action Row
+        // Noise Clean switch inside the mic sheet settings
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(DocFlowTokens.minTouchTarget)
-                    .clip(DocFlowTokens.pillButtonShape)
-                    .background(if (isRecording) DocFlowTokens.IconCircleRed else DocFlowTokens.AccentBlue)
-                    .clickable {
-                        if (isRecording) {
-                            controller.stopListening()
-                            isRecording = false
-                            statusNotice = "Mic stopped • Noise Clean filter applied"
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Noise clean",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = palette.textPrimary,
+                    maxLines = 1
+                )
+                Text(
+                    text = "Hardware DSP NoiseSuppressor + acoustic filler removal",
+                    fontSize = 12.sp,
+                    color = palette.textSecondary
+                )
+            }
+            Switch(
+                checked = noiseCleanEnabled,
+                onCheckedChange = { enabled ->
+                    noiseCleanEnabled = enabled
+                    OnDeviceAiAndBackupEngine.setAiMicNoiseSuppressionEnabled(context, enabled)
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = DocFlowTokens.AccentBlue
+                ),
+                modifier = Modifier.testTag("ai_mic_noise_clean_switch")
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Start / Stop Listening Button (48dp height, 24dp icon)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(DocFlowTokens.pillButtonShape)
+                .background(
+                    if (micState == AiMicUiState.LISTENING) DocFlowTokens.IconCircleRed
+                    else DocFlowTokens.AccentBlue
+                )
+                .clickable {
+                    if (micState == AiMicUiState.LISTENING) {
+                        controller.stopListening()
+                        livePartialText = ""
+                        micState = AiMicUiState.IDLE
+                        statusNotice = "Stopped listening"
+                    } else {
+                        if (controller.hasRecordPermission()) {
+                            micState = AiMicUiState.LISTENING
+                            statusNotice = "Listening..."
+                            val recognizerLocale = if (selectedLanguage == "hinglish") "en-IN" else selectedLanguage
+                            controller.startListening(recognizerLocale, activeNoiseLevel)
                         } else {
-                            if (controller.hasRecordPermission()) {
-                                isRecording = true
-                                statusNotice = "Listening (${selectedNoiseLevel.label})..."
-                                controller.startListening(selectedLanguage, selectedNoiseLevel)
-                            } else {
-                                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            }
+                            micState = AiMicUiState.ASKING_PERMISSION
+                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
                     }
-                    .testTag("ai_mic_record_toggle_button"),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isRecording) Icons.Filled.Stop else Icons.Filled.Mic,
-                        contentDescription = if (isRecording) "Stop AI Mic" else "Start AI Mic",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = if (isRecording) "Stop Listening" else "Start AI Mic (Noise Clean)",
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    )
                 }
+                .testTag("ai_mic_record_toggle_button"),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = if (micState == AiMicUiState.LISTENING) Icons.Filled.Stop else Icons.Filled.Mic,
+                    contentDescription = if (micState == AiMicUiState.LISTENING) "Stop" else "Start listening",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = if (micState == AiMicUiState.LISTENING) "Stop" else "Start Listening",
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    maxLines = 1
+                )
             }
-
-            DocFlowSecondaryButton(
-                text = "Clean Noise",
-                onClick = {
-                    transcriptText = AiMicNoiseCleanController.cleanTranscribedText(transcriptText, selectedNoiseLevel)
-                    statusNotice = "Removed acoustic fillers, background artifacts & normalized punctuation"
-                },
-                palette = palette,
-                modifier = Modifier.testTag("ai_mic_clean_text_button")
-            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -299,12 +519,16 @@ fun AiMicDictationBottomSheet(
         OutlinedTextField(
             value = transcriptText,
             onValueChange = { transcriptText = it },
-            label = { Text("Voice-to-Text Transcript (Editable • Noise Cleaned)") },
+            label = { Text("Dictated text", fontSize = 13.sp) },
             placeholder = {
-                Text("Speak with AI Mic or use keyboard voice input. Background noise & filler words ('um', 'uh', '[noise]') are stripped automatically...")
+                Text(
+                    "Speak or type here...",
+                    fontSize = 14.sp,
+                    color = palette.textSecondary
+                )
             },
-            minLines = 4,
-            maxLines = 8,
+            minLines = 3,
+            maxLines = 6,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("ai_mic_transcript_input")
@@ -329,8 +553,12 @@ fun AiMicDictationBottomSheet(
                 text = confirmButtonLabel,
                 onClick = {
                     controller.stopListening()
-                    val cleaned = AiMicNoiseCleanController.cleanTranscribedText(transcriptText, selectedNoiseLevel)
-                    onConfirmCleanText(cleaned)
+                    val output = if (noiseCleanEnabled) {
+                        AiMicNoiseCleanController.cleanTranscribedText(transcriptText, NoiseCleanLevel.HIGH)
+                    } else {
+                        transcriptText.trim()
+                    }
+                    onConfirmCleanText(output)
                 },
                 enabled = transcriptText.isNotBlank(),
                 modifier = Modifier

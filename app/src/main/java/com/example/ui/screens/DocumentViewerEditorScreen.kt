@@ -166,7 +166,9 @@ import com.example.ui.components.DocFlowListRow
 import com.example.ui.components.DocFlowPrimaryButton
 import com.example.ui.components.DocFlowSecondaryButton
 import com.example.ui.components.DocFlowToast
+import com.example.ui.components.MySharedLinksBottomSheet
 import com.example.ui.components.PdfWatermarkExportSheet
+import com.example.ui.components.ShareNoteWithLinkBottomSheet
 import com.example.ui.theme.DocFlowPalette
 import com.example.ui.theme.DocFlowTokens
 import com.example.ui.viewmodel.DocFlowViewModel
@@ -304,10 +306,10 @@ fun DocumentViewerEditorScreen(
     var pageMargins by remember { mutableStateOf("Normal") } // Normal, Narrow, Wide
     var pageColumns by remember { mutableIntStateOf(1) }
     var showLineNumbers by remember { mutableStateOf(false) }
-    var showRuler by remember { mutableStateOf(true) }
+    var showRuler by remember { mutableStateOf(false) }
     var showFormattingMarks by remember { mutableStateOf(false) }
     var pageHeaderText by remember { mutableStateOf("") }
-    var pageFooterText by remember { mutableStateOf("Stored on this device") }
+    var pageFooterText by remember { mutableStateOf("") }
     var showPageNumbers by remember { mutableStateOf(true) }
 
     // Find & Replace / Spell Check / Table / Comments / Export Modals
@@ -326,6 +328,13 @@ fun DocumentViewerEditorScreen(
 
     var showCommentsSheet by remember { mutableStateOf(false) }
     var newCommentBody by remember { mutableStateOf("") }
+    var newNoteTitleInput by remember { mutableStateOf("") }
+    var newNoteColorHex by remember { mutableStateOf("#FFFFFF") }
+    var newNoteChecklistText by remember { mutableStateOf("") }
+    var newNotePinned by remember { mutableStateOf(false) }
+    var noteSearchQuery by remember { mutableStateOf("") }
+    var shareLinkTargetNote by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var showMySharedLinksSheet by remember { mutableStateOf(false) }
     var showExportVersionsNotesSheet by remember { mutableStateOf(false) }
     var showWatermarkPdfExportSheet by remember { mutableStateOf(false) }
 
@@ -382,10 +391,10 @@ fun DocumentViewerEditorScreen(
             explicitPages.map { it.trim() }
         } else {
             val lines = editableContent.lines().filter { it.isNotEmpty() }
-            val chunked = if (lines.isEmpty()) listOf(doc.title) else lines.chunked(26).map { it.joinToString("\n") }
+            val chunked = if (lines.isEmpty()) listOf("") else lines.chunked(26).map { it.joinToString("\n") }
             val count = maxOf(chunked.size, doc.pageCount.toInt().coerceAtLeast(1)).coerceAtMost(12)
             (0 until count).map { idx ->
-                chunked.getOrNull(idx) ?: "Page ${idx + 1} — ${doc.title}"
+                chunked.getOrNull(idx) ?: ""
             }
         }
     }
@@ -421,9 +430,9 @@ fun DocumentViewerEditorScreen(
 
     val subtitleText = when {
         isPdf -> "Page ${(currentPageIndex + 1).coerceIn(1, totalPages)} of $totalPages"
-        isExcel -> "Excel spreadsheet (.xlsx) • $wordCount words"
-        isPpt -> "Presentation (.pptx) • $totalPages slide(s)"
-        else -> "Word document • $totalPages page(s) • $saveStatusIndicator"
+        isExcel -> "Excel • $wordCount words"
+        isPpt -> "Presentation • $totalPages ${if (totalPages == 1) "slide" else "slides"}"
+        else -> "Word • $totalPages ${if (totalPages == 1) "page" else "pages"}"
     }
 
     Box(
@@ -498,7 +507,7 @@ fun DocumentViewerEditorScreen(
                                 }
                             },
                             enabled = undoIndex > 0,
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(DocFlowTokens.minTouchTarget)
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Undo,
@@ -515,7 +524,7 @@ fun DocumentViewerEditorScreen(
                                 }
                             },
                             enabled = undoIndex < undoStack.lastIndex,
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(DocFlowTokens.minTouchTarget)
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Redo,
@@ -523,26 +532,39 @@ fun DocumentViewerEditorScreen(
                                 tint = if (undoIndex < undoStack.lastIndex) palette.textPrimary else palette.divider
                             )
                         }
-                    }
-
-                    // AI Mic (Sound to Text with Noise Clean) Quick Button
-                    IconButton(
-                        onClick = { showAiMicSheet = true },
-                        modifier = Modifier
-                            .size(44.dp)
-                            .testTag("viewer_ai_mic_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Mic,
-                            contentDescription = "AI Mic Noise Clean",
-                            tint = DocFlowTokens.IconCircleTeal
-                        )
+                        IconButton(
+                            onClick = {
+                                viewModel.updateDocumentContent(
+                                    doc = doc,
+                                    newTitle = documentTitle,
+                                    newFolderId = doc.folderId,
+                                    newCategory = doc.category,
+                                    plainContent = editableContent,
+                                    isEncrypted = doc.isEncrypted,
+                                    password = null,
+                                    encryptionKeyHint = doc.encryptionKeyHint,
+                                    isOfflineCached = true
+                                )
+                                hasUnsavedChanges = false
+                                isEditingMode = false
+                                viewerToast = "Saved changes on this device"
+                            },
+                            modifier = Modifier
+                                .size(DocFlowTokens.minTouchTarget)
+                                .testTag("word_save_done_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = "Done editing",
+                                tint = DocFlowTokens.IconCircleGreen
+                            )
+                        }
                     }
 
                     IconButton(
                         onClick = { showInDocSearch = !showInDocSearch },
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(DocFlowTokens.minTouchTarget)
                             .testTag("viewer_search_button")
                     ) {
                         Icon(
@@ -555,7 +577,7 @@ fun DocumentViewerEditorScreen(
                     IconButton(
                         onClick = { viewModel.shareAnyDocument(context, doc) },
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(DocFlowTokens.minTouchTarget)
                             .testTag("viewer_share_button")
                     ) {
                         Icon(
@@ -569,7 +591,7 @@ fun DocumentViewerEditorScreen(
                         IconButton(
                             onClick = { showOverflowMenu = true },
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(DocFlowTokens.minTouchTarget)
                                 .testTag("viewer_overflow_button")
                         ) {
                             Icon(
@@ -617,10 +639,24 @@ fun DocumentViewerEditorScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Comments (${comments.size})") },
+                                text = { Text("Notes (${comments.size})") },
                                 onClick = {
                                     showOverflowMenu = false
                                     showCommentsSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("AI Summarise") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showSummariseSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Translate Offline") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showTranslateSheet = true
                                 }
                             )
                             DropdownMenuItem(
@@ -754,84 +790,86 @@ fun DocumentViewerEditorScreen(
             }
 
             // =================================================================
-            // 3. VIEW MODE LAYOUT BAR (Print Layout vs Reading Reflow, Ruler, Page Width)
+            // 3. VIEW MODE CONTROL ROW (2-option Segmented Control: Print layout | Reading + Word Count)
             // =================================================================
             if (!isPdf) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(palette.surface)
-                        .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = 6.dp),
+                        .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FilterChip(
-                            selected = isPrintLayoutMode,
-                            onClick = { isPrintLayoutMode = true },
-                            label = { Text("Print Layout", fontSize = 12.sp) },
-                            modifier = Modifier.testTag("word_print_layout_chip")
-                        )
-                        FilterChip(
-                            selected = !isPrintLayoutMode,
-                            onClick = { isPrintLayoutMode = false },
-                            label = { Text("Reading (Reflow)", fontSize = 12.sp) },
-                            modifier = Modifier.testTag("word_reflow_layout_chip")
-                        )
-                    }
-
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.width(228.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = "$wordCount words",
-                            style = DocFlowTokens.captionStyle,
-                            color = palette.textSecondary
-                        )
+                        val unselectedTextColor = if (palette.isDark) Color(0xFFC8CBD2) else Color(0xFF4A4D55)
                         Box(
                             modifier = Modifier
-                                .clip(DocFlowTokens.pillButtonShape)
+                                .weight(1f)
+                                .height(36.dp)
+                                .clip(DocFlowTokens.buttonShape)
                                 .background(
-                                    if (isEditingMode) DocFlowTokens.IconCircleGreen else DocFlowTokens.AccentBlue
+                                    if (isPrintLayoutMode) Color(0xFFE8F0FF) else palette.surface
                                 )
-                                .clickable {
-                                    if (isEditingMode) {
-                                        viewModel.updateDocumentContent(
-                                            doc = doc,
-                                            newTitle = documentTitle,
-                                            newFolderId = doc.folderId,
-                                            newCategory = doc.category,
-                                            plainContent = editableContent,
-                                            isEncrypted = doc.isEncrypted,
-                                            password = null,
-                                            encryptionKeyHint = doc.encryptionKeyHint,
-                                            isOfflineCached = true
-                                        )
-                                        hasUnsavedChanges = false
-                                        isEditingMode = false
-                                        viewerToast = "Saved changes on this device"
-                                    } else {
-                                        isEditingMode = true
-                                    }
-                                }
-                                .padding(horizontal = 14.dp, vertical = 6.dp)
-                                .testTag("word_toggle_edit_mode_button")
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isPrintLayoutMode) DocFlowTokens.AccentBlue else palette.divider,
+                                    shape = DocFlowTokens.buttonShape
+                                )
+                                .clickable { isPrintLayoutMode = true }
+                                .testTag("word_print_layout_chip"),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = if (isEditingMode) "Done & Save" else "Edit in Word UI",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                                text = "Print layout",
+                                fontSize = 13.sp,
+                                fontWeight = if (isPrintLayoutMode) FontWeight.SemiBold else FontWeight.Medium,
+                                color = if (isPrintLayoutMode) DocFlowTokens.AccentBlue else unselectedTextColor,
+                                maxLines = 1
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .clip(DocFlowTokens.buttonShape)
+                                .background(
+                                    if (!isPrintLayoutMode) Color(0xFFE8F0FF) else palette.surface
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (!isPrintLayoutMode) DocFlowTokens.AccentBlue else palette.divider,
+                                    shape = DocFlowTokens.buttonShape
+                                )
+                                .clickable { isPrintLayoutMode = false }
+                                .testTag("word_reflow_layout_chip"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Reading",
+                                fontSize = 13.sp,
+                                fontWeight = if (!isPrintLayoutMode) FontWeight.SemiBold else FontWeight.Medium,
+                                color = if (!isPrintLayoutMode) DocFlowTokens.AccentBlue else unselectedTextColor,
+                                maxLines = 1
                             )
                         }
                     }
+
+                    Text(
+                        text = "$wordCount words",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = palette.textSecondary
+                    )
                 }
                 DocFlowDivider(palette = palette)
             }
 
-            // Optional Horizontal Ruler in Print Layout Mode
-            if (!isPdf && isPrintLayoutMode && showRuler) {
+            // Horizontal Ruler: shown ONLY in edit mode when enabled in View menu
+            if (!isPdf && isEditingMode && isPrintLayoutMode && showRuler) {
                 Canvas(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -921,7 +959,7 @@ fun DocumentViewerEditorScreen(
                             if (pageHeaderText.isNotBlank()) {
                                 Text(
                                     text = pageHeaderText,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     color = Color(0xFF6B7280),
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
@@ -935,14 +973,14 @@ fun DocumentViewerEditorScreen(
                             ) {
                                 Text(
                                     text = "$pageSizeOption ($pageOrientation) • $paragraphStyleName • ${selectedFontFamily} ${selectedFontSizePt}pt",
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = DocFlowTokens.AccentBlue
                                 )
                                 if (showFormattingMarks) {
                                     Text(
                                         text = "¶ Formatting marks ON",
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         color = DocFlowTokens.IconCircleTeal
                                     )
                                 }
@@ -957,13 +995,13 @@ fun DocumentViewerEditorScreen(
                                 },
                                 textStyle = TextStyle(
                                     fontFamily = activeFontFamily,
-                                    fontSize = (selectedFontSizePt * zoomScale).sp,
+                                    fontSize = (selectedFontSizePt * zoomScale).coerceAtLeast(12f).sp,
                                     fontWeight = if (isBold || paragraphStyleName.startsWith("Heading") || paragraphStyleName == "Title") FontWeight.Bold else FontWeight.Normal,
                                     fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
                                     textDecoration = activeTextDecoration,
                                     textAlign = activeTextAlign,
                                     color = parsedTextColor,
-                                    lineHeight = (selectedFontSizePt * lineSpacingMultiplier * zoomScale).sp
+                                    lineHeight = (selectedFontSizePt * lineSpacingMultiplier * zoomScale).coerceAtLeast(16f).sp
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -982,13 +1020,13 @@ fun DocumentViewerEditorScreen(
                                 ) {
                                     Text(
                                         text = pageFooterText,
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         color = Color(0xFF6B7280)
                                     )
                                     if (showPageNumbers) {
                                         Text(
                                             text = "Page 1 of $totalPages",
-                                            fontSize = 11.sp,
+                                            fontSize = 12.sp,
                                             color = Color(0xFF6B7280)
                                         )
                                     }
@@ -997,13 +1035,13 @@ fun DocumentViewerEditorScreen(
                         }
                     }
                 } else {
-                    // Paginated White Page Sheets in View Mode (Print Layout or Reflow)
+                    // Paginated White Page Sheets in View Mode (Print Layout or Reading)
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
                             .testTag("viewer_pages_list"),
                         contentPadding = PaddingValues(
-                            horizontal = if (isPrintLayoutMode) DocFlowTokens.screenHorizontalMargin else 0.dp,
+                            horizontal = if (isPrintLayoutMode) 16.dp else 0.dp,
                             vertical = if (isPrintLayoutMode) DocFlowTokens.space3 else 0.dp
                         ),
                         verticalArrangement = Arrangement.spacedBy(if (isPrintLayoutMode) DocFlowTokens.space3 else 0.dp)
@@ -1012,150 +1050,153 @@ fun DocumentViewerEditorScreen(
                             val bmp = renderedPdfBitmaps[index]
                             val pageAnnotations = annotations.filter { it.pageIndex == index }
 
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(if (isPrintLayoutMode) DocFlowTokens.thumbnailShape else androidx.compose.ui.graphics.RectangleShape)
-                                    .background(Color.White)
-                                    .border(
-                                        width = if (isPrintLayoutMode) 1.dp else 0.dp,
-                                        color = if (currentPageIndex == index && isPrintLayoutMode) DocFlowTokens.AccentBlue else palette.divider,
-                                        shape = if (isPrintLayoutMode) DocFlowTokens.thumbnailShape else androidx.compose.ui.graphics.RectangleShape
-                                    )
-                                    .clickable { currentPageIndex = index }
-                                    .padding(pageMarginPadding)
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Column {
-                                    // Header Bar inside Page Sheet
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = pageHeaderText.ifBlank { documentTitle },
-                                            fontSize = 11.sp,
-                                            color = Color(0xFF8A8D93),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(if (isPrintLayoutMode && bmp == null && pageText.lines().size < 14) 460.dp else androidx.compose.ui.unit.Dp.Unspecified)
+                                        .clip(if (isPrintLayoutMode) DocFlowTokens.thumbnailShape else androidx.compose.ui.graphics.RectangleShape)
+                                        .background(Color.White)
+                                        .border(
+                                            width = if (isPrintLayoutMode) 1.dp else 0.dp,
+                                            color = Color(0xFFE3E4E7),
+                                            shape = if (isPrintLayoutMode) DocFlowTokens.thumbnailShape else androidx.compose.ui.graphics.RectangleShape
                                         )
-                                        if (showPageNumbers) {
+                                        .clickable { currentPageIndex = index }
+                                        .padding(pageMarginPadding)
+                                ) {
+                                    Column {
+                                        if (pageHeaderText.isNotBlank()) {
                                             Text(
-                                                text = "Page ${index + 1} of $totalPages",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Color(0xFF8A8D93)
+                                                text = pageHeaderText,
+                                                fontSize = 12.sp,
+                                                color = Color(0xFF8A8D93),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.padding(bottom = 8.dp)
                                             )
                                         }
-                                    }
-                                    Spacer(modifier = Modifier.height(10.dp))
 
-                                    if (bmp != null) {
-                                        Image(
-                                            bitmap = bmp.asImageBitmap(),
-                                            contentDescription = "PDF Page ${index + 1}",
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height((420f * zoomScale).dp),
-                                            contentScale = ContentScale.Fit
-                                        )
-                                    } else {
-                                        // Render structured headings, tables, lists & paragraphs
-                                        val lines = pageText.lines()
-                                        lines.forEachIndexed { lineIdx, line ->
-                                            val trimmed = line.trim()
-                                            val linePrefix = if (showLineNumbers) "${lineIdx + 1}. " else ""
-                                            when {
-                                                trimmed.startsWith("===") -> {
-                                                    Text(
-                                                        text = trimmed.removePrefix("===").removeSuffix("===").trim(),
-                                                        fontSize = (18f * zoomScale).sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = DocFlowTokens.AccentBlue,
-                                                        modifier = Modifier.padding(vertical = 6.dp)
-                                                    )
-                                                }
-                                                trimmed.startsWith("# ") -> {
-                                                    Text(
-                                                        text = trimmed.removePrefix("# "),
-                                                        fontSize = (22f * zoomScale).sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Color(0xFF111111),
-                                                        modifier = Modifier.padding(vertical = 6.dp)
-                                                    )
-                                                }
-                                                trimmed.startsWith("## ") -> {
-                                                    Text(
-                                                        text = trimmed.removePrefix("## "),
-                                                        fontSize = (18f * zoomScale).sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = Color(0xFF111111),
-                                                        modifier = Modifier.padding(vertical = 4.dp)
-                                                    )
-                                                }
-                                                trimmed.startsWith("|") -> {
-                                                    // Structured Table Row
-                                                    val cells = trimmed.trim('|').split("|").map { it.trim() }
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .background(Color(0xFFF8FAFC))
-                                                            .border(0.5.dp, Color(0xFFE3E4E7))
-                                                            .padding(vertical = 6.dp, horizontal = 8.dp)
-                                                    ) {
-                                                        cells.forEach { cell ->
-                                                            Text(
-                                                                text = cell,
-                                                                modifier = Modifier.weight(1f),
-                                                                fontSize = (13f * zoomScale).sp,
-                                                                fontWeight = FontWeight.Medium,
-                                                                color = Color(0xFF111111)
-                                                            )
+                                        if (bmp != null) {
+                                            Image(
+                                                bitmap = bmp.asImageBitmap(),
+                                                contentDescription = "PDF Page ${index + 1}",
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height((420f * zoomScale).dp),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                        } else if (pageText.isBlank()) {
+                                            Text(
+                                                text = "Tap Edit to start typing",
+                                                fontSize = 14.sp,
+                                                color = Color(0xFF8A8D93),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable { isEditingMode = true }
+                                                    .padding(vertical = 12.dp)
+                                                    .testTag("empty_word_page_placeholder")
+                                            )
+                                        } else {
+                                            // Render structured headings, tables, lists & paragraphs
+                                            val lines = pageText.lines()
+                                            lines.forEachIndexed { lineIdx, line ->
+                                                val trimmed = line.trim()
+                                                val linePrefix = if (showLineNumbers) "${lineIdx + 1}. " else ""
+                                                when {
+                                                    trimmed.startsWith("===") -> {
+                                                        Text(
+                                                            text = trimmed.removePrefix("===").removeSuffix("===").trim(),
+                                                            fontSize = (18f * zoomScale).coerceAtLeast(12f).sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = DocFlowTokens.AccentBlue,
+                                                            modifier = Modifier.padding(vertical = 6.dp)
+                                                        )
+                                                    }
+                                                    trimmed.startsWith("# ") -> {
+                                                        Text(
+                                                            text = trimmed.removePrefix("# "),
+                                                            fontSize = (22f * zoomScale).coerceAtLeast(12f).sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Color(0xFF111111),
+                                                            modifier = Modifier.padding(vertical = 6.dp)
+                                                        )
+                                                    }
+                                                    trimmed.startsWith("## ") -> {
+                                                        Text(
+                                                            text = trimmed.removePrefix("## "),
+                                                            fontSize = (18f * zoomScale).coerceAtLeast(12f).sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = Color(0xFF111111),
+                                                            modifier = Modifier.padding(vertical = 4.dp)
+                                                        )
+                                                    }
+                                                    trimmed.startsWith("|") -> {
+                                                        // Structured Table Row
+                                                        val cells = trimmed.trim('|').split("|").map { it.trim() }
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .background(Color(0xFFF8FAFC))
+                                                                .border(0.5.dp, Color(0xFFE3E4E7))
+                                                                .padding(vertical = 6.dp, horizontal = 8.dp)
+                                                        ) {
+                                                            cells.forEach { cell ->
+                                                                Text(
+                                                                    text = cell,
+                                                                    modifier = Modifier.weight(1f),
+                                                                    fontSize = (13f * zoomScale).coerceAtLeast(12f).sp,
+                                                                    fontWeight = FontWeight.Medium,
+                                                                    color = Color(0xFF111111)
+                                                                )
+                                                            }
                                                         }
                                                     }
-                                                }
-                                                trimmed == "---" -> {
-                                                    DocFlowDivider(
-                                                        palette = palette,
-                                                        modifier = Modifier.padding(vertical = 8.dp)
-                                                    )
-                                                }
-                                                else -> {
-                                                    val matchesQuery = inDocSearchQuery.isNotBlank() &&
-                                                        line.contains(inDocSearchQuery, ignoreCase = true)
-                                                    Text(
-                                                        text = "$linePrefix$line",
-                                                        fontFamily = activeFontFamily,
-                                                        fontSize = (selectedFontSizePt * zoomScale).sp,
-                                                        fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                                        fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                                        textDecoration = activeTextDecoration,
-                                                        textAlign = activeTextAlign,
-                                                        lineHeight = (selectedFontSizePt * lineSpacingMultiplier * zoomScale).sp,
-                                                        color = if (matchesQuery) DocFlowTokens.AccentBlue else parsedTextColor,
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .background(
-                                                                if (matchesQuery) Color(0xFFFFF59D) else Color.Transparent
-                                                            )
-                                                            .padding(vertical = 2.dp)
-                                                    )
+                                                    trimmed == "---" -> {
+                                                        DocFlowDivider(
+                                                            palette = palette,
+                                                            modifier = Modifier.padding(vertical = 8.dp)
+                                                        )
+                                                    }
+                                                    else -> {
+                                                        val matchesQuery = inDocSearchQuery.isNotBlank() &&
+                                                            line.contains(inDocSearchQuery, ignoreCase = true)
+                                                        Text(
+                                                            text = "$linePrefix$line",
+                                                            fontFamily = activeFontFamily,
+                                                            fontSize = (selectedFontSizePt * zoomScale).coerceAtLeast(12f).sp,
+                                                            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                                            fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                                            textDecoration = activeTextDecoration,
+                                                            textAlign = activeTextAlign,
+                                                            lineHeight = (selectedFontSizePt * lineSpacingMultiplier * zoomScale).coerceAtLeast(16f).sp,
+                                                            color = if (matchesQuery) DocFlowTokens.AccentBlue else parsedTextColor,
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .background(
+                                                                    if (matchesQuery) Color(0xFFFFF59D) else Color.Transparent
+                                                                )
+                                                                .padding(vertical = 2.dp)
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
 
-                                    if (pageFooterText.isNotBlank()) {
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        DocFlowDivider(palette = palette)
-                                        Text(
-                                            text = pageFooterText,
-                                            fontSize = 11.sp,
-                                            color = Color(0xFF8A8D93),
-                                            modifier = Modifier.padding(top = 6.dp)
-                                        )
+                                        if (pageFooterText.isNotBlank()) {
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            DocFlowDivider(palette = palette)
+                                            Text(
+                                                text = pageFooterText,
+                                                fontSize = 12.sp,
+                                                color = Color(0xFF8A8D93),
+                                                modifier = Modifier.padding(top = 6.dp)
+                                            )
+                                        }
                                     }
-                                }
 
                                 // PDF Freehand / Highlight / Note Markup Overlay
                                 if (isPdf && (pageAnnotations.isNotEmpty() || activeMarkupTool != null)) {
@@ -1223,21 +1264,37 @@ fun DocumentViewerEditorScreen(
                                         }
                                     }
                                 }
+                                }
+
+                                // Page Number OUTSIDE, centered under the sheet (12sp, secondary text)
+                                if (showPageNumbers && isPrintLayoutMode) {
+                                    Text(
+                                        text = "Page ${index + 1} of $totalPages",
+                                        fontSize = 12.sp,
+                                        color = palette.textSecondary,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 8.dp, bottom = 4.dp)
+                                            .testTag("viewer_page_number_outside_${index + 1}")
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                // Floating Blue "Edit" Pill in View Mode (for Word/Office/Notes)
+                // Single Edit Entry Point: Floating Blue "Edit" Pill in View Mode (56dp high, 16dp above bottom bar)
                 if (!isPdf && !isEditingMode) {
                     Row(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(end = 20.dp, bottom = 16.dp)
+                            .height(56.dp)
                             .clip(DocFlowTokens.pillButtonShape)
                             .background(DocFlowTokens.AccentBlue)
                             .clickable { isEditingMode = true }
-                            .padding(horizontal = 20.dp, vertical = 12.dp)
+                            .padding(horizontal = 22.dp)
                             .testTag("viewer_floating_edit_pill"),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1246,7 +1303,7 @@ fun DocumentViewerEditorScreen(
                             imageVector = Icons.Filled.Edit,
                             contentDescription = "Edit document",
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Text(
                             text = "Edit",
@@ -1391,22 +1448,23 @@ fun DocumentViewerEditorScreen(
                     onToggleLayoutMode = { isPrintLayoutMode = !isPrintLayoutMode }
                 )
             } else {
-                // View Mode Bottom Action Bar
+                // View Mode Bottom Action Bar (56dp height, 4 equal-width items for Word: Export PDF, Versions, Notes, AI Mic)
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(palette.surface)
                 ) {
                     DocFlowDivider(palette = palette)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = DocFlowTokens.space3, vertical = DocFlowTokens.space2),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (isPdf) {
+                    if (isPdf) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = DocFlowTokens.space2),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             ViewerBottomActionButton(
                                 icon = Icons.Filled.GridView,
                                 label = "Pages ($totalPages)",
@@ -1436,56 +1494,68 @@ fun DocumentViewerEditorScreen(
                             )
                             ViewerBottomActionButton(
                                 icon = Icons.Filled.PictureAsPdf,
-                                label = "Watermark Copy",
-                                active = false,
-                                palette = palette,
-                                onClick = { showWatermarkPdfExportSheet = true }
-                            )
-                        } else {
-                            ViewerBottomActionButton(
-                                icon = Icons.Filled.Edit,
-                                label = "Edit (Word UI)",
-                                active = isEditingMode,
-                                palette = palette,
-                                onClick = { isEditingMode = true }
-                            )
-                            ViewerBottomActionButton(
-                                icon = Icons.Filled.PictureAsPdf,
                                 label = "Export PDF",
                                 active = false,
                                 palette = palette,
                                 onClick = { showWatermarkPdfExportSheet = true }
                             )
                             ViewerBottomActionButton(
-                                icon = Icons.Filled.History,
-                                label = "Versions / Notes PDF",
+                                icon = Icons.Filled.Notes,
+                                label = "Notes",
                                 active = false,
                                 palette = palette,
-                                onClick = { showExportVersionsNotesSheet = true }
+                                onClick = { showCommentsSheet = true }
+                            )
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.Mic,
+                                label = "AI Mic",
+                                active = false,
+                                palette = palette,
+                                onClick = { showAiMicSheet = true }
                             )
                         }
-
-                        ViewerBottomActionButton(
-                            icon = Icons.Filled.Mic,
-                            label = "AI Mic",
-                            active = false,
-                            palette = palette,
-                            onClick = { showAiMicSheet = true }
-                        )
-                        ViewerBottomActionButton(
-                            icon = Icons.Filled.AutoAwesome,
-                            label = "Summarise",
-                            active = false,
-                            palette = palette,
-                            onClick = { showSummariseSheet = true }
-                        )
-                        ViewerBottomActionButton(
-                            icon = Icons.Filled.Translate,
-                            label = "Translate",
-                            active = false,
-                            palette = palette,
-                            onClick = { showTranslateSheet = true }
-                        )
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .padding(horizontal = DocFlowTokens.space2),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.PictureAsPdf,
+                                label = "Export PDF",
+                                active = false,
+                                palette = palette,
+                                modifier = Modifier.weight(1f).testTag("viewer_bottom_export_pdf"),
+                                onClick = { showWatermarkPdfExportSheet = true }
+                            )
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.History,
+                                label = "Versions",
+                                active = false,
+                                palette = palette,
+                                modifier = Modifier.weight(1f).testTag("viewer_bottom_versions"),
+                                onClick = { showExportVersionsNotesSheet = true }
+                            )
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.Notes,
+                                label = "Notes",
+                                active = false,
+                                palette = palette,
+                                modifier = Modifier.weight(1f).testTag("viewer_bottom_notes"),
+                                onClick = { showCommentsSheet = true }
+                            )
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.Mic,
+                                label = "AI Mic",
+                                active = false,
+                                palette = palette,
+                                modifier = Modifier.weight(1f).testTag("viewer_bottom_ai_mic"),
+                                onClick = { showAiMicSheet = true }
+                            )
+                        }
                     }
                 }
             }
@@ -1614,63 +1684,219 @@ fun DocumentViewerEditorScreen(
         )
     }
 
-    // Comments Sheet (Review Tab > Local Comments)
+    // Notes Sheet (Per-Document Notes + Pin + Color Label + Checklist + AI Mic + Export PDF + Share with Link)
     if (showCommentsSheet) {
+        val filteredNotes = remember(comments, noteSearchQuery) {
+            val q = noteSearchQuery.trim()
+            val base = if (q.isEmpty()) comments else comments.filter {
+                it.body.contains(q, ignoreCase = true) || it.anchorLineOrText.contains(q, ignoreCase = true)
+            }
+            base.sortedByDescending { it.anchorLineOrText.contains("[PINNED]") }
+        }
+
         DocFlowBottomSheet(
             onDismissRequest = { showCommentsSheet = false },
             palette = palette
         ) {
-            Text(
-                text = "Document Comments & Notes (${comments.size})",
-                style = DocFlowTokens.sectionLabelStyle,
-                fontWeight = FontWeight.Bold,
-                color = palette.textPrimary
-            )
-            Text(
-                text = "Stored on this device • Exportable to PDF",
-                style = DocFlowTokens.captionStyle,
-                color = palette.textSecondary
-            )
-            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = newCommentBody,
-                    onValueChange = { newCommentBody = it },
-                    placeholder = { Text("Add a local review comment or note...") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                DocFlowPrimaryButton(
-                    text = "Add",
-                    enabled = newCommentBody.isNotBlank(),
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Notes (${comments.size})",
+                        style = DocFlowTokens.sectionLabelStyle,
+                        fontWeight = FontWeight.Bold,
+                        color = palette.textPrimary
+                    )
+                    Text(
+                        text = "Stored on this device • Export PDF or Share with link",
+                        style = DocFlowTokens.captionStyle,
+                        color = palette.textSecondary
+                    )
+                }
+                TextButton(
                     onClick = {
-                        viewModel.addDocumentComment(
-                            doc = doc,
-                            anchorLineOrText = "Page ${currentPageIndex + 1}",
-                            body = newCommentBody.trim(),
-                            isSuggestion = false,
-                            suggestedReplacement = ""
-                        )
-                        newCommentBody = ""
+                        showCommentsSheet = false
+                        showMySharedLinksSheet = true
                     }
-                )
+                ) {
+                    Text("Shared links", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = DocFlowTokens.AccentBlue)
+                }
             }
 
             Spacer(modifier = Modifier.height(DocFlowTokens.space2))
 
-            comments.forEach { comment ->
+            // Search inside notes
+            OutlinedTextField(
+                value = noteSearchQuery,
+                onValueChange = { noteSearchQuery = it },
+                placeholder = { Text("Search notes...") },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("doc_notes_search_input")
+            )
+
+            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+
+            // Create Note Card: Title, Color Label, Pin toggle, Checklist item, Body with AI Mic
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(DocFlowTokens.cardShape)
+                    .background(palette.background)
+                    .border(1.dp, palette.divider, DocFlowTokens.cardShape)
+                    .padding(DocFlowTokens.space3),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = newNoteTitleInput,
+                    onValueChange = { newNoteTitleInput = it },
+                    placeholder = { Text("Note title (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Color labels & Pin toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Color:", fontSize = 12.sp, color = palette.textSecondary)
+                        listOf("#FFFFFF", "#FFF8E1", "#E8F0FF", "#E8F5E9", "#FCE4EC").forEach { hex ->
+                            val c = Color(android.graphics.Color.parseColor(hex))
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(c)
+                                    .border(
+                                        width = if (newNoteColorHex == hex) 2.dp else 1.dp,
+                                        color = if (newNoteColorHex == hex) DocFlowTokens.AccentBlue else palette.divider,
+                                        shape = CircleShape
+                                    )
+                                    .clickable { newNoteColorHex = hex }
+                            )
+                        }
+                    }
+
+                    FilterChip(
+                        selected = newNotePinned,
+                        onClick = { newNotePinned = !newNotePinned },
+                        label = { Text(if (newNotePinned) "Pinned" else "Pin to top", fontSize = 12.sp) }
+                    )
+                }
+
+                // Body + AI Mic inside bottom-right
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = newCommentBody,
+                        onValueChange = { newCommentBody = it },
+                        placeholder = { Text("Write note or checklist items (use '- [ ] task')...") },
+                        minLines = 3,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("doc_note_body_input")
+                    )
+                    IconButton(
+                        onClick = {
+                            showCommentsSheet = false
+                            showAiMicSheet = true
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp)
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(DocFlowTokens.AccentBlue.copy(alpha = 0.12f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Mic,
+                            contentDescription = "Dictate note with AI Mic",
+                            tint = DocFlowTokens.AccentBlue
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = {
+                            newCommentBody = if (newCommentBody.isBlank()) "- [ ] " else "${newCommentBody.trimEnd()}\n- [ ] "
+                        }
+                    ) {
+                        Text("+ Checklist item", fontSize = 13.sp, color = DocFlowTokens.AccentBlue, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    DocFlowPrimaryButton(
+                        text = "Save Note",
+                        enabled = newCommentBody.isNotBlank() || newNoteTitleInput.isNotBlank(),
+                        onClick = {
+                            val titlePart = newNoteTitleInput.trim().ifBlank { "Note on Page ${currentPageIndex + 1}" }
+                            val pinTag = if (newNotePinned) "[PINNED] " else ""
+                            val fullBody = if (newNoteTitleInput.isNotBlank()) {
+                                "# ${newNoteTitleInput.trim()}\n${newCommentBody.trim()}"
+                            } else {
+                                newCommentBody.trim()
+                            }
+                            viewModel.addDocumentComment(
+                                doc = doc,
+                                anchorLineOrText = "$pinTag$titlePart • Color:$newNoteColorHex",
+                                body = fullBody,
+                                isSuggestion = false,
+                                suggestedReplacement = ""
+                            )
+                            newCommentBody = ""
+                            newNoteTitleInput = ""
+                            newNotePinned = false
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+
+            filteredNotes.forEach { comment ->
+                val noteTitle = comment.body.lines().firstOrNull()?.removePrefix("# ")?.trim()?.ifBlank { "Note" } ?: "Note"
                 DocFlowListRow(
-                    title = comment.body,
-                    subtitle = "${comment.authorName} • ${comment.status} • Tap PDF icon to export note",
+                    title = noteTitle,
+                    subtitle = "${comment.body.take(90)} • ${comment.anchorLineOrText}",
                     palette = palette,
                     onClick = {},
                     trailing = {
                         Row {
+                            IconButton(
+                                onClick = {
+                                    showCommentsSheet = false
+                                    shareLinkTargetNote = noteTitle to comment.body
+                                },
+                                modifier = Modifier.testTag("share_note_link_button_${comment.id}")
+                            ) {
+                                Icon(Icons.Filled.Link, contentDescription = "Share with link", tint = DocFlowTokens.AccentBlue)
+                            }
+                            IconButton(
+                                onClick = {
+                                    val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(android.content.Intent.EXTRA_SUBJECT, noteTitle)
+                                        putExtra(android.content.Intent.EXTRA_TEXT, comment.body)
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(sendIntent, "Share note as text"))
+                                }
+                            ) {
+                                Icon(Icons.Filled.Share, contentDescription = "Share note as text", tint = palette.textPrimary)
+                            }
                             IconButton(
                                 onClick = {
                                     viewModel.exportCommentOrNoteAsPdf(context, doc, comment)
@@ -1682,13 +1908,30 @@ fun DocumentViewerEditorScreen(
                             IconButton(
                                 onClick = { viewModel.deleteComment(comment.id) }
                             ) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete comment", tint = palette.textSecondary)
+                                Icon(Icons.Filled.Delete, contentDescription = "Delete note", tint = palette.textSecondary)
                             }
                         }
                     }
                 )
             }
         }
+    }
+
+    // Share Note with Link Sheet (#v1.<payload>)
+    shareLinkTargetNote?.let { (noteTitle, noteBody) ->
+        ShareNoteWithLinkBottomSheet(
+            noteTitle = noteTitle,
+            noteBody = noteBody,
+            palette = palette,
+            onDismiss = { shareLinkTargetNote = null }
+        )
+    }
+
+    if (showMySharedLinksSheet) {
+        MySharedLinksBottomSheet(
+            palette = palette,
+            onDismiss = { showMySharedLinksSheet = false }
+        )
     }
 
     // Export Individual Versions or Notes to PDF Sheet
@@ -2096,7 +2339,7 @@ fun DocumentViewerEditorScreen(
                     ) {
                         Text(
                             text = contentPages.getOrNull(i)?.take(60) ?: "Page ${i + 1}",
-                            fontSize = 9.sp,
+                            fontSize = 12.sp,
                             color = Color.DarkGray,
                             maxLines = 4,
                             overflow = TextOverflow.Ellipsis,
@@ -2366,7 +2609,7 @@ private fun MsWordBottomRibbon(
                             FilterChip(
                                 selected = selectedFontFamily == font,
                                 onClick = { onSelectFontFamily(font) },
-                                label = { Text(font, fontSize = 11.sp) }
+                                label = { Text(font, fontSize = 12.sp) }
                             )
                         }
                         FilterChip(
@@ -2450,7 +2693,7 @@ private fun MsWordBottomRibbon(
                             FilterChip(
                                 selected = paragraphStyleName == st,
                                 onClick = { onSelectParagraphStyle(st) },
-                                label = { Text(st, fontSize = 11.sp) }
+                                label = { Text(st, fontSize = 12.sp) }
                             )
                         }
                         listOf("#111111", "#1F6BFF", "#E5483F", "#25C25A").forEach { hex ->
@@ -2625,28 +2868,33 @@ private fun ViewerBottomActionButton(
     label: String,
     active: Boolean,
     palette: DocFlowPalette,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
+        verticalArrangement = Arrangement.Center,
+        modifier = modifier
+            .height(52.dp)
             .clip(DocFlowTokens.buttonShape)
             .background(if (active) DocFlowTokens.AccentBlue.copy(alpha = 0.12f) else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
             tint = if (active) DocFlowTokens.AccentBlue else palette.textPrimary,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(24.dp)
         )
-        Spacer(modifier = Modifier.height(3.dp))
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-            color = if (active) DocFlowTokens.AccentBlue else palette.textSecondary
+            color = if (active) DocFlowTokens.AccentBlue else palette.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

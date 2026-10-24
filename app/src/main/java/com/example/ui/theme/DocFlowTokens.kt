@@ -29,7 +29,8 @@ data class DocFlowPalette(
     val textSecondary: Color,
     val divider: Color,
     val pressOverlay: Color,
-    val accentBlue: Color = DocFlowAccentBlue
+    val accentBlue: Color = DocFlowAccentBlue,
+    val inputBorder: Color = if (isDark) Color(0xFF3A3D45) else Color(0xFFC9CBD0)
 )
 
 /**
@@ -139,6 +140,7 @@ object DocFlowTokens {
     val IconCircleOrange: Color = iconOrangePpt
     val IconCircleGreenExcel: Color = iconGreenDarkExcel
     val IconCircleExcelGreen: Color = iconGreenDarkExcel
+    val SelectedRowTintLight: Color = Color(0xFFE8F0FF)
 
     // -------------------------------------------------------------------------
     // 2. Corner Radii
@@ -224,6 +226,8 @@ object DocFlowTokens {
         fontSize = 20.sp,
         lineHeight = 26.sp
     )
+
+    val screenTitleStyle: TextStyle = sectionLabelStyle
 
     val rowTitleStyle: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,

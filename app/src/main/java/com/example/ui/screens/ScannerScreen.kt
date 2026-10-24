@@ -64,6 +64,7 @@ import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.ViewCarousel
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -72,6 +73,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -201,6 +203,7 @@ fun ScannerScreen(
     var selectedPageIndex by remember { mutableIntStateOf(0) }
     var isAdjustingCrop by remember { mutableStateOf(false) }
     var showMultiPageDrawer by remember { mutableStateOf(false) }
+    var pendingDeletePageIndex by remember { mutableStateOf<Int?>(null) }
     var showSaveSheet by remember { mutableStateOf(false) }
 
     // Save Sheet State
@@ -553,10 +556,7 @@ fun ScannerScreen(
                                 }
                             },
                             onDeletePage = { idx ->
-                                capturedPages.removeAt(idx)
-                                if (selectedPageIndex >= capturedPages.size) {
-                                    selectedPageIndex = (capturedPages.size - 1).coerceAtLeast(0)
-                                }
+                                pendingDeletePageIndex = idx
                             },
                             onDoneReview = {
                                 showMultiPageDrawer = false
@@ -681,7 +681,7 @@ fun ScannerScreen(
                                         Text(
                                             text = "${capturedPages.size}",
                                             color = Color.White,
-                                            fontSize = 11.sp,
+                                            fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
@@ -918,18 +918,12 @@ fun ScannerScreen(
                             palette = palette,
                             tint = DocFlowTokens.IconCircleRed,
                             onClick = {
-                                if (capturedPages.size > 1) {
-                                    capturedPages.removeAt(safeIndex)
-                                    selectedPageIndex = (safeIndex - 1).coerceAtLeast(0)
-                                } else {
-                                    capturedPages.clear()
-                                    currentStep = ScannerStep.CAMERA
-                                }
+                                pendingDeletePageIndex = safeIndex
                             }
                         )
                     }
 
-                    // Multi-Page Preview Drawer Strip (Reorder Left/Right, Delete, Add Page)
+                    // Multi-Page Preview Drawer Strip (Drag-to-Reorder, Swipe-to-Delete with Confirmation, Add Page)
                     BatchMultiPagePreviewDrawer(
                         pages = capturedPages,
                         selectedIndex = safeIndex,
@@ -950,13 +944,7 @@ fun ScannerScreen(
                             }
                         },
                         onDeletePage = { idx ->
-                            if (capturedPages.size > 1) {
-                                capturedPages.removeAt(idx)
-                                selectedPageIndex = (idx - 1).coerceAtLeast(0)
-                            } else {
-                                capturedPages.clear()
-                                currentStep = ScannerStep.CAMERA
-                            }
+                            pendingDeletePageIndex = idx
                         },
                         onAddPage = { currentStep = ScannerStep.CAMERA }
                     )
@@ -1199,6 +1187,67 @@ fun ScannerScreen(
             }
         }
     }
+    // Confirmation Dialog for Swipe-to-Delete / Page Deletion
+    pendingDeletePageIndex?.let { delIdx ->
+        val pageNum = delIdx + 1
+        AlertDialog(
+            onDismissRequest = { pendingDeletePageIndex = null },
+            containerColor = palette.surface,
+            title = {
+                Text(
+                    text = "Delete Page $pageNum?",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.textPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to remove Page $pageNum from this scan batch?",
+                    fontSize = 14.sp,
+                    color = palette.textSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (delIdx in capturedPages.indices) {
+                            capturedPages.removeAt(delIdx)
+                            if (capturedPages.isEmpty()) {
+                                selectedPageIndex = 0
+                                showMultiPageDrawer = false
+                                currentStep = ScannerStep.CAMERA
+                            } else {
+                                selectedPageIndex = selectedPageIndex.coerceIn(0, capturedPages.lastIndex)
+                            }
+                            scannerToast = "Deleted Page $pageNum"
+                        }
+                        pendingDeletePageIndex = null
+                    },
+                    modifier = Modifier.testTag("scanner_confirm_delete_page_button")
+                ) {
+                    Text(
+                        text = "Delete",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DocFlowTokens.IconCircleRed
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingDeletePageIndex = null },
+                    modifier = Modifier.testTag("scanner_cancel_delete_page_button")
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontSize = 14.sp,
+                        color = palette.textSecondary
+                    )
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -1216,11 +1265,23 @@ private fun BatchMultiPagePreviewDrawer(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(DocFlowTokens.sheetShape)
             .background(palette.surface)
-            .border(1.dp, palette.divider)
+            .border(1.dp, palette.divider, DocFlowTokens.sheetShape)
             .padding(horizontal = DocFlowTokens.screenHorizontalMargin, vertical = DocFlowTokens.space2)
             .testTag("scanner_multipage_preview_drawer")
     ) {
+        // Sheet grab handle
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = 6.dp)
+                .width(36.dp)
+                .height(4.dp)
+                .clip(DocFlowTokens.pillButtonShape)
+                .background(palette.divider)
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1237,7 +1298,7 @@ private fun BatchMultiPagePreviewDrawer(
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = "Batch Pages (${pages.size}) • Reorder or Delete",
+                    text = "Batch Pages (${pages.size}) • Drag to reorder, swipe up to delete",
                     style = DocFlowTokens.captionStyle,
                     fontWeight = FontWeight.Bold,
                     color = palette.textPrimary
@@ -1265,6 +1326,9 @@ private fun BatchMultiPagePreviewDrawer(
         ) {
             pages.forEachIndexed { idx, page ->
                 val isSelected = idx == selectedIndex
+                var dragAccumX by remember(page.id, idx) { mutableFloatStateOf(0f) }
+                var dragAccumY by remember(page.id, idx) { mutableFloatStateOf(0f) }
+
                 Column(
                     modifier = Modifier
                         .width(96.dp)
@@ -1275,6 +1339,33 @@ private fun BatchMultiPagePreviewDrawer(
                             color = if (isSelected) DocFlowTokens.AccentBlue else palette.divider,
                             shape = DocFlowTokens.thumbnailShape
                         )
+                        .pointerInput(page.id, idx, pages.size) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    dragAccumX = 0f
+                                    dragAccumY = 0f
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    dragAccumX += dragAmount.x
+                                    dragAccumY += dragAmount.y
+                                },
+                                onDragEnd = {
+                                    // Vertical swipe up or down (> 45px) triggers swipe-to-delete confirmation
+                                    if (kotlin.math.abs(dragAccumY) > 45f && kotlin.math.abs(dragAccumY) > kotlin.math.abs(dragAccumX)) {
+                                        onDeletePage(idx)
+                                    } else if (dragAccumX < -40f && idx > 0) {
+                                        // Drag left reorders page left
+                                        onMovePageLeft(idx)
+                                    } else if (dragAccumX > 40f && idx < pages.lastIndex) {
+                                        // Drag right reorders page right
+                                        onMovePageRight(idx)
+                                    }
+                                    dragAccumX = 0f
+                                    dragAccumY = 0f
+                                }
+                            )
+                        }
                         .clickable { onSelectPage(idx) }
                         .padding(4.dp)
                         .testTag("drawer_page_card_$idx"),
@@ -1301,7 +1392,7 @@ private fun BatchMultiPagePreviewDrawer(
                             Text(
                                 text = "${idx + 1}",
                                 color = Color.White,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -1375,7 +1466,7 @@ private fun BatchMultiPagePreviewDrawer(
                         )
                         Text(
                             text = "Add",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = DocFlowTokens.AccentBlue
                         )

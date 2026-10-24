@@ -63,9 +63,21 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.FilterChip
 import com.example.data.local.CachedDocumentEntity
+import com.example.data.local.DocumentCommentEntity
+import com.example.data.model.DocEntity
 import com.example.data.model.FolderEntity
 import com.example.data.util.OnDeviceAiAndBackupEngine
+import com.example.ui.components.AiMicDictationBottomSheet
 import com.example.ui.components.DocFlowCard
 import com.example.ui.components.DocFlowDivider
 import com.example.ui.components.DocFlowHeaderAction
@@ -75,6 +87,8 @@ import com.example.ui.components.DocFlowPrimaryButton
 import com.example.ui.components.DocFlowScreenHeader
 import com.example.ui.components.DocFlowSecondaryButton
 import com.example.ui.components.DocFlowSectionLabel
+import com.example.ui.components.MySharedLinksBottomSheet
+import com.example.ui.components.ShareNoteWithLinkBottomSheet
 import com.example.ui.theme.DocFlowPalette
 import com.example.ui.theme.DocFlowTokens
 import com.example.ui.viewmodel.DocFlowViewModel
@@ -106,11 +120,24 @@ fun ManageScreen(
 
     // Sub-screens / Sheets
     var showCreatedByMeSheet by remember { mutableStateOf(false) }
+    var showStandaloneNotesSheet by remember { mutableStateOf(false) }
+    var showMySharedLinksSheet by remember { mutableStateOf(false) }
     var showPrivateSafePinDialog by remember { mutableStateOf(false) }
     var showPrivateSafeSheet by remember { mutableStateOf(false) }
     var showRecentlyDeletedSheet by remember { mutableStateOf(false) }
     var activeFolderSheet by remember { mutableStateOf<FolderEntity?>(null) }
     var activeSourceSheetKey by remember { mutableStateOf<String?>(null) }
+
+    // Standalone Notes state
+    val standaloneNotesDocId = "standalone_notes_hub"
+    val standaloneNotes by viewModel.observeDocumentComments(standaloneNotesDocId).collectAsState(initial = emptyList())
+    var noteSearchQuery by remember { mutableStateOf("") }
+    var newNoteTitle by remember { mutableStateOf("") }
+    var newNoteBody by remember { mutableStateOf("") }
+    var newNoteColorHex by remember { mutableStateOf("#FFFFFF") }
+    var newNotePinned by remember { mutableStateOf(false) }
+    var showNoteAiMic by remember { mutableStateOf(false) }
+    var shareLinkTargetNote by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
@@ -256,7 +283,7 @@ fun ManageScreen(
             }
         }
 
-        // Section 2: Personal (Created by me, Private Safe, Recently deleted)
+        // Section 2: Personal (Notes, Created by me, Private Safe, Recently deleted, My shared links)
         item {
             Spacer(modifier = Modifier.height(DocFlowTokens.space2))
             DocFlowSectionLabel(text = "Personal", palette = palette)
@@ -264,6 +291,32 @@ fun ManageScreen(
                 palette = palette,
                 contentPadding = PaddingValues(vertical = DocFlowTokens.space1)
             ) {
+                ManageRowItem(
+                    icon = Icons.Filled.Notes,
+                    iconBg = DocFlowTokens.AccentBlue,
+                    title = "Notes",
+                    subtitle = "${standaloneNotes.size} note(s) • Checklists, AI Mic, PDF export & Share with link",
+                    palette = palette,
+                    testTag = "manage_personal_notes",
+                    onClick = { showStandaloneNotesSheet = true }
+                )
+                DocFlowDivider(
+                    palette = palette,
+                    modifier = Modifier.padding(start = 72.dp, end = DocFlowTokens.cardPaddingMin)
+                )
+                ManageRowItem(
+                    icon = Icons.Filled.Link,
+                    iconBg = DocFlowTokens.IconCircleTeal,
+                    title = "My shared links",
+                    subtitle = "${OnDeviceAiAndBackupEngine.getSavedSharedLinks(context).size} link(s) • Local list stored on this device",
+                    palette = palette,
+                    testTag = "manage_personal_shared_links",
+                    onClick = { showMySharedLinksSheet = true }
+                )
+                DocFlowDivider(
+                    palette = palette,
+                    modifier = Modifier.padding(start = 72.dp, end = DocFlowTokens.cardPaddingMin)
+                )
                 ManageRowItem(
                     icon = Icons.Filled.Person,
                     iconBg = DocFlowTokens.IconCircleTeal,
@@ -855,6 +908,296 @@ fun ManageScreen(
                 Spacer(modifier = Modifier.height(DocFlowTokens.space5))
             }
         }
+    }
+
+    // Standalone Notes Sheet (Manage > Notes)
+    if (showStandaloneNotesSheet) {
+        val virtualNotesHostDoc = remember {
+            DocEntity(
+                id = standaloneNotesDocId,
+                userId = viewModel.currentUserId,
+                folderId = "root",
+                title = "DocFlow Standalone Notes",
+                category = "Notes",
+                fileType = "note",
+                fileName = "standalone_notes.txt",
+                fileSize = 1024L,
+                content = ""
+            )
+        }
+        val filteredStandalone = remember(standaloneNotes, noteSearchQuery) {
+            val q = noteSearchQuery.trim()
+            val list = if (q.isEmpty()) standaloneNotes else standaloneNotes.filter {
+                it.body.contains(q, ignoreCase = true) || it.anchorLineOrText.contains(q, ignoreCase = true)
+            }
+            list.sortedByDescending { it.anchorLineOrText.contains("[PINNED]") }
+        }
+
+        ModalBottomSheet(
+            onDismissRequest = { showStandaloneNotesSheet = false },
+            containerColor = palette.surface,
+            shape = DocFlowTokens.sheetShape
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = DocFlowTokens.cardPaddingMax, vertical = DocFlowTokens.space2)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Notes (${standaloneNotes.size})",
+                            style = DocFlowTokens.sectionLabelStyle,
+                            fontWeight = FontWeight.Bold,
+                            color = palette.textPrimary
+                        )
+                        Text(
+                            text = "Stored on this device • Export PDF or Share with link",
+                            style = DocFlowTokens.captionStyle,
+                            color = palette.textSecondary
+                        )
+                    }
+                    TextButton(
+                        onClick = {
+                            showStandaloneNotesSheet = false
+                            showMySharedLinksSheet = true
+                        }
+                    ) {
+                        Text("Shared links", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = DocFlowTokens.AccentBlue)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+
+                OutlinedTextField(
+                    value = noteSearchQuery,
+                    onValueChange = { noteSearchQuery = it },
+                    placeholder = { Text("Search inside notes...") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("manage_notes_search_input")
+                )
+
+                Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+
+                // New Note Composer Card
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(DocFlowTokens.cardShape)
+                        .background(palette.background)
+                        .border(1.dp, palette.divider, DocFlowTokens.cardShape)
+                        .padding(DocFlowTokens.space3),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = newNoteTitle,
+                        onValueChange = { newNoteTitle = it },
+                        placeholder = { Text("Note title") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("manage_note_title_input")
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Color:", fontSize = 12.sp, color = palette.textSecondary)
+                            listOf("#FFFFFF", "#FFF8E1", "#E8F0FF", "#E8F5E9", "#FCE4EC").forEach { hex ->
+                                val c = Color(android.graphics.Color.parseColor(hex))
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(c)
+                                        .border(
+                                            width = if (newNoteColorHex == hex) 2.dp else 1.dp,
+                                            color = if (newNoteColorHex == hex) DocFlowTokens.AccentBlue else palette.divider,
+                                            shape = CircleShape
+                                        )
+                                        .clickable { newNoteColorHex = hex }
+                                )
+                            }
+                        }
+
+                        FilterChip(
+                            selected = newNotePinned,
+                            onClick = { newNotePinned = !newNotePinned },
+                            label = { Text(if (newNotePinned) "Pinned" else "Pin", fontSize = 12.sp) }
+                        )
+                    }
+
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = newNoteBody,
+                            onValueChange = { newNoteBody = it },
+                            placeholder = { Text("Write note or checklist items ('- [ ] item')...") },
+                            minLines = 3,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("manage_note_body_input")
+                        )
+                        IconButton(
+                            onClick = { showNoteAiMic = true },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(6.dp)
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(DocFlowTokens.AccentBlue.copy(alpha = 0.12f))
+                                .testTag("manage_note_ai_mic_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Mic,
+                                contentDescription = "Dictate note with AI Mic",
+                                tint = DocFlowTokens.AccentBlue
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                newNoteBody = if (newNoteBody.isBlank()) "- [ ] " else "${newNoteBody.trimEnd()}\n- [ ] "
+                            }
+                        ) {
+                            Text("+ Checklist", fontSize = 13.sp, color = DocFlowTokens.AccentBlue, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        DocFlowPrimaryButton(
+                            text = "Save Note",
+                            enabled = newNoteBody.isNotBlank() || newNoteTitle.isNotBlank(),
+                            onClick = {
+                                val resolvedTitle = newNoteTitle.trim().ifBlank { "Untitled Note" }
+                                val pinPrefix = if (newNotePinned) "[PINNED] " else ""
+                                val bodyText = if (newNoteTitle.isNotBlank()) {
+                                    "# ${newNoteTitle.trim()}\n${newNoteBody.trim()}"
+                                } else {
+                                    newNoteBody.trim()
+                                }
+                                viewModel.addDocumentComment(
+                                    doc = virtualNotesHostDoc,
+                                    anchorLineOrText = "$pinPrefix$resolvedTitle • Color:$newNoteColorHex",
+                                    body = bodyText,
+                                    isSuggestion = false,
+                                    suggestedReplacement = ""
+                                )
+                                newNoteTitle = ""
+                                newNoteBody = ""
+                                newNotePinned = false
+                            },
+                            modifier = Modifier.testTag("manage_save_note_button")
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(DocFlowTokens.space2))
+
+                if (filteredStandalone.isEmpty()) {
+                    Text(
+                        text = "No standalone notes yet. Create a note above or use AI Mic to dictate.",
+                        style = DocFlowTokens.captionStyle,
+                        color = palette.textSecondary,
+                        modifier = Modifier.padding(vertical = DocFlowTokens.space3)
+                    )
+                } else {
+                    filteredStandalone.forEach { comment ->
+                        val extractedTitle = comment.body.lines().firstOrNull()?.removePrefix("# ")?.trim()?.ifBlank { "Note" } ?: "Note"
+                        DocFlowListRow(
+                            title = extractedTitle,
+                            subtitle = "${comment.body.take(80)} • ${comment.anchorLineOrText}",
+                            palette = palette,
+                            onClick = {},
+                            trailing = {
+                                Row {
+                                    IconButton(
+                                        onClick = {
+                                            showStandaloneNotesSheet = false
+                                            shareLinkTargetNote = extractedTitle to comment.body
+                                        },
+                                        modifier = Modifier.testTag("manage_share_note_link_${comment.id}")
+                                    ) {
+                                        Icon(Icons.Filled.Link, contentDescription = "Share with link", tint = DocFlowTokens.AccentBlue)
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(Intent.EXTRA_SUBJECT, extractedTitle)
+                                                putExtra(Intent.EXTRA_TEXT, comment.body)
+                                            }
+                                            context.startActivity(Intent.createChooser(sendIntent, "Share note as text"))
+                                        }
+                                    ) {
+                                        Icon(Icons.Filled.Share, contentDescription = "Share note as text", tint = palette.textPrimary)
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.exportCommentOrNoteAsPdf(context, virtualNotesHostDoc, comment)
+                                            showStandaloneNotesSheet = false
+                                        }
+                                    ) {
+                                        Icon(Icons.Filled.PictureAsPdf, contentDescription = "Export Note as PDF", tint = DocFlowTokens.IconCircleRed)
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.deleteComment(comment.id) }
+                                    ) {
+                                        Icon(Icons.Filled.Delete, contentDescription = "Delete note", tint = palette.textSecondary)
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(DocFlowTokens.space5))
+            }
+        }
+    }
+
+    if (showNoteAiMic) {
+        AiMicDictationBottomSheet(
+            palette = palette,
+            initialText = "",
+            confirmButtonLabel = "Insert into Note",
+            onDismiss = { showNoteAiMic = false },
+            onConfirmCleanText = { cleaned ->
+                newNoteBody = if (newNoteBody.isBlank()) cleaned else "${newNoteBody.trimEnd()}\n$cleaned"
+                showNoteAiMic = false
+            }
+        )
+    }
+
+    shareLinkTargetNote?.let { (noteTitle, noteBody) ->
+        ShareNoteWithLinkBottomSheet(
+            noteTitle = noteTitle,
+            noteBody = noteBody,
+            palette = palette,
+            onDismiss = { shareLinkTargetNote = null }
+        )
+    }
+
+    if (showMySharedLinksSheet) {
+        MySharedLinksBottomSheet(
+            palette = palette,
+            onDismiss = { showMySharedLinksSheet = false }
+        )
     }
 }
 
