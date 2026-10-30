@@ -1,6 +1,7 @@
 package com.example.data.util
 
 import android.graphics.Bitmap
+import android.graphics.RectF
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
@@ -43,12 +44,19 @@ data class LanguageDetectionResult(
     val characterSummary: String
 )
 
+data class MlKitTextBlock(
+    val text: String,
+    val normalizedBoundingBox: RectF? = null,
+    val lines: List<String> = emptyList()
+)
+
 data class MlKitOcrPageBlock(
     val pageNumber: Int,
     val rawText: String,
     val blockCount: Int,
     val lineCount: Int,
-    val elementCount: Int
+    val elementCount: Int,
+    val detailedBlocks: List<MlKitTextBlock> = emptyList()
 )
 
 data class MlKitOcrScanResult(
@@ -103,7 +111,7 @@ object MultiLanguageOcrEngine {
                 val visionText: Text? = if (recognizer != null) {
                     runCatching {
                         val inputImage = InputImage.fromBitmap(bitmap, 0)
-                        withTimeoutOrNull(3500L) {
+                        withTimeoutOrNull(12000L) {
                             suspendCancellableCoroutine<Text?> { cont ->
                                 recognizer.process(inputImage)
                                     .addOnSuccessListener { result ->
@@ -129,6 +137,23 @@ object MultiLanguageOcrEngine {
                     block.lines.sumOf { line -> line.elements.size }
                 } ?: 0
 
+                val detailedBlocks = visionText?.textBlocks?.map { block ->
+                    val box = block.boundingBox
+                    val normBox = if (box != null && bitmap.width > 0 && bitmap.height > 0) {
+                        RectF(
+                            (box.left.toFloat() / bitmap.width).coerceIn(0f, 1f),
+                            (box.top.toFloat() / bitmap.height).coerceIn(0f, 1f),
+                            (box.right.toFloat() / bitmap.width).coerceIn(0f, 1f),
+                            (box.bottom.toFloat() / bitmap.height).coerceIn(0f, 1f)
+                        )
+                    } else null
+                    MlKitTextBlock(
+                        text = block.text,
+                        normalizedBoundingBox = normBox,
+                        lines = block.lines.map { it.text }
+                    )
+                } ?: emptyList()
+
                 totalBlocks += blockCount
                 totalLines += lineCount
                 totalElements += elementCount
@@ -139,7 +164,8 @@ object MultiLanguageOcrEngine {
                         rawText = recognizedPageText,
                         blockCount = blockCount,
                         lineCount = lineCount,
-                        elementCount = elementCount
+                        elementCount = elementCount,
+                        detailedBlocks = detailedBlocks
                     )
                 )
             }

@@ -727,4 +727,60 @@ object ImageProcessingPdfPipeline {
             null
         }
     }
+
+    /**
+     * Applies a custom text watermark with user-selected text string, opacity, color,
+     * and angle onto all pages of an existing PDF document entirely on-device.
+     */
+    suspend fun applyWatermarkToExistingPdf(
+        context: Context,
+        inputUri: Uri,
+        outputFile: File,
+        config: PdfWatermarkConfig
+    ): Result<File> = withContext(Dispatchers.IO) {
+        runCatching {
+            val pfd = context.contentResolver.openFileDescriptor(inputUri, "r")
+                ?: throw IllegalStateException("Could not open PDF file descriptor")
+            pfd.use { descriptor ->
+                android.graphics.pdf.PdfRenderer(descriptor).use { renderer ->
+                    val totalPages = renderer.pageCount
+                    if (totalPages <= 0) throw IllegalStateException("PDF has 0 pages")
+
+                    val outDoc = PdfDocument()
+                    for (pageIdx in 0 until totalPages) {
+                        renderer.openPage(pageIdx).use { page ->
+                            val pWidth = page.width
+                            val pHeight = page.height
+                            val scale = 2f
+                            val bmpWidth = (pWidth * scale).toInt().coerceIn(600, 2400)
+                            val bmpHeight = (pHeight * scale).toInt().coerceIn(800, 3200)
+                            val pageBitmap = Bitmap.createBitmap(bmpWidth, bmpHeight, Bitmap.Config.ARGB_8888)
+                            pageBitmap.eraseColor(Color.WHITE)
+                            page.render(pageBitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
+                            val pageInfo = PdfDocument.PageInfo.Builder(pWidth, pHeight, pageIdx + 1).create()
+                            val docPage = outDoc.startPage(pageInfo)
+                            val canvas = docPage.canvas
+
+                            val destRect = Rect(0, 0, pWidth, pHeight)
+                            canvas.drawBitmap(pageBitmap, null, destRect, null)
+
+                            if (config.enabled && config.text.isNotBlank() && isPageInWatermarkRange(pageIdx + 1, totalPages, config)) {
+                                drawWatermarkOnCanvas(canvas, pWidth.toFloat(), pHeight.toFloat(), config)
+                            }
+
+                            outDoc.finishPage(docPage)
+                            pageBitmap.recycle()
+                        }
+                    }
+
+                    outputFile.outputStream().use { outStream ->
+                        outDoc.writeTo(outStream)
+                    }
+                    outDoc.close()
+                }
+            }
+            outputFile
+        }
+    }
 }

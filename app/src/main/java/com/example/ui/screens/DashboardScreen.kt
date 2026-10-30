@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -121,7 +122,8 @@ fun DashboardScreen(
     onOpenBatchProcessor: () -> Unit,
     onOpenStorageDashboard: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenSearch: () -> Unit
+    onOpenSearch: () -> Unit,
+    onOpenApryseSuite: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val documents by viewModel.filteredDocuments.collectAsState()
@@ -225,6 +227,12 @@ fun DashboardScreen(
                             isMultiSelectMode = !isMultiSelectMode
                             if (!isMultiSelectMode) selectedDocIds = emptySet()
                         }
+                    ),
+                    DocFlowHeaderAction(
+                        icon = Icons.Filled.Edit,
+                        contentDescription = "Apryse Document Suite",
+                        testTag = "top_apryse_button",
+                        onClick = onOpenApryseSuite
                     ),
                     DocFlowHeaderAction(
                         icon = Icons.Filled.Settings,
@@ -466,8 +474,19 @@ fun DashboardScreen(
                 Spacer(modifier = Modifier.height(DocFlowTokens.space3))
 
                 FabSheetRow(
-                    icon = Icons.Filled.CameraAlt,
+                    icon = Icons.Filled.Edit,
                     iconBg = DocFlowTokens.AccentBlue,
+                    title = "Apryse Office & PDF Suite",
+                    subtitle = "Client-side viewer & editor for PDF, Word (.docx), Excel (.xlsx), PPT (.pptx)",
+                    palette = palette,
+                    onClick = {
+                        showFabSheet = false
+                        onOpenApryseSuite()
+                    }
+                )
+                FabSheetRow(
+                    icon = Icons.Filled.CameraAlt,
+                    iconBg = DocFlowTokens.IconCircleTeal,
                     title = "Scan document (AI Auto Capture)",
                     subtitle = "CameraX batch scanner with auto-edge lock & multi-page preview drawer",
                     palette = palette,

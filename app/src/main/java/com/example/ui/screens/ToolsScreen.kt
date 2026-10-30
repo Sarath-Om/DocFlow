@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.GraphicEq
@@ -142,7 +143,8 @@ fun ToolsScreen(
     onOpenDocument: (String) -> Unit,
     onOpenScanner: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenSearch: () -> Unit
+    onOpenSearch: () -> Unit,
+    onOpenApryseSuite: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -329,6 +331,32 @@ fun ToolsScreen(
                     Spacer(modifier = Modifier.height(DocFlowTokens.space2))
                     DocFlowProgressBar(progress = conversionProgress, palette = palette)
                 }
+            }
+        }
+
+        // =====================================================================
+        // SECTION 0: APRYSE CLIENT-SIDE SUITE
+        // =====================================================================
+        item {
+            DocFlowSectionLabel(text = "Apryse Document Suite", palette = palette)
+            DocFlowCard(
+                palette = palette,
+                contentPadding = PaddingValues(vertical = DocFlowTokens.space1)
+            ) {
+                DocFlowListRow(
+                    title = "Apryse Office & PDF Editor",
+                    subtitle = "100% Client-side on-device viewer & editor for PDF, DOCX, XLSX, PPTX",
+                    palette = palette,
+                    onClick = onOpenApryseSuite,
+                    showChevron = true,
+                    modifier = Modifier.testTag("tools_row_apryse_suite"),
+                    leading = {
+                        DocFlowIconCircle(
+                            icon = Icons.Filled.Edit,
+                            circleColor = DocFlowTokens.AccentBlue
+                        )
+                    }
+                )
             }
         }
 

@@ -125,6 +125,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -134,6 +135,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -157,6 +159,9 @@ import com.example.data.util.ImageProcessingPdfPipeline
 import com.example.data.util.OnDeviceAiAndBackupEngine
 import com.example.data.util.TranslationLanguage
 import com.example.ui.components.AiMicDictationBottomSheet
+import androidx.compose.material.icons.filled.BrandingWatermark
+import androidx.compose.material.icons.filled.DocumentScanner
+import com.example.ui.components.AddWatermarkSheet
 import com.example.ui.components.DocFlowBottomSheet
 import com.example.ui.components.DocFlowCard
 import com.example.ui.components.DocFlowDivider
@@ -166,6 +171,8 @@ import com.example.ui.components.DocFlowListRow
 import com.example.ui.components.DocFlowPrimaryButton
 import com.example.ui.components.DocFlowSecondaryButton
 import com.example.ui.components.DocFlowToast
+import com.example.ui.components.MlKitExtractedTextOverlaySheet
+import com.example.ui.components.MlKitOcrPageBoundingBoxesOverlay
 import com.example.ui.components.MySharedLinksBottomSheet
 import com.example.ui.components.PdfWatermarkExportSheet
 import com.example.ui.components.ShareNoteWithLinkBottomSheet
@@ -173,6 +180,7 @@ import com.example.ui.theme.DocFlowPalette
 import com.example.ui.theme.DocFlowTokens
 import com.example.ui.viewmodel.DocFlowViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -195,6 +203,7 @@ fun DocumentViewerEditorScreen(
     onRequestBiometricSign: (onVerified: () -> Unit) -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val documents by viewModel.filteredDocuments.collectAsState()
     val cachedMap by viewModel.cachedDocumentsMap.collectAsState()
     val privateSafeDocs by viewModel.privateSafeDocuments.collectAsState()
@@ -338,6 +347,14 @@ fun DocumentViewerEditorScreen(
     var showExportVersionsNotesSheet by remember { mutableStateOf(false) }
     var showWatermarkPdfExportSheet by remember { mutableStateOf(false) }
 
+    // Add Watermark & ML Kit Text Recognition States
+    var showAddWatermarkSheet by remember { mutableStateOf(false) }
+    var activeLiveWatermarkConfig by remember { mutableStateOf<com.example.data.util.PdfWatermarkConfig?>(null) }
+    var showOcrOverlaySheet by remember { mutableStateOf(false) }
+    var isRunningMlKitOcr by remember { mutableStateOf(false) }
+    var ocrScanResult by remember { mutableStateOf<com.example.data.util.MlKitOcrScanResult?>(null) }
+    var isLiveOcrBoxesVisible by remember { mutableStateOf(false) }
+
     // Top-right Overflow & Sheets
     var showOverflowMenu by remember { mutableStateOf(false) }
     var showDetailsSheet by remember { mutableStateOf(false) }
@@ -360,6 +377,22 @@ fun DocumentViewerEditorScreen(
     var activeMarkupTool by remember { mutableStateOf<PdfMarkupTool?>(null) }
     var activeStrokeColorHex by remember { mutableStateOf("#FFEB3B") }
     val currentDragPoints = remember { mutableStateListOf<Offset>() }
+
+    fun triggerMlKitOcr() {
+        isRunningMlKitOcr = true
+        viewerToast = "Extracting text with Google ML Kit on-device..."
+        viewModel.recognizeTextFromDocPage(context, doc, currentPageIndex) { result ->
+            isRunningMlKitOcr = false
+            if (result.isSuccess) {
+                ocrScanResult = result.getOrNull()
+                isLiveOcrBoxesVisible = true
+                showOcrOverlaySheet = true
+                viewerToast = "Extracted text on-device (Page ${currentPageIndex + 1})"
+            } else {
+                viewerToast = "Text recognition failed: ${result.exceptionOrNull()?.message}"
+            }
+        }
+    }
 
     // Mark document accessed & save resume page
     LaunchedEffect(doc.id, currentPageIndex) {
@@ -587,6 +620,25 @@ fun DocumentViewerEditorScreen(
                         )
                     }
 
+                    IconButton(
+                        onClick = {
+                            if (ocrScanResult != null) {
+                                showOcrOverlaySheet = true
+                            } else {
+                                triggerMlKitOcr()
+                            }
+                        },
+                        modifier = Modifier
+                            .size(DocFlowTokens.minTouchTarget)
+                            .testTag("viewer_top_ocr_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.DocumentScanner,
+                            contentDescription = "Extract Text with ML Kit",
+                            tint = if (ocrScanResult != null) DocFlowTokens.AccentBlue else palette.textPrimary
+                        )
+                    }
+
                     Box {
                         IconButton(
                             onClick = { showOverflowMenu = true },
@@ -610,6 +662,20 @@ fun DocumentViewerEditorScreen(
                                 onClick = {
                                     showOverflowMenu = false
                                     showDetailsSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Add Watermark to All Pages") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showAddWatermarkSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Extract Text (Google ML Kit OCR)") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    triggerMlKitOcr()
                                 }
                             )
                             DropdownMenuItem(
@@ -1081,14 +1147,60 @@ fun DocumentViewerEditorScreen(
                                         }
 
                                         if (bmp != null) {
-                                            Image(
-                                                bitmap = bmp.asImageBitmap(),
-                                                contentDescription = "PDF Page ${index + 1}",
+                                            Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .height((420f * zoomScale).dp),
-                                                contentScale = ContentScale.Fit
-                                            )
+                                                    .height((420f * zoomScale).dp)
+                                            ) {
+                                                Image(
+                                                    bitmap = bmp.asImageBitmap(),
+                                                    contentDescription = "PDF Page ${index + 1}",
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Fit
+                                                )
+
+                                                // Live Watermark Overlay across all pages
+                                                activeLiveWatermarkConfig?.let { wmConfig ->
+                                                    if (wmConfig.enabled && wmConfig.text.isNotBlank()) {
+                                                        Canvas(modifier = Modifier.fillMaxSize()) {
+                                                            val baseColor = runCatching {
+                                                                android.graphics.Color.parseColor(wmConfig.colorHex)
+                                                            }.getOrDefault(android.graphics.Color.GRAY)
+                                                            val alphaVal = ((wmConfig.opacityPercent.coerceIn(5, 100) / 100f) * 255f).toInt().coerceIn(12, 255)
+                                                            val wmPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                                                color = android.graphics.Color.argb(
+                                                                    alphaVal,
+                                                                    android.graphics.Color.red(baseColor),
+                                                                    android.graphics.Color.green(baseColor),
+                                                                    android.graphics.Color.blue(baseColor)
+                                                                )
+                                                                textSize = (wmConfig.fontSizeSp * zoomScale).coerceIn(16f, 80f)
+                                                                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+                                                                textAlign = android.graphics.Paint.Align.CENTER
+                                                            }
+                                                            drawContext.canvas.nativeCanvas.save()
+                                                            drawContext.canvas.nativeCanvas.translate(size.width / 2f, size.height / 2f)
+                                                            drawContext.canvas.nativeCanvas.rotate(wmConfig.rotationDegrees.toFloat())
+                                                            drawContext.canvas.nativeCanvas.drawText(wmConfig.text, 0f, 0f, wmPaint)
+                                                            drawContext.canvas.nativeCanvas.restore()
+                                                        }
+                                                    }
+                                                }
+
+                                                // Live ML Kit OCR Bounding Boxes on current image-based PDF page
+                                                if (isLiveOcrBoxesVisible && ocrScanResult != null && index == currentPageIndex) {
+                                                    val pageDetail = ocrScanResult?.pages?.find { it.pageNumber == index + 1 }
+                                                    if (pageDetail != null && pageDetail.detailedBlocks.isNotEmpty()) {
+                                                        MlKitOcrPageBoundingBoxesOverlay(
+                                                            detailedBlocks = pageDetail.detailedBlocks,
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            onBlockCopied = { snippet ->
+                                                                viewerToast = "Copied text snippet"
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         } else if (pageText.isBlank()) {
                                             Text(
                                                 text = "Tap Edit to start typing",
@@ -1490,6 +1602,28 @@ fun DocumentViewerEditorScreen(
                                 onClick = {
                                     activeMarkupTool = if (activeMarkupTool == PdfMarkupTool.PEN) null else PdfMarkupTool.PEN
                                     activeStrokeColorHex = "#1F6BFF"
+                                }
+                            )
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.BrandingWatermark,
+                                label = "Watermark",
+                                active = activeLiveWatermarkConfig != null,
+                                palette = palette,
+                                modifier = Modifier.testTag("viewer_bottom_add_watermark"),
+                                onClick = { showAddWatermarkSheet = true }
+                            )
+                            ViewerBottomActionButton(
+                                icon = Icons.Filled.DocumentScanner,
+                                label = if (isRunningMlKitOcr) "Extracting..." else "Live Text",
+                                active = showOcrOverlaySheet || isLiveOcrBoxesVisible,
+                                palette = palette,
+                                modifier = Modifier.testTag("viewer_bottom_live_ocr"),
+                                onClick = {
+                                    if (ocrScanResult != null) {
+                                        showOcrOverlaySheet = true
+                                    } else {
+                                        triggerMlKitOcr()
+                                    }
                                 }
                             )
                             ViewerBottomActionButton(
@@ -2071,6 +2205,61 @@ fun DocumentViewerEditorScreen(
                 ) {
                     viewerToast = "Exported PDF${if (wmConfig.enabled) " with '${wmConfig.text}' watermark" else ""} on this device"
                 }
+            }
+        )
+    }
+
+    // Dedicated 'Add Watermark' Tool Sheet (Overlay onto all pages of document)
+    if (showAddWatermarkSheet) {
+        AddWatermarkSheet(
+            palette = palette,
+            documentTitle = documentTitle,
+            initialConfig = activeLiveWatermarkConfig ?: com.example.data.util.PdfWatermarkConfig(
+                enabled = true,
+                text = "CONFIDENTIAL",
+                opacityPercent = 25
+            ),
+            onDismiss = { showAddWatermarkSheet = false },
+            onApplyWatermark = { wmConfig ->
+                showAddWatermarkSheet = false
+                activeLiveWatermarkConfig = wmConfig
+                viewerToast = "Applying watermark '${wmConfig.text}' (${wmConfig.opacityPercent}% opacity) to all pages..."
+                viewModel.applyWatermarkToExistingDocument(context, doc, wmConfig) { res ->
+                    if (res.isSuccess) {
+                        viewerToast = "Watermark applied to all pages • Stored on this device"
+                        coroutineScope.launch {
+                            val updatedUri = viewModel.getRealDocumentUri(context, doc)
+                            if (updatedUri != null) {
+                                val map = mutableMapOf<Int, Bitmap>()
+                                for (idx in 0 until totalPages.coerceAtMost(8)) {
+                                    val bmp = FileParserUtils.renderPdfPage(context, updatedUri, idx)
+                                    if (bmp != null) map[idx] = bmp
+                                }
+                                renderedPdfBitmaps = map
+                            }
+                        }
+                    } else {
+                        viewerToast = "Watermark failed: ${res.exceptionOrNull()?.message}"
+                    }
+                }
+            }
+        )
+    }
+
+    // Google ML Kit Text Recognition Bottom Sheet & Copy Overlay
+    if (showOcrOverlaySheet && ocrScanResult != null) {
+        MlKitExtractedTextOverlaySheet(
+            palette = palette,
+            scanResult = ocrScanResult!!,
+            currentPageIndex = currentPageIndex,
+            onDismiss = { showOcrOverlaySheet = false },
+            onAddToNotes = { extractedText ->
+                viewModel.addDocumentComment(
+                    doc = doc,
+                    anchorLineOrText = "ML Kit On-Device OCR",
+                    body = extractedText
+                )
+                viewerToast = "Extracted text added to document notes"
             }
         )
     }

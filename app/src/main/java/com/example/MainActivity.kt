@@ -73,6 +73,11 @@ import com.example.ui.theme.DocFlowTokens
 import com.example.ui.viewmodel.DocFlowViewModel
 import com.example.ui.viewmodel.ThemeMode
 import com.example.ui.viewmodel.UiState
+import com.example.data.model.ApryseDocumentModel
+import com.example.data.repository.DocumentRepositoryImpl
+import com.example.ui.screens.DocumentViewerScreen
+import com.example.ui.screens.MainDashboardScreen
+import com.example.ui.viewmodel.DocumentViewModel
 import com.example.widget.DocFlowAppWidgetProvider
 
 enum class BottomNavTab(
@@ -108,6 +113,8 @@ sealed interface AppScreen {
     data object Scanner : AppScreen
     data object BatchProcessor : AppScreen
     data class DocumentDetail(val documentId: String) : AppScreen
+    data object ApryseDashboard : AppScreen
+    data class ApryseViewer(val document: ApryseDocumentModel) : AppScreen
 }
 
 class MainActivity : FragmentActivity() {
@@ -347,6 +354,13 @@ private fun OfflineDocFlowWorkspace(
         return
     }
 
+    val apryseRepo = remember(context) { DocumentRepositoryImpl(context) }
+    val apryseViewModel: DocumentViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer { DocumentViewModel(apryseRepo) }
+        }
+    )
+
     when (val screen = currentScreen) {
         is AppScreen.MainTabs -> {
             BackHandler(enabled = activeTab != BottomNavTab.RECENT) {
@@ -386,6 +400,9 @@ private fun OfflineDocFlowWorkspace(
                                 onOpenSettings = { currentScreen = AppScreen.Settings },
                                 onOpenSearch = {
                                     activeTab = BottomNavTab.RECENT
+                                },
+                                onOpenApryseSuite = {
+                                    currentScreen = AppScreen.ApryseDashboard
                                 }
                             )
                         }
@@ -402,6 +419,9 @@ private fun OfflineDocFlowWorkspace(
                                 onOpenSettings = { currentScreen = AppScreen.Settings },
                                 onOpenSearch = {
                                     activeTab = BottomNavTab.RECENT
+                                },
+                                onOpenApryseSuite = {
+                                    currentScreen = AppScreen.ApryseDashboard
                                 }
                             )
                         }
@@ -513,6 +533,25 @@ private fun OfflineDocFlowWorkspace(
                         onError = { _ -> onVerified() }
                     )
                 }
+            )
+        }
+
+        is AppScreen.ApryseDashboard -> {
+            BackHandler { currentScreen = AppScreen.MainTabs }
+            MainDashboardScreen(
+                viewModel = apryseViewModel,
+                onOpenDocumentViewer = { doc ->
+                    currentScreen = AppScreen.ApryseViewer(doc)
+                }
+            )
+        }
+
+        is AppScreen.ApryseViewer -> {
+            BackHandler { currentScreen = AppScreen.ApryseDashboard }
+            DocumentViewerScreen(
+                document = screen.document,
+                viewModel = apryseViewModel,
+                onNavigateBack = { currentScreen = AppScreen.ApryseDashboard }
             )
         }
     }
