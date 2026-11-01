@@ -176,6 +176,7 @@ import com.example.ui.components.MlKitOcrPageBoundingBoxesOverlay
 import com.example.ui.components.MySharedLinksBottomSheet
 import com.example.ui.components.PdfWatermarkExportSheet
 import com.example.ui.components.ShareNoteWithLinkBottomSheet
+import com.example.ui.components.VersionHistorySheet
 import com.example.ui.theme.DocFlowPalette
 import com.example.ui.theme.DocFlowTokens
 import com.example.ui.viewmodel.DocFlowViewModel
@@ -345,6 +346,7 @@ fun DocumentViewerEditorScreen(
     var shareLinkTargetNote by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showMySharedLinksSheet by remember { mutableStateOf(false) }
     var showExportVersionsNotesSheet by remember { mutableStateOf(false) }
+    var showVersionHistorySheet by remember { mutableStateOf(false) }
     var showWatermarkPdfExportSheet by remember { mutableStateOf(false) }
 
     // Add Watermark & ML Kit Text Recognition States
@@ -367,6 +369,13 @@ fun DocumentViewerEditorScreen(
     var showPageGridSheet by remember { mutableStateOf(false) }
     var showUnsavedExitDialog by remember { mutableStateOf(false) }
     var viewerToast by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(viewerToast) {
+        if (viewerToast != null) {
+            delay(3200L)
+            viewerToast = null
+        }
+    }
 
     // PDF Viewer State
     val annotations by viewModel.observeDocumentAnnotations(doc.id).collectAsState(initial = emptyList())
@@ -1641,6 +1650,13 @@ fun DocumentViewerEditorScreen(
                                 onClick = { showCommentsSheet = true }
                             )
                             ViewerBottomActionButton(
+                                icon = Icons.Filled.History,
+                                label = "Versions",
+                                active = false,
+                                palette = palette,
+                                onClick = { showVersionHistorySheet = true }
+                            )
+                            ViewerBottomActionButton(
                                 icon = Icons.Filled.Mic,
                                 label = "AI Mic",
                                 active = false,
@@ -1671,7 +1687,7 @@ fun DocumentViewerEditorScreen(
                                 active = false,
                                 palette = palette,
                                 modifier = Modifier.weight(1f).testTag("viewer_bottom_versions"),
-                                onClick = { showExportVersionsNotesSheet = true }
+                                onClick = { showVersionHistorySheet = true }
                             )
                             ViewerBottomActionButton(
                                 icon = Icons.Filled.Notes,
@@ -2035,6 +2051,10 @@ fun DocumentViewerEditorScreen(
                                 onClick = {
                                     viewModel.exportCommentOrNoteAsPdf(context, doc, comment)
                                     showCommentsSheet = false
+                                    val authorInfo = if (comment.authorName.isNotBlank()) " by ${comment.authorName}" else ""
+                                    val msg = "Successfully exported note$authorInfo to PDF • Stored on this device"
+                                    viewerToast = msg
+                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                 }
                             ) {
                                 Icon(Icons.Filled.PictureAsPdf, contentDescription = "Export Note to PDF", tint = DocFlowTokens.IconCircleRed)
@@ -2176,7 +2196,9 @@ fun DocumentViewerEditorScreen(
                         launchShareSheet = true,
                         onExported = { _, outTitle, _ ->
                             showExportVersionsNotesSheet = false
-                            viewerToast = "Exported '$outTitle' to PDF • Stored on this device"
+                            val msg = "Successfully exported '$outTitle' to PDF • Stored on this device"
+                            viewerToast = msg
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                         }
                     )
                 },
@@ -2203,8 +2225,49 @@ fun DocumentViewerEditorScreen(
                     sourceDoc = doc.copy(title = documentTitle, content = editableContent),
                     watermarkConfig = wmConfig
                 ) {
-                    viewerToast = "Exported PDF${if (wmConfig.enabled) " with '${wmConfig.text}' watermark" else ""} on this device"
+                    val msg = "Successfully exported '$documentTitle' to PDF${if (wmConfig.enabled) " with '${wmConfig.text}' watermark" else ""} • Stored on this device"
+                    viewerToast = msg
+                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                 }
+            }
+        )
+    }
+
+    // Dedicated 'Version History' UI Component (Displays file snapshots, restore previous versions, export as PDF)
+    if (showVersionHistorySheet) {
+        VersionHistorySheet(
+            palette = palette,
+            document = doc,
+            versions = versionsForDoc,
+            canRestore = true,
+            onDismiss = { showVersionHistorySheet = false },
+            onCreateNamedVersion = { label ->
+                viewModel.saveNewVersionSnapshot(
+                    doc = doc,
+                    plainContent = editableContent,
+                    versionLabel = label
+                )
+                viewerToast = "Created named snapshot '$label'"
+            },
+            onRestoreVersion = { versionToRestore ->
+                viewModel.restoreVersionSnapshot(
+                    doc = doc,
+                    version = versionToRestore,
+                    password = null
+                ) { restoredText ->
+                    pushEditContent(restoredText)
+                    viewerToast = "Restored version v${versionToRestore.versionNumber} • Stored on this device"
+                }
+            },
+            onExportVersionAsPdf = { versionToExport ->
+                viewModel.exportVersionSnapshotAsPdf(
+                    context = context,
+                    doc = doc,
+                    version = versionToExport
+                )
+                val msg = "Successfully exported version v${versionToExport.versionNumber} ('${versionToExport.versionLabel}') as PDF • Stored on this device"
+                viewerToast = msg
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
             }
         )
     }

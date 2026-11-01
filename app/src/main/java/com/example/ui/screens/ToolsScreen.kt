@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BrandingWatermark
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -102,6 +103,7 @@ import com.example.data.util.OnDeviceAiAndBackupEngine
 import com.example.data.util.PdfWatermarkConfig
 import com.example.data.util.TranslationLanguage
 import com.example.ui.components.AiMicDictationBottomSheet
+import com.example.ui.components.ApryseWatermarkToolSheet
 import com.example.ui.components.DocFlowCard
 import com.example.ui.components.DocFlowDivider
 import com.example.ui.components.DocFlowEmptyState
@@ -159,6 +161,8 @@ fun ToolsScreen(
     var showExportVersionsNotesSheet by remember { mutableStateOf(false) }
     var showWatermarkSheetForPendingAction by remember { mutableStateOf<((PdfWatermarkConfig) -> Unit)?>(null) }
     var watermarkSheetTitle by remember { mutableStateOf("Document") }
+    var showApryseWatermarkSheet by remember { mutableStateOf(false) }
+    var apryseWatermarkSelectedDoc by remember { mutableStateOf<DocEntity?>(null) }
 
     // Progress & Cancelable Conversion State
     var isConverting by remember { mutableStateOf(false) }
@@ -166,6 +170,16 @@ fun ToolsScreen(
     var conversionStatusLabel by remember { mutableStateOf("") }
     var conversionCancelled by remember { mutableStateOf(false) }
     var conversionSuccess by remember { mutableStateOf<ConversionSuccessState?>(null) }
+
+    LaunchedEffect(conversionSuccess) {
+        conversionSuccess?.let { success ->
+            Toast.makeText(
+                context,
+                "Successfully exported '${success.outputTitle}' to ${success.outputFormat} • Stored on this device",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
 
     // Image to PDF State
     val pickedImages = remember { mutableStateListOf<PickedImagePage>() }
@@ -353,6 +367,30 @@ fun ToolsScreen(
                     leading = {
                         DocFlowIconCircle(
                             icon = Icons.Filled.Edit,
+                            circleColor = DocFlowTokens.AccentBlue
+                        )
+                    }
+                )
+
+                DocFlowDivider(
+                    palette = palette,
+                    modifier = Modifier.padding(horizontal = DocFlowTokens.cardPaddingMin)
+                )
+
+                // Dedicated 'Watermark' tool in the Tools module using Apryse SDK
+                DocFlowListRow(
+                    title = "Watermark (Apryse SDK)",
+                    subtitle = "Programmatically stamp text with custom opacity, position & rotation on background thread",
+                    palette = palette,
+                    onClick = {
+                        apryseWatermarkSelectedDoc = documents.firstOrNull { it.fileType == "pdf" }
+                        showApryseWatermarkSheet = true
+                    },
+                    showChevron = true,
+                    modifier = Modifier.testTag("tool_card_apryse_watermark"),
+                    leading = {
+                        DocFlowIconCircle(
+                            icon = Icons.Filled.BrandingWatermark,
                             circleColor = DocFlowTokens.AccentBlue
                         )
                     }
@@ -1942,5 +1980,59 @@ fun ToolsScreen(
                 Spacer(modifier = Modifier.height(DocFlowTokens.space5))
             }
         }
+    }
+
+    // Dedicated 'Watermark' tool Sheet using Apryse SDK on background thread
+    if (showApryseWatermarkSheet) {
+        ApryseWatermarkToolSheet(
+            palette = palette,
+            availableDocuments = documents,
+            initialDocument = apryseWatermarkSelectedDoc,
+            onResolveDocUri = { docToResolve -> viewModel.getRealDocumentUri(context, docToResolve) },
+            onDismiss = { showApryseWatermarkSheet = false },
+            onApplyWatermark = { doc, externalUri, title, options, onFinished ->
+                if (doc != null) {
+                    viewModel.applyApryseWatermarkToDocument(
+                        context = context,
+                        doc = doc,
+                        options = options,
+                        createAsNewCopy = true
+                    ) { result ->
+                        if (result.isSuccess) {
+                            val watermarked = result.getOrThrow()
+                            onFinished(true)
+                            conversionSuccess = ConversionSuccessState(
+                                createdDocId = watermarked.id,
+                                outputTitle = watermarked.title,
+                                outputFormat = "PDF (Watermarked)",
+                                summaryDetail = "Applied watermark '${options.text}' (${options.opacityPercent}% opacity, ${options.position.label}) via Apryse SDK on background thread • Saved to device"
+                            )
+                        } else {
+                            onFinished(false)
+                        }
+                    }
+                } else if (externalUri != null) {
+                    viewModel.applyApryseWatermarkToUri(
+                        context = context,
+                        inputUri = externalUri,
+                        title = title,
+                        options = options
+                    ) { result ->
+                        if (result.isSuccess) {
+                            val watermarked = result.getOrThrow()
+                            onFinished(true)
+                            conversionSuccess = ConversionSuccessState(
+                                createdDocId = watermarked.id,
+                                outputTitle = watermarked.title,
+                                outputFormat = "PDF (Watermarked)",
+                                summaryDetail = "Applied watermark '${options.text}' (${options.opacityPercent}% opacity, ${options.position.label}) via Apryse SDK on background thread • Saved to device"
+                            )
+                        } else {
+                            onFinished(false)
+                        }
+                    }
+                }
+            }
+        )
     }
 }

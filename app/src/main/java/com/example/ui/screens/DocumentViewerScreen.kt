@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -144,14 +145,28 @@ fun DocumentViewerScreen(
             }
         )
     ) { uri: Uri? ->
-        uri?.let { viewModel.saveDocument(it) }
+        uri?.let {
+            viewModel.saveDocument(it)
+            val msg = "Successfully saved '${document.title}' • Stored on this device"
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            scope.launch {
+                snackbarHostState.showSnackbar(msg)
+            }
+        }
     }
 
     // SAF PDF Exporter: exports any document format to PDF
     val exportPdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/pdf")
     ) { uri: Uri? ->
-        uri?.let { viewModel.exportAsPdf(it) }
+        uri?.let {
+            viewModel.exportAsPdf(it)
+            val msg = "Successfully exported '${document.title}' to PDF • Stored on this device"
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            scope.launch {
+                snackbarHostState.showSnackbar(msg)
+            }
+        }
     }
 
     Scaffold(
@@ -373,7 +388,9 @@ fun DocumentViewerScreen(
                         config = config
                     )
                     if (res.isSuccess) {
-                        snackbarHostState.showSnackbar("Watermark '${config.text}' (${config.opacityPercent}% opacity) applied to all pages • Stored on this device")
+                        val msg = "Watermark '${config.text}' (${config.opacityPercent}% opacity) applied to all pages • Stored on this device"
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        snackbarHostState.showSnackbar(msg)
                     } else {
                         snackbarHostState.showSnackbar("Watermark failed: ${res.exceptionOrNull()?.message}")
                     }

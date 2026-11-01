@@ -2067,6 +2067,174 @@ class DocFlowViewModel(
     }
 
     /**
+     * Programmatically applies a custom text watermark with opacity and position settings
+     * using the Apryse SDK on a background thread.
+     */
+    fun applyApryseWatermarkToDocument(
+        context: Context,
+        doc: DocEntity,
+        options: com.example.data.util.ApryseWatermarkOptions,
+        createAsNewCopy: Boolean = true,
+        onComplete: (Result<DocEntity>) -> Unit
+    ) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                var inputUri: Uri? = getRealDocumentUri(context, doc)
+                if (inputUri == null) {
+                    val tempExport = PdfLibAnnotationEngine.exportAnnotatedPdf(
+                        context = context,
+                        document = doc,
+                        plainContent = doc.content,
+                        annotations = emptyList(),
+                        isBiometricSigned = false,
+                        signerName = "Local Device Owner",
+                        signerEmail = ""
+                    ).getOrNull()
+                    inputUri = tempExport?.shareUri
+                }
+
+                if (inputUri == null) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onComplete(Result.failure(IllegalStateException("Local PDF file not accessible for Apryse watermarking")))
+                    }
+                    return@launch
+                }
+
+                val outDir = java.io.File(context.filesDir, "apryse_watermarked").apply { if (!exists()) mkdirs() }
+                val cleanTitle = doc.title.replace(Regex("[^a-zA-Z0-9._-]"), "_").ifBlank { "doc" }
+                val outFile = java.io.File(outDir, "${cleanTitle}_apryse_wm_${System.currentTimeMillis()}.pdf")
+
+                val result = com.example.data.util.ApryseWatermarkEngine.applyWatermark(
+                    context = context,
+                    inputUri = inputUri,
+                    outputFile = outFile,
+                    options = options
+                )
+
+                if (result.isSuccess) {
+                    val savedFile = result.getOrThrow()
+                    val savedUri = Uri.fromFile(savedFile)
+                    val cached = cachedDocumentsMap.value[doc.id]
+
+                    val finalDocId = if (createAsNewCopy) UUID.randomUUID().toString() else doc.id
+                    val finalTitle = if (createAsNewCopy) "${doc.title} (Watermarked)" else doc.title
+
+                    val targetEntity = CachedDocumentEntity(
+                        id = finalDocId,
+                        userId = currentUserId,
+                        title = finalTitle,
+                        folderId = doc.folderId,
+                        category = doc.category,
+                        fileType = "pdf",
+                        fileName = savedFile.name,
+                        fileSize = savedFile.length(),
+                        content = doc.content,
+                        contentPreview = CachedDocumentEntity.buildPreview(doc.content, doc.isEncrypted),
+                        tags = cached?.tags ?: CachedDocumentEntity.defaultTagsFor(finalTitle, doc.category, "pdf"),
+                        localFilePath = savedFile.absolutePath,
+                        isEncrypted = doc.isEncrypted,
+                        encryptionKeyHint = doc.encryptionKeyHint,
+                        isOfflineCached = true,
+                        pageCount = doc.pageCount,
+                        syncState = SyncState.LOCAL_ONLY.name
+                    )
+
+                    dao?.upsertDocument(targetEntity)
+
+                    val updatedUris = _localDocumentUris.value.toMutableMap()
+                    updatedUris[finalDocId] = savedUri
+                    _localDocumentUris.value = updatedUris
+
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        _statusBannerMessage.value = "Apryse Watermark '${options.text}' applied (${options.opacityPercent}% opacity, ${options.position.label}) • Background thread"
+                        onComplete(Result.success(targetEntity.toDocEntity()))
+                    }
+                } else {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onComplete(Result.failure(result.exceptionOrNull() ?: Exception("Apryse watermark operation failed")))
+                    }
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onComplete(Result.failure(e))
+                }
+            }
+        }
+    }
+
+    /**
+     * Programmatically applies a custom text watermark to any external PDF URI using the Apryse SDK on a background thread.
+     */
+    fun applyApryseWatermarkToUri(
+        context: Context,
+        inputUri: Uri,
+        title: String,
+        options: com.example.data.util.ApryseWatermarkOptions,
+        onComplete: (Result<DocEntity>) -> Unit
+    ) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val outDir = java.io.File(context.filesDir, "apryse_watermarked").apply { if (!exists()) mkdirs() }
+                val cleanTitle = title.replace(Regex("[^a-zA-Z0-9._-]"), "_").ifBlank { "doc" }
+                val outFile = java.io.File(outDir, "${cleanTitle}_apryse_wm_${System.currentTimeMillis()}.pdf")
+
+                val result = com.example.data.util.ApryseWatermarkEngine.applyWatermark(
+                    context = context,
+                    inputUri = inputUri,
+                    outputFile = outFile,
+                    options = options
+                )
+
+                if (result.isSuccess) {
+                    val savedFile = result.getOrThrow()
+                    val savedUri = Uri.fromFile(savedFile)
+                    val newId = UUID.randomUUID().toString()
+                    val finalTitle = if (title.endsWith(" (Watermarked)", ignoreCase = true)) title else "$title (Watermarked)"
+
+                    val targetEntity = CachedDocumentEntity(
+                        id = newId,
+                        userId = currentUserId,
+                        title = finalTitle,
+                        folderId = "root",
+                        category = "Work",
+                        fileType = "pdf",
+                        fileName = savedFile.name,
+                        fileSize = savedFile.length(),
+                        content = "[Watermarked PDF generated via Apryse SDK on background thread]",
+                        contentPreview = "Watermark: ${options.text} (${options.opacityPercent}% opacity, ${options.position.label})",
+                        tags = "pdf, watermark, apryse",
+                        localFilePath = savedFile.absolutePath,
+                        isEncrypted = false,
+                        encryptionKeyHint = null,
+                        isOfflineCached = true,
+                        pageCount = 1,
+                        syncState = SyncState.LOCAL_ONLY.name
+                    )
+
+                    dao?.upsertDocument(targetEntity)
+
+                    val updatedUris = _localDocumentUris.value.toMutableMap()
+                    updatedUris[newId] = savedUri
+                    _localDocumentUris.value = updatedUris
+
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        _statusBannerMessage.value = "Apryse Watermark '${options.text}' applied (${options.opacityPercent}% opacity) • Saved to device"
+                        onComplete(Result.success(targetEntity.toDocEntity()))
+                    }
+                } else {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onComplete(Result.failure(result.exceptionOrNull() ?: Exception("Apryse watermark operation failed")))
+                    }
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onComplete(Result.failure(e))
+                }
+            }
+        }
+    }
+
+    /**
      * Integrates Google ML Kit on-device Text Recognition to process image-based PDF pages,
      * extracting text blocks with normalized coordinates for copy overlays.
      */

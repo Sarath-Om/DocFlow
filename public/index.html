@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DocFlow — Download Android APK</title>
+  <style>
+    :root {
+      --primary: #1A73E8;
+      --primary-dark: #1557B0;
+      --bg: #F8F9FA;
+      --surface: #FFFFFF;
+      --text: #202124;
+      --text-secondary: #5F6368;
+      --border: #DADCE0;
+      --success: #1E8E3E;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 24px; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; max-width: 540px; width: 100%; padding: 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06); text-align: center; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 999px; background: #E8F0FE; color: var(--primary); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    h1 { font-size: 26px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    p.sub { color: var(--text-secondary); font-size: 14px; line-height: 1.5; margin-bottom: 24px; }
+    .download-btn { display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--primary); color: white; text-decoration: none; font-size: 16px; font-weight: 600; padding: 14px 24px; border-radius: 10px; transition: background 0.2s; box-shadow: 0 2px 6px rgba(26,115,232,0.3); margin-bottom: 12px; }
+    .download-btn:hover { background: var(--primary-dark); }
+    .secondary-btn { display: inline-block; color: var(--primary); text-decoration: none; font-size: 14px; font-weight: 500; padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 24px; }
+    .secondary-btn:hover { background: #f1f3f4; }
+    .info-box { background: #F8F9FA; border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: left; font-size: 13px; line-height: 1.6; margin-bottom: 20px; }
+    .info-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #E0E0E0; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: var(--text-secondary); }
+    .info-val { font-weight: 600; font-family: monospace; word-break: break-all; }
+    .steps { text-align: left; background: #FFF8E1; border: 1px solid #FFE082; border-radius: 10px; padding: 16px; font-size: 13px; line-height: 1.5; color: #5D4037; }
+    .steps ol { padding-left: 20px; margin-top: 6px; }
+    .steps li { margin-bottom: 4px; }
+    .status-pill { display: inline-flex; align-items: center; gap: 6px; color: var(--success); font-weight: 600; font-size: 13px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">Verified Clean Build</div>
+    <h1>DocFlow Android APK</h1>
+    <p class="sub">Complete document suite with Apryse SDK, on-device ML Kit OCR, PDF watermarking, version history snapshots, and note exports.</p>
+
+    <a href="/DocFlow.apk" download="DocFlow.apk" class="download-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      Download DocFlow.apk (314 MB)
+    </a>
+
+    <a href="/app-debug.apk" download="app-debug.apk" class="secondary-btn">Alternative Link (app-debug.apk)</a>
+
+    <div class="info-box">
+      <div class="info-row"><span class="info-label">Package:</span><span class="info-val">com.aistudio.docflow.kznm</span></div>
+      <div class="info-row"><span class="info-label">Version:</span><span class="info-val">1.0 (code 1)</span></div>
+      <div class="info-row"><span class="info-label">Target SDK:</span><span class="info-val">Android 16 (API 36)</span></div>
+      <div class="info-row"><span class="info-label">Min SDK:</span><span class="info-val">Android 7.0 (API 24+)</span></div>
+      <div class="info-row"><span class="info-label">Signature:</span><span class="info-val">APK Scheme v2 (Signed)</span></div>
+      <div class="info-row"><span class="info-label">SHA-256:</span><span class="info-val" style="font-size:10px;">55bccd5153a3284425dbade71962baf973b4692c80b50788f9f59da05ad0e5f4</span></div>
+    </div>
+
+    <div class="steps">
+      <strong>How to install on Android:</strong>
+      <ol>
+        <li>Tap <strong>Download</strong> and wait for the file to finish downloading completely.</li>
+        <li>Open your browser's Downloads or File Manager and tap <code>DocFlow.apk</code>.</li>
+        <li>If prompted with <em>"Install unknown apps"</em>, tap <strong>Settings</strong> and switch on <strong>Allow from this source</strong>.</li>
+        <li>Tap <strong>Install</strong> to complete installation.</li>
+      </ol>
+    </div>
+
+    <div class="status-pill">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+      Integrity Verified via apksigner & aapt2
+    </div>
+  </div>
+</body>
+</html>

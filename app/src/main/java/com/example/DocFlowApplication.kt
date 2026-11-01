@@ -28,10 +28,8 @@ class DocFlowApplication : MultiDexApplication() {
             Log.i(TAG, "Apryse PDFNet initialized successfully")
 
             PDFNet.enableJavaScript(true)
-        } catch (e: PDFNetException) {
-            Log.e(TAG, "Failed to initialize Apryse PDFNet", e)
-        } catch (e: Exception) {
-            Log.e(TAG, "Unexpected error initializing Apryse SDK", e)
+        } catch (t: Throwable) {
+            Log.w(TAG, "Apryse PDFNet native initialization skipped or unavailable in current runtime: ${t.message}")
         }
     }
 
